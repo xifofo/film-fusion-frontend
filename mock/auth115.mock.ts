@@ -72,7 +72,7 @@ export default {
 
   // 完成授权
   'POST /api/auth/115/complete': (req: any, res: any) => {
-    const { session_id } = req.body;
+    const { session_id, storage_id } = req.body;
 
     if (!session_id) {
       return res.status(400).json({
@@ -80,15 +80,31 @@ export default {
       });
     }
 
-    // 模拟完成授权并返回存储信息
-    const storageId = Math.floor(Math.random() * 1000) + 1;
-
-    res.json({
-      message: '授权完成，配置已保存',
-      storage_id: storageId,
-      access_token: 'access_token_***_hidden',
-      refresh_token: 'refresh_token_***_hidden',
-      expires_in: 7200
-    });
+    if (storage_id) {
+      // 如果传递了storage_id，表示是重新登录，更新现有记录
+      res.json({
+        code: 0,
+        message: '重新登录成功，令牌已更新',
+        data: {
+          storage_id: storage_id,
+          access_token: `updated_access_token_${Date.now()}`,
+          refresh_token: `updated_refresh_token_${Date.now()}`,
+          expires_in: 7200
+        }
+      });
+    } else {
+      // 如果没有传递storage_id，表示是首次授权，创建新记录
+      const newStorageId = Math.floor(Math.random() * 1000) + 1;
+      res.json({
+        code: 0,
+        message: '授权完成，配置已保存',
+        data: {
+          storage_id: newStorageId,
+          access_token: `new_access_token_${Date.now()}`,
+          refresh_token: `new_refresh_token_${Date.now()}`,
+          expires_in: 7200
+        }
+      });
+    }
   }
 };

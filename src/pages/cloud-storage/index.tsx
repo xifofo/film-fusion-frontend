@@ -20,12 +20,15 @@ import {
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
+import ReloginModal from './components/ReloginModal';
 
 const CloudStorageList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
 
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<API.CloudStorage>();
+  const [showRelogin, setShowRelogin] = useState<boolean>(false);
+  const [reloginRow, setReloginRow] = useState<API.CloudStorage>();
 
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -247,7 +250,7 @@ const CloudStorageList: React.FC = () => {
     {
       title: '操作',
       dataIndex: 'option',
-      width: 300,
+      width: 400,
       valueType: 'option',
       fixed: 'right',
       render: (_, record) => [
@@ -257,6 +260,17 @@ const CloudStorageList: React.FC = () => {
           onOk={actionRef.current?.reload}
           values={record}
         />,
+        <Tooltip key="relogin" title="重新配置云盘授权信息">
+          <a
+            style={{ color: '#1890ff' }}
+            onClick={() => {
+              setReloginRow(record);
+              setShowRelogin(true);
+            }}
+          >
+            重新登录
+          </a>
+        </Tooltip>,
         <Popconfirm
           key="delete"
           title="确定删除这个云存储配置吗？"
@@ -321,6 +335,20 @@ const CloudStorageList: React.FC = () => {
           />
         )}
       </Drawer>
+
+      {reloginRow && (
+        <ReloginModal
+          open={showRelogin}
+          onCancel={() => {
+            setShowRelogin(false);
+            setReloginRow(undefined);
+          }}
+          onSuccess={() => {
+            actionRef.current?.reload?.();
+          }}
+          cloudStorage={reloginRow}
+        />
+      )}
     </PageContainer>
   );
 };

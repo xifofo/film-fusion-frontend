@@ -27,6 +27,7 @@ export interface Auth115StatusData {
 
 export interface Auth115CompleteRequest {
   session_id: string;
+  storage_id?: number;  // 可选的存储ID，用于更新现有记录
 }
 
 export interface Auth115CompleteData {

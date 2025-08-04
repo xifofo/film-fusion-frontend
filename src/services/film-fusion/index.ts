@@ -12,3 +12,6 @@ export * from './scanTask';
 
 // 云存储相关API
 export * from './cloudStorage';
+
+// 115网盘授权相关API
+export * from './auth115';
