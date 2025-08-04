@@ -117,6 +117,14 @@ export const errorConfig: RequestConfig = {
       // 拦截响应数据，进行个性化处理
       const { data } = response as unknown as ResponseStructure;
 
+      // 检查是否是Film Fusion API的响应格式（包含code字段）
+      if (data && typeof data === 'object' && 'code' in data) {
+        // 这是Film Fusion API的响应，不做处理，直接返回
+        console.log('[ResponseInterceptor] Film Fusion API响应:', data);
+        return response;
+      }
+
+      // 检查原有的success字段格式
       if (data?.success === false) {
         message.error('请求失败！');
       }

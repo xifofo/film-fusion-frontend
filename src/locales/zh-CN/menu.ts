@@ -50,4 +50,6 @@ export default {
   'menu.editor.mind': '脑图编辑器',
   'menu.editor.koni': '拓扑编辑器',
   'menu.film-fusion': '影视库管理',
+  'menu.云存储管理': '云存储管理',
+  'menu.云路径映射': '云路径映射',
 };

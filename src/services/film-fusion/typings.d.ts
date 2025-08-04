@@ -32,13 +32,21 @@ declare namespace API {
   /** 云盘路径配置 */
   type CloudPath = {
     id: number;
-    name: string;
-    path: string;
-    type: 'local' | 'webdav' | 'alist';
-    config?: Record<string, any>;
-    isActive: boolean;
-    createTime: string;
-    updateTime: string;
+    user_id: number;
+    cloud_storage_id: number;
+    source_path: string;        // 云盘源路径
+    content_prefix?: string;    // STRM内容前缀
+    local_path?: string;        // 本地路径
+    link_type: "strm" | "symlink";  // 链接类型
+    filter_rules?: string;      // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
+    strm_content_type?: "openlist" | "path";  // STRM文件内容类型
+    created_at: string;
+    updated_at: string;
+    cloud_storage?: {           // 关联的云存储信息
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
   };
 
   /** 扫描任务 */
@@ -100,29 +108,124 @@ declare namespace API {
 
   /** 云盘路径查询参数 */
   type CloudPathQueryParams = PageParams & {
-    name?: string;
-    type?: string;
-    isActive?: boolean;
+    cloud_storage_id?: number;
+    source_path?: string;
+    local_path?: string;
+    link_type?: "strm" | "symlink";
+    strm_content_type?: "openlist" | "path";
+    search?: string;
+    order_by?: string;
+    order_dir?: "asc" | "desc";
   };
 
   /** 创建云盘路径参数 */
   type CreateCloudPathParams = {
-    name: string;
-    path: string;
-    type: 'local' | 'webdav' | 'alist';
-    config?: Record<string, any>;
+    cloud_storage_id: number;
+    source_path: string;
+    content_prefix?: string;
+    local_path?: string;
+    link_type: "strm" | "symlink";
+    filter_rules?: string;
+    strm_content_type?: "openlist" | "path";
   };
 
-  /** 扫描任务查询参数 */
-  type ScanTaskQueryParams = PageParams & {
-    status?: string;
-    pathId?: number;
+  /** 更新云盘路径参数 */
+  type UpdateCloudPathParams = {
+    id: number;
+    cloud_storage_id?: number;
+    source_path?: string;
+    content_prefix?: string;
+    local_path?: string;
+    link_type?: "strm" | "symlink";
+    filter_rules?: string;
+    strm_content_type?: "openlist" | "path";
   };
 
-  /** 创建扫描任务参数 */
-  type CreateScanTaskParams = {
-    name: string;
-    pathId: number;
+  /** 批量操作参数 */
+  type BatchCloudPathParams = {
+    ids: number[];
+    operation: "delete" | "sync" | "update";
+    data?: {
+      link_type?: "strm" | "symlink";
+      strm_content_type?: "openlist" | "path";
+      content_prefix?: string;
+      filter_rules?: string;
+    };
+  };
+
+  /** 批量操作响应 */
+  type BatchOperationResult = {
+    success_count: number;
+    error_count: number;
+    errors: string[];
+  };
+
+  /** 链接类型选项 */
+  type LinkTypeOption = {
+    value: "strm" | "symlink";
+    label: string;
+    desc: string;
+  };
+
+  /** STRM内容类型选项 */
+  type StrmContentTypeOption = {
+    value: "openlist" | "path";
+    label: string;
+    desc: string;
+  };
+
+  /** 路径验证参数 */
+  type ValidateCloudPathParams = {
+    cloud_storage_id: number;
+    source_path: string;
+    content_prefix?: string;
+    local_path?: string;
+    link_type: "strm" | "symlink";
+    filter_rules?: string;
+    strm_content_type?: "openlist" | "path";
+  };
+
+  /** 路径验证结果 */
+  type ValidateCloudPathResult = {
+    valid: boolean;
+    cloud_storage: string;
+    link_type_valid: boolean;
+    source_path: string;
+    local_path: string;
+    strm_content_type_valid: boolean;
+  };
+
+  /** 路径统计信息 */
+  type CloudPathStatistics = {
+    total_paths: number;
+    strm_paths: number;
+    symlink_paths: number;
+    by_storage_type: Array<{
+      storage_type: string;
+      storage_name: string;
+      count: number;
+    }>;
+    recently_created: CloudPath[];
+  };
+
+  /** 导出数据 */
+  type ExportCloudPathData = {
+    version: string;
+    exported_at: string;
+    paths: CloudPath[];
+  };
+
+  /** 导入参数 */
+  type ImportCloudPathParams = {
+    paths: CreateCloudPathParams[];
+    replace_existing: boolean;
+  };
+
+  /** 导入结果 */
+  type ImportCloudPathResult = {
+    success_count: number;
+    error_count: number;
+    errors: string[];
   };
 
   /** 云存储配置 */

@@ -50,4 +50,6 @@ export default {
   'menu.editor.mind': 'Mind Editor',
   'menu.editor.koni': 'Koni Editor',
   'menu.film-fusion': 'Film Fusion',
+  'menu.云存储管理': 'Cloud Storage',
+  'menu.云路径映射': 'Cloud Path Mapping',
 };

@@ -38,12 +38,11 @@ export async function updateCloudStorage(
 
 /** 删除云存储 */
 export async function deleteCloudStorage(
-  ids: number[],
+  id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<boolean>>('/api/cloud-storage', {
+  return request<API.Response<boolean>>(`/api/cloud-storage/${id}`, {
     method: 'DELETE',
-    data: { ids },
     ...(options || {}),
   });
 }

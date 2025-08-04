@@ -4,14 +4,13 @@ import type {
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
 import {
-  FooterToolbar,
   PageContainer,
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
 import { Button, Drawer, message, Tag, Popconfirm, Space, Tooltip } from 'antd';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   getCloudStorageList,
   deleteCloudStorage,
@@ -27,14 +26,12 @@ const CloudStorageList: React.FC = () => {
 
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<API.CloudStorage>();
-  const [selectedRowsState, setSelectedRows] = useState<API.CloudStorage[]>([]);
 
   const [messageApi, contextHolder] = message.useMessage();
 
   const { run: delRun, loading: delLoading } = useRequest(deleteCloudStorage, {
     manual: true,
     onSuccess: () => {
-      setSelectedRows([]);
       actionRef.current?.reloadAndRest?.();
       messageApi.success('删除成功');
     },
@@ -109,12 +106,6 @@ const CloudStorageList: React.FC = () => {
       hideInSearch: true,
     },
     {
-      title: '用户ID',
-      dataIndex: 'user_id',
-      width: 100,
-      hideInSearch: true,
-    },
-    {
       title: '存储名称',
       dataIndex: 'storage_name',
       width: 150,
@@ -138,7 +129,7 @@ const CloudStorageList: React.FC = () => {
       width: 120,
       render: (_, record) => getStorageTypeLabel(record.storage_type),
       valueEnum: {
-        '115': { text: '115网盘' },
+        '115open': { text: '115网盘 OpenAPI' },
         'baidu': { text: '百度网盘' },
         'aliyun': { text: '阿里云盘' },
         'tencent': { text: '腾讯云' },
@@ -180,28 +171,6 @@ const CloudStorageList: React.FC = () => {
     {
       title: '令牌过期时间',
       dataIndex: 'token_expires_at',
-      width: 160,
-      valueType: 'dateTime',
-      hideInSearch: true,
-      render: (_, record) => {
-        if (!record.token_expires_at) {
-          return <Tag color="gray">未配置</Tag>;
-        }
-        const expireTime = new Date(record.token_expires_at).getTime();
-        const now = Date.now();
-        if (expireTime <= now) {
-          return <Tag color="red">已过期</Tag>;
-        }
-        const diffHours = Math.floor((expireTime - now) / (1000 * 60 * 60));
-        if (diffHours < 24) {
-          return <Tag color="orange">即将过期({diffHours}小时)</Tag>;
-        }
-        return record.token_expires_at;
-      },
-    },
-    {
-      title: '刷新令牌过期时间',
-      dataIndex: 'refresh_expires_at',
       width: 160,
       valueType: 'dateTime',
       hideInSearch: true,
@@ -276,53 +245,9 @@ const CloudStorageList: React.FC = () => {
       },
     },
     {
-      title: '默认存储',
-      dataIndex: 'is_default',
-      width: 100,
-      render: (_, record) => (
-        <Tag color={record.is_default ? 'blue' : 'gray'}>
-          {record.is_default ? '是' : '否'}
-        </Tag>
-      ),
-      valueEnum: {
-        true: { text: '是' },
-        false: { text: '否' },
-      },
-    },
-    {
-      title: '排序',
-      dataIndex: 'sort_order',
-      width: 80,
-      hideInSearch: true,
-      sorter: true,
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      valueType: 'dateTime',
-      hideInSearch: true,
-      sorter: true,
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      valueType: 'dateTime',
-      hideInSearch: true,
-      sorter: true,
-    },
-    {
-      title: '删除时间',
-      dataIndex: 'deleted_at',
-      width: 160,
-      valueType: 'dateTime',
-      hideInSearch: true,
-    },
-    {
       title: '操作',
       dataIndex: 'option',
-      width: 250,
+      width: 300,
       valueType: 'option',
       fixed: 'right',
       render: (_, record) => [
@@ -333,49 +258,19 @@ const CloudStorageList: React.FC = () => {
           values={record}
         />,
         <Popconfirm
-          key="setDefault"
-          title="确定设为默认存储吗？"
-          onConfirm={() => setDefaultRun(record.id)}
-          disabled={record.is_default || setDefaultLoading}
+          key="delete"
+          title="确定删除这个云存储配置吗？"
+          description="删除后将无法恢复，请谨慎操作。"
+          onConfirm={() => delRun(record.id)}
+          okText="确定"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
         >
-          <a style={{ color: record.is_default ? '#ccc' : undefined }}>
-            设为默认
-          </a>
+          <a style={{ color: '#ff4d4f' }}>删除</a>
         </Popconfirm>,
-        <Tooltip title="刷新访问令牌" key="refresh">
-          <a
-            onClick={() => refreshTokenRun(record.id)}
-            style={{ color: refreshLoading ? '#ccc' : undefined }}
-          >
-            刷新令牌
-          </a>
-        </Tooltip>,
-        <Tooltip title="测试连接" key="test">
-          <a
-            onClick={() => testConnectionRun(record.id)}
-            style={{ color: testLoading ? '#ccc' : undefined }}
-          >
-            测试连接
-          </a>
-        </Tooltip>,
       ],
     },
   ];
-
-  /**
-   * 删除节点
-   */
-  const handleRemove = useCallback(
-    async (selectedRows: API.CloudStorage[]) => {
-      if (!selectedRows?.length) {
-        messageApi.warning('请选择删除项');
-        return;
-      }
-
-      await delRun(selectedRows.map((row) => row.id));
-    },
-    [delRun, messageApi],
-  );
 
   return (
     <PageContainer>
@@ -393,39 +288,15 @@ const CloudStorageList: React.FC = () => {
         ]}
         request={async (params) => {
           const response = await getCloudStorageList(params);
+
           return {
-            data: response.data.list,
-            success: response.code === 200,
-            total: response.data.total,
+            data: response.data.list || [],
+            success: response.code === 0,
+            total: response.data?.total || 0,
           };
         }}
         columns={columns}
-        rowSelection={{
-          onChange: (_, selectedRows) => {
-            setSelectedRows(selectedRows);
-          },
-        }}
       />
-      {selectedRowsState?.length > 0 && (
-        <FooterToolbar
-          extra={
-            <div>
-              已选择{' '}
-              <a style={{ fontWeight: 600 }}>{selectedRowsState.length}</a>{' '}
-              项
-            </div>
-          }
-        >
-          <Button
-            loading={delLoading}
-            onClick={() => {
-              handleRemove(selectedRowsState);
-            }}
-          >
-            批量删除
-          </Button>
-        </FooterToolbar>
-      )}
 
       <Drawer
         width={600}
