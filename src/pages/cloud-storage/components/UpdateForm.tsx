@@ -106,7 +106,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           label="应用ID"
           placeholder="请输入应用ID"
         />
-        <ProFormText.Password
+        <ProFormText
           width="md"
           name="app_secret"
           label="应用密钥"
