@@ -197,6 +197,17 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           ]}
           tooltip="STRM文件适用于Jellyfin/Emby等媒体服务器，软链接直接映射文件到本地文件系统"
         />
+        <ProFormSelect
+          width="md"
+          name="source_type"
+          label="源类型"
+          placeholder="请选择源类型"
+          options={[
+            { label: 'CloudDrive2', value: 'clouddrive2' },
+            { label: 'MoviePilot2', value: 'moviepilot2' },
+          ]}
+          tooltip="选择数据源类型，用于标识数据来源"
+        />
         <ProFormDependency name={['link_type']}>
           {({ link_type }) => {
             if (link_type === 'strm') {

@@ -8,26 +8,26 @@ const Footer: React.FC = () => {
       style={{
         background: 'none',
       }}
-      copyright="Powered by Ant Desgin"
+      copyright="Powered by Kumayi"
       links={[
-        {
-          key: 'Ant Design Pro',
-          title: 'Ant Design Pro',
-          href: 'https://pro.ant.design',
-          blankTarget: true,
-        },
-        {
-          key: 'github',
-          title: <GithubOutlined />,
-          href: 'https://github.com/ant-design/ant-design-pro',
-          blankTarget: true,
-        },
-        {
-          key: 'Ant Design',
-          title: 'Ant Design',
-          href: 'https://ant.design',
-          blankTarget: true,
-        },
+        // {
+        //   key: 'Ant Design Pro',
+        //   title: 'Ant Design Pro',
+        //   href: 'https://pro.ant.design',
+        //   blankTarget: true,
+        // },
+        // {
+        //   key: 'github',
+        //   title: <GithubOutlined />,
+        //   href: 'https://github.com/ant-design/ant-design-pro',
+        //   blankTarget: true,
+        // },
+        // {
+        //   key: 'Ant Design',
+        //   title: 'Ant Design',
+        //   href: 'https://ant.design',
+        //   blankTarget: true,
+        // },
       ]}
     />
   );

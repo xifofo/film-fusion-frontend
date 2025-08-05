@@ -99,6 +99,16 @@ const CloudPathList: React.FC = () => {
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
+  const getSourceTypeTag = (type?: string) => {
+    if (!type) return '-';
+    const typeMap = {
+      clouddrive2: { color: 'cyan', text: 'CloudDrive2' },
+      moviepilot2: { color: 'magenta', text: 'MoviePilot2' },
+    };
+    const config = typeMap[type as keyof typeof typeMap] || { color: 'default', text: type };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
   const formatFilterRules = (rules?: string) => {
     if (!rules) return '-';
     try {
@@ -206,6 +216,16 @@ const CloudPathList: React.FC = () => {
       valueEnum: {
         path: { text: 'Path' },
         openlist: { text: 'Openlist' },
+      },
+    },
+    {
+      title: '源类型',
+      dataIndex: 'source_type',
+      width: 120,
+      render: (_, record) => getSourceTypeTag(record.source_type),
+      valueEnum: {
+        clouddrive2: { text: 'CloudDrive2' },
+        moviepilot2: { text: 'MoviePilot2' },
       },
     },
     {
