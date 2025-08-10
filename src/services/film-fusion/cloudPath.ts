@@ -132,3 +132,11 @@ export async function getCloudPathFiles(id: number, path?: string) {
     params: { path },
   });
 }
+
+/** 替换 STRM 内容 */
+export async function replaceStrmContent(id: number, params: API.ReplaceStrmContentParams) {
+  return request<API.Response<any>>(`/api/paths/${id}/strm/replace`, {
+    method: 'POST',
+    data: params,
+  });
+}

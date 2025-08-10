@@ -9,13 +9,13 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
-import { Drawer, message, Tag, Popconfirm, Tooltip, Button, Space } from 'antd';
+import { Drawer, message, Tag, Popconfirm, Tooltip, Button, Space, Modal, Form, Input } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   getCloudPaths,
   deleteCloudPath,
-  syncCloudPath,
   batchOperateCloudPaths,
+  replaceStrmContent,
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
@@ -30,6 +30,11 @@ const CloudPathList: React.FC = () => {
 
   const [messageApi, contextHolder] = message.useMessage();
 
+  // 替换 STRM 内容弹窗与表单
+  const [replaceOpen, setReplaceOpen] = useState<boolean>(false);
+  const [replaceTargetId, setReplaceTargetId] = useState<number>();
+  const [replaceForm] = Form.useForm();
+
   // 删除操作
   const { run: delRun, loading: delLoading } = useRequest(deleteCloudPath, {
     manual: true,
@@ -39,17 +44,6 @@ const CloudPathList: React.FC = () => {
     },
     onError: () => {
       messageApi.error('删除失败，请重试');
-    },
-  });
-
-  // 同步操作
-  const { run: syncRun, loading: syncLoading } = useRequest(syncCloudPath, {
-    manual: true,
-    onSuccess: () => {
-      messageApi.success('同步请求已提交');
-    },
-    onError: () => {
-      messageApi.error('同步失败，请重试');
     },
   });
 
@@ -78,16 +72,42 @@ const CloudPathList: React.FC = () => {
     });
   };
 
-  // 批量同步
-  const handleBatchSync = () => {
-    if (selectedRowKeys.length === 0) {
-      messageApi.warning('请先选择要同步的项');
+  // 替换 STRM 内容
+  const { run: replaceRun, loading: replaceLoading } = useRequest(replaceStrmContent as any, {
+    manual: true,
+    onSuccess: () => {
+      messageApi.success('替换成功');
+      setReplaceOpen(false);
+      replaceForm.resetFields();
+      actionRef.current?.reload?.();
+    },
+    onError: () => {
+      messageApi.error('替换失败，请重试');
+    },
+  });
+
+  const openReplaceModal = (record: API.CloudPath) => {
+    if (record.link_type !== 'strm') {
+      messageApi.warning('仅 STRM 类型支持替换');
       return;
     }
-    batchRun({
-      ids: selectedRowKeys as number[],
-      operation: 'sync',
-    });
+    setReplaceTargetId(record.id);
+    setReplaceOpen(true);
+  };
+
+  const handleReplaceOk = async () => {
+    try {
+      const values = await replaceForm.validateFields();
+      if (!replaceTargetId) return;
+      replaceRun(replaceTargetId, values);
+    } catch (e) {
+      // 校验失败忽略
+    }
+  };
+
+  const handleReplaceCancel = () => {
+    setReplaceOpen(false);
+    replaceForm.resetFields();
   };
 
   const getLinkTypeTag = (type: string) => {
@@ -280,15 +300,17 @@ const CloudPathList: React.FC = () => {
           onOk={actionRef.current?.reload}
           values={record}
         />,
-        <Button
-          key="sync"
-          type="link"
-          size="small"
-          loading={syncLoading}
-          onClick={() => syncRun(record.id)}
-        >
-          同步
-        </Button>,
+        record.link_type === 'strm' && (
+          <Button
+            key="replace"
+            type="link"
+            size="small"
+            loading={replaceLoading}
+            onClick={() => openReplaceModal(record)}
+          >
+            替换内容
+          </Button>
+        ),
         <Popconfirm
           key="delete"
           title="确定删除这个云路径映射吗？"
@@ -320,13 +342,6 @@ const CloudPathList: React.FC = () => {
           <CreateForm key="create" reload={actionRef.current?.reload} />,
           selectedRowKeys.length > 0 && (
             <Space key="batch-actions">
-              <Button
-                type="default"
-                loading={batchLoading}
-                onClick={handleBatchSync}
-              >
-                批量同步 ({selectedRowKeys.length})
-              </Button>
               <Popconfirm
                 title="确定删除选中的路径映射吗？"
                 description="删除后将无法恢复，请谨慎操作。"
@@ -335,10 +350,7 @@ const CloudPathList: React.FC = () => {
                 cancelText="取消"
                 okButtonProps={{ danger: true }}
               >
-                <Button
-                  danger
-                  loading={batchLoading}
-                >
+                <Button danger loading={batchLoading}>
                   批量删除 ({selectedRowKeys.length})
                 </Button>
               </Popconfirm>
@@ -398,6 +410,33 @@ const CloudPathList: React.FC = () => {
           />
         )}
       </Drawer>
+
+      {/* 替换 STRM 内容弹窗 */}
+      <Modal
+        title="替换 STRM 内容"
+        open={replaceOpen}
+        onOk={handleReplaceOk}
+        confirmLoading={replaceLoading}
+        onCancel={handleReplaceCancel}
+        destroyOnClose
+      >
+        <Form form={replaceForm} layout="vertical" preserve={false}>
+          <Form.Item
+            label="要替换的文字"
+            name="from"
+            rules={[{ required: true, message: '请输入要替换的文字' }]}
+          >
+            <Input placeholder="例如：/old/path" allowClear />
+          </Form.Item>
+          <Form.Item
+            label="替换为"
+            name="to"
+            rules={[{ required: true, message: '请输入替换后的子串' }]}
+          >
+            <Input placeholder="例如：/new/path" allowClear />
+          </Form.Item>
+        </Form>
+      </Modal>
     </PageContainer>
   );
 };

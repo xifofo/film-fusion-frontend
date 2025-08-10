@@ -299,4 +299,12 @@ declare namespace API {
     is_default?: boolean;
     sort_order?: number;
   };
+
+  /** 替换 STRM 内容参数（仅当 CloudPath.link_type 为 "strm" 时有效） */
+  type ReplaceStrmContentParams = {
+    /** 要被替换的子串 */
+    from: string;
+    /** 替换成的子串 */
+    to: string;
+  };
 }
