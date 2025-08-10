@@ -4,6 +4,7 @@ import {
   ProFormTextArea,
   ModalForm,
   ProFormDependency,
+  ProFormSwitch,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
 import { Button, message } from 'antd';
@@ -105,7 +106,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
     }
   }, [open, getStorageList, getLinkTypeList, getStrmContentTypeList]);
 
-  const defaultFilterRules = JSON.stringify([".mp4", ".mkv", ".avi", ".m4v", ".mov", ".wmv", ".flv", ".mpg", ".mpeg", ".rm", ".rmvb", ".vob", ".ts", ".tp", ".ass", ".srt"]);
+  const defaultFilterRules = JSON.stringify({ include: [".mp4", ".mkv", ".avi", ".m4v", ".mov", ".wmv", ".flv", ".mpg", ".mpeg", ".rm", ".rmvb", ".vob", ".ts", ".tp"], download: ["ass", "srt"] });
 
   return (
     <>
@@ -133,6 +134,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
           link_type: 'strm',
           strm_content_type: 'path',
           filter_rules: defaultFilterRules,
+          is_windows_path: false,
         }}
       >
         <ProFormSelect
@@ -201,6 +203,15 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
           ]}
           tooltip="选择数据源类型，用于标识数据来源"
         />
+        <ProFormSwitch
+          name="is_windows_path"
+          label="Windows路径格式"
+          tooltip="启用后将使用Windows路径分隔符（反斜杠）处理路径"
+          fieldProps={{
+            checkedChildren: "是",
+            unCheckedChildren: "否",
+          }}
+        />
         <ProFormDependency name={['link_type']}>
           {({ link_type }) => {
             if (link_type === 'strm') {
@@ -219,7 +230,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
                     label="STRM内容类型"
                     placeholder="请选择STRM内容类型"
                     options={strmContentTypeOptions.length > 0 ? strmContentTypeOptions : [
-                      { label: 'Openlist', value: 'openlist' },
+                      // { label: 'Openlist', value: 'openlist' },
                       { label: 'Path', value: 'path' },
                     ]}
                     tooltip="STRM文件内容格式类型"
@@ -244,13 +255,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
               validator: (_: any, value: string) => {
                 if (value) {
                   try {
-                    const parsed = JSON.parse(value);
-                    if (!Array.isArray(parsed)) {
-                      return Promise.reject(new Error('过滤规则必须是JSON数组格式'));
-                    }
-                    if (parsed.some(item => typeof item !== 'string')) {
-                      return Promise.reject(new Error('数组中的所有元素必须是字符串'));
-                    }
+                    JSON.parse(value);
                   } catch (error) {
                     return Promise.reject(new Error('请输入有效的JSON格式'));
                   }

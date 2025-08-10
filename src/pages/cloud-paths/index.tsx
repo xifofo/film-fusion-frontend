@@ -229,6 +229,15 @@ const CloudPathList: React.FC = () => {
       },
     },
     {
+      title: 'Windows路径',
+      dataIndex: 'is_windows_path',
+      width: 120,
+      hideInSearch: true,
+      render: (value) => {
+        return <Tag color={value ? 'blue' : 'default'}>{value ? '是' : '否'}</Tag>;
+      },
+    },
+    {
       title: '文件过滤规则',
       dataIndex: 'filter_rules',
       width: 150,

@@ -41,6 +41,7 @@ declare namespace API {
     filter_rules?: string;      // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
     strm_content_type?: "openlist" | "path";  // STRM文件内容类型
     source_type?: "clouddrive2" | "moviepilot2";  // 源类型
+    is_windows_path?: boolean;  // 是否为Windows路径格式
     created_at: string;
     updated_at: string;
     cloud_storage?: {           // 关联的云存储信息
@@ -115,6 +116,7 @@ declare namespace API {
     link_type?: "strm" | "symlink";
     strm_content_type?: "openlist" | "path";
     source_type?: "clouddrive2" | "moviepilot2";
+    is_windows_path?: boolean;
     search?: string;
     order_by?: string;
     order_dir?: "asc" | "desc";
@@ -130,6 +132,7 @@ declare namespace API {
     filter_rules?: string;
     strm_content_type?: "openlist" | "path";
     source_type?: "clouddrive2" | "moviepilot2";
+    is_windows_path?: boolean;
   };
 
   /** 更新云盘路径参数 */
@@ -143,6 +146,7 @@ declare namespace API {
     filter_rules?: string;
     strm_content_type?: "openlist" | "path";
     source_type?: "clouddrive2" | "moviepilot2";
+    is_windows_path?: boolean;
   };
 
   /** 批量操作参数 */
@@ -154,6 +158,7 @@ declare namespace API {
       strm_content_type?: "openlist" | "path";
       content_prefix?: string;
       filter_rules?: string;
+      is_windows_path?: boolean;
     };
   };
 
@@ -187,6 +192,7 @@ declare namespace API {
     link_type: "strm" | "symlink";
     filter_rules?: string;
     strm_content_type?: "openlist" | "path";
+    is_windows_path?: boolean;
   };
 
   /** 路径验证结果 */

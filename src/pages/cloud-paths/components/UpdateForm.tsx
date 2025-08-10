@@ -4,6 +4,7 @@ import {
   ProFormTextArea,
   ModalForm,
   ProFormDependency,
+  ProFormSwitch,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
 import { message } from 'antd';
@@ -135,7 +136,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
         }}
         initialValues={{
           ...values,
-          filter_rules: values.filter_rules || JSON.stringify(['mkv', 'mp4', 'avi', 'wmv', 'flv', 'mov', 'rmvb', 'rm', '3gp', 'ts', 'webm']),
+          filter_rules: values.filter_rules || JSON.stringify({ include: ['mkv', 'mp4', 'avi', 'wmv', 'flv', 'mov', 'rmvb', 'rm', '3gp', 'ts', 'webm'], download: ["ass", "srt"] }),
         }}
         onFinish={async (value) => {
           await run({ ...value, id: values.id } as API.UpdateCloudPathParams);
@@ -208,6 +209,15 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           ]}
           tooltip="选择数据源类型，用于标识数据来源"
         />
+        <ProFormSwitch
+          name="is_windows_path"
+          label="Windows路径格式"
+          tooltip="启用后将使用Windows路径分隔符（反斜杠）处理路径"
+          fieldProps={{
+            checkedChildren: "是",
+            unCheckedChildren: "否",
+          }}
+        />
         <ProFormDependency name={['link_type']}>
           {({ link_type }) => {
             if (link_type === 'strm') {
@@ -242,7 +252,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           name="filter_rules"
           label="文件扩展名过滤规则"
           placeholder="请输入JSON格式的文件扩展名列表"
-          tooltip="JSON格式的数组，只处理这些扩展名的文件，如：[&quot;mkv&quot;,&quot;mp4&quot;,&quot;avi&quot;]"
+          tooltip="JSON格式的数组，只处理这些扩展名的文件"
           fieldProps={{
             rows: 3,
           }}
@@ -251,13 +261,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
               validator: (_: any, value: string) => {
                 if (value) {
                   try {
-                    const parsed = JSON.parse(value);
-                    if (!Array.isArray(parsed)) {
-                      return Promise.reject(new Error('过滤规则必须是JSON数组格式'));
-                    }
-                    if (parsed.some(item => typeof item !== 'string')) {
-                      return Promise.reject(new Error('数组中的所有元素必须是字符串'));
-                    }
+                    JSON.parse(value);
                   } catch (error) {
                     return Promise.reject(new Error('请输入有效的JSON格式'));
                   }
