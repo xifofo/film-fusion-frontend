@@ -163,6 +163,7 @@ const CloudPathList: React.FC = () => {
       if (values.content_prefix) fd.append('content_prefix', values.content_prefix);
       fd.append('save_local_path', values.save_local_path);
       fd.append('filter_rules', (values.filter_rules || '').trim());
+      if (values.link_type) fd.append('link_type', values.link_type);
       genRun(fd);
     } catch (_) {
       // ignore
@@ -173,8 +174,9 @@ const CloudPathList: React.FC = () => {
     setGenModalOpen(true);
     // 获取云存储列表
     getStorageList();
-    // 设置默认过滤规则
+    // 设置默认过滤规则和链接类型
     genForm.setFieldsValue({
+      link_type: 'strm',
       filter_rules: '{"include":[".mp4",".mkv",".avi",".m4v",".mov",".wmv",".flv",".mpg",".mpeg",".rm",".rmvb",".vob",".ts",".tp"],"download":["ass","srt"]}'
     });
   };
@@ -415,7 +417,7 @@ const CloudPathList: React.FC = () => {
         scroll={{ x: 'max-content' }}
         toolBarRender={() => [
           <Button key="gen-strm" type="primary" onClick={openGenModal}>
-            生成 STRM（115 目录树）
+            生成媒体库（115 目录树）
           </Button>,
           <CreateForm key="create" reload={actionRef.current?.reload} />,
           selectedRowKeys.length > 0 && (
@@ -516,9 +518,9 @@ const CloudPathList: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* 生成 STRM（115 目录树）弹窗 */}
+      {/* 生成媒体库（115 目录树）弹窗 */}
       <Modal
-        title="生成 STRM（115 目录树）"
+        title="生成媒体库（115 目录树）"
         open={genModalOpen}
         onOk={handleGenSubmit}
         confirmLoading={genLoading}
@@ -575,6 +577,20 @@ const CloudPathList: React.FC = () => {
               filterOption={(input, option) =>
                 (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
               }
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="link_type"
+            label="链接类型"
+            rules={[{ required: true, message: '请选择链接类型' }]}
+          >
+            <Select
+              placeholder="请选择链接类型"
+              options={[
+                { label: 'STRM文件', value: 'strm' },
+                { label: '软链接', value: 'symlink' },
+              ]}
             />
           </Form.Item>
 
