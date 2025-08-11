@@ -9,17 +9,21 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
-import { Drawer, message, Tag, Popconfirm, Tooltip, Button, Space, Modal, Form, Input } from 'antd';
+import { Drawer, message, Tag, Popconfirm, Tooltip, Button, Space, Modal, Form, Input, Upload, Select, Card } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   getCloudPaths,
   deleteCloudPath,
   batchOperateCloudPaths,
   replaceStrmContent,
+  // 新增：获取云存储列表与生成 STRM 接口
+  getCloudStorageList,
+  generate115DirectoryTree,
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
-import StatisticsCards from './components/StatisticsCards';
+// 移除统计卡片组件
+// import StatisticsCards from './components/StatisticsCards';
 
 const CloudPathList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
@@ -35,7 +39,29 @@ const CloudPathList: React.FC = () => {
   const [replaceTargetId, setReplaceTargetId] = useState<number>();
   const [replaceForm] = Form.useForm();
 
-  // 删除操作
+  // 新增：生成 STRM 表单
+  const [genForm] = Form.useForm();
+  const [worldFile, setWorldFile] = useState<File | undefined>();
+  const [genModalOpen, setGenModalOpen] = useState<boolean>(false);
+  const [storageOptions, setStorageOptions] = useState<{ label: string; value: number }[]>([]);
+
+  // 获取云存储列表
+  const { run: getStorageList, loading: cloudStorageLoading } = useRequest(
+    async () => {
+      const result = await getCloudStorageList({ current: 1, pageSize: 100 });
+      if (result.code === 0 && result.data?.list) {
+        const options = result.data.list.map((item: API.CloudStorage) => ({
+          label: `${item.storage_name} (${item.storage_type})`,
+          value: item.id,
+        }));
+        setStorageOptions(options);
+      }
+      return result;
+    },
+    {
+      manual: true,
+    }
+  );
   const { run: delRun, loading: delLoading } = useRequest(deleteCloudPath, {
     manual: true,
     onSuccess: () => {
@@ -108,6 +134,55 @@ const CloudPathList: React.FC = () => {
   const handleReplaceCancel = () => {
     setReplaceOpen(false);
     replaceForm.resetFields();
+  };
+
+  // 新增：生成 STRM 提交
+  const { run: genRun, loading: genLoading } = useRequest(generate115DirectoryTree as any, {
+    manual: true,
+    onSuccess: () => {
+      messageApi.success('已提交生成任务');
+      genForm.resetFields();
+      setWorldFile(undefined);
+      setGenModalOpen(false);
+    },
+    onError: (err: any) => {
+      messageApi.error(err?.message || '提交失败，请重试');
+    },
+  });
+
+  const handleGenSubmit = async () => {
+    try {
+      const values = await genForm.validateFields();
+      if (!worldFile) {
+        messageApi.error('请上传 world 文本文件');
+        return;
+      }
+      const fd = new FormData();
+      fd.append('world', worldFile);
+      fd.append('cloud_storage_id', String(values.cloud_storage_id));
+      if (values.content_prefix) fd.append('content_prefix', values.content_prefix);
+      fd.append('save_local_path', values.save_local_path);
+      fd.append('filter_rules', (values.filter_rules || '').trim());
+      genRun(fd);
+    } catch (_) {
+      // ignore
+    }
+  };
+
+  const openGenModal = () => {
+    setGenModalOpen(true);
+    // 获取云存储列表
+    getStorageList();
+    // 设置默认过滤规则
+    genForm.setFieldsValue({
+      filter_rules: '{"include":[".mp4",".mkv",".avi",".m4v",".mov",".wmv",".flv",".mpg",".mpeg",".rm",".rmvb",".vob",".ts",".tp"],"download":["ass","srt"]}'
+    });
+  };
+
+  const handleGenCancel = () => {
+    setGenModalOpen(false);
+    genForm.resetFields();
+    setWorldFile(undefined);
   };
 
   const getLinkTypeTag = (type: string) => {
@@ -329,7 +404,7 @@ const CloudPathList: React.FC = () => {
   return (
     <PageContainer>
       {contextHolder}
-      <StatisticsCards />
+
       <ProTable<API.CloudPath, API.CloudPathQueryParams>
         headerTitle="云路径映射管理"
         actionRef={actionRef}
@@ -339,6 +414,9 @@ const CloudPathList: React.FC = () => {
         }}
         scroll={{ x: 'max-content' }}
         toolBarRender={() => [
+          <Button key="gen-strm" type="primary" onClick={openGenModal}>
+            生成 STRM（115 目录树）
+          </Button>,
           <CreateForm key="create" reload={actionRef.current?.reload} />,
           selectedRowKeys.length > 0 && (
             <Space key="batch-actions">
@@ -434,6 +512,112 @@ const CloudPathList: React.FC = () => {
             rules={[{ required: true, message: '请输入替换后的子串' }]}
           >
             <Input placeholder="例如：/new/path" allowClear />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 生成 STRM（115 目录树）弹窗 */}
+      <Modal
+        title="生成 STRM（115 目录树）"
+        open={genModalOpen}
+        onOk={handleGenSubmit}
+        confirmLoading={genLoading}
+        onCancel={handleGenCancel}
+        destroyOnClose
+        width={800}
+      >
+        <Form form={genForm} layout="vertical" preserve={false}>
+          <Form.Item label="world 文本文件 (.txt)" required>
+            <Upload.Dragger
+              multiple={false}
+              accept=".txt"
+              maxCount={1}
+              beforeUpload={(file) => {
+                const isTxt = file.name.toLowerCase().endsWith('.txt');
+                if (!isTxt) {
+                  messageApi.error('仅支持 .txt 文件');
+                  return Upload.LIST_IGNORE as any;
+                }
+                const maxSize = 256 * 1024 * 1024; // 256MB
+                if (file.size > maxSize) {
+                  messageApi.error('文件大小不能超过 256MB');
+                  return Upload.LIST_IGNORE as any;
+                }
+                setWorldFile(file as File);
+                genForm.setFieldsValue({ world: file });
+                return false; // 阻止自动上传
+              }}
+              onRemove={() => {
+                setWorldFile(undefined);
+                genForm.setFieldsValue({ world: undefined });
+              }}
+              fileList={worldFile ? [{ uid: 'world', name: worldFile.name, status: 'done' } as any] : []}
+            >
+              <p className="ant-upload-drag-icon">📄</p>
+              <p className="ant-upload-text">点击或拖拽 .txt 文件到此处</p>
+              <p className="ant-upload-hint">支持 UTF-8/UTF-16，最大 256MB</p>
+            </Upload.Dragger>
+          </Form.Item>
+          <Form.Item name="world" hidden rules={[{ required: true, message: '请上传 world 文本文件' }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="cloud_storage_id"
+            label="云存储"
+            rules={[{ required: true, message: '请选择云存储' }]}
+          >
+            <Select
+              placeholder="请选择要映射的云存储"
+              options={storageOptions}
+              loading={cloudStorageLoading}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+              }
+            />
+          </Form.Item>
+
+          <Form.Item name="content_prefix" label="STRM 内容前缀（可选）">
+            <Input placeholder="例如：/mnt/prefix 或 C:\\Media" allowClear />
+          </Form.Item>
+
+          <Form.Item
+            name="save_local_path"
+            label="本地保存根路径"
+            rules={[{ required: true, message: '请输入本地保存根路径' }]}
+          >
+            <Input placeholder="例如：/Users/you/Movies/STRM" />
+          </Form.Item>
+
+          <Form.Item
+            name="filter_rules"
+            label="过滤规则 (JSON)"
+            rules={[
+              { required: true, message: '请输入过滤规则 JSON' },
+              {
+                validator: (_, value) => {
+                  try {
+                    const obj = JSON.parse((value || '').trim());
+                    if (!obj || typeof obj !== 'object') return Promise.reject(new Error('必须是 JSON 对象'));
+                    const include = Array.isArray(obj.include) ? obj.include.filter((s: any) => !!s) : [];
+                    const download = Array.isArray(obj.download) ? obj.download.filter((s: any) => !!s) : [];
+                    if (include.length === 0 && download.length === 0) {
+                      return Promise.reject(new Error('include 或 download 至少一个非空'));
+                    }
+                    return Promise.resolve();
+                  } catch {
+                    return Promise.reject(new Error('非法 JSON 格式'));
+                  }
+                },
+              },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder='例如：{"include":[".mp4",".mkv"],"download":["ass","srt"]}'
+              allowClear
+            />
           </Form.Item>
         </Form>
       </Modal>

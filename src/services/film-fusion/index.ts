@@ -15,3 +15,6 @@ export * from './cloudStorage';
 
 // 115网盘授权相关API
 export * from './auth115';
+
+// STRM 相关API
+export * from './strm';
