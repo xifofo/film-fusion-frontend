@@ -307,4 +307,51 @@ declare namespace API {
     /** 替换成的子串 */
     to: string;
   };
+
+  /** Pickcode 缓存记录 */
+  type PickcodeCache = {
+    id: number;
+    file_path: string;
+    pickcode: string;
+    file_size?: number;
+    mime_type?: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  /** Pickcode 缓存查询参数 */
+  type PickcodeCacheQueryParams = PageParams & {
+    search?: string;
+    page?: number;
+    size?: number;
+  };
+
+  /** 创建 Pickcode 缓存参数 */
+  type CreatePickcodeCacheParams = {
+    file_path: string;
+    pickcode: string;
+    file_size?: number;
+    mime_type?: string;
+  };
+
+  /** 更新 Pickcode 缓存参数 */
+  type UpdatePickcodeCacheParams = {
+    id: number;
+    file_path?: string;
+    pickcode?: string;
+    file_size?: number;
+    mime_type?: string;
+  };
+
+  /** 批量删除 Pickcode 缓存参数 */
+  type BatchDeletePickcodeCacheParams = {
+    ids: number[];
+  };
+
+  /** Pickcode 缓存统计信息 */
+  type PickcodeCacheStats = {
+    total_count: number;
+    total_size: number;
+    latest_update: string;
+  };
 }

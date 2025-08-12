@@ -52,4 +52,5 @@ export default {
   'menu.film-fusion': 'Film Fusion',
   'menu.云存储管理': 'Cloud Storage',
   'menu.云路径映射': 'Cloud Path Mapping',
+  'menu.Pickcode缓存管理': 'Pickcode Cache',
 };

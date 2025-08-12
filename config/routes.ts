@@ -41,6 +41,12 @@ export default [
     component: './cloud-paths',
   },
   {
+    name: 'Pickcode缓存管理',
+    icon: 'database',
+    path: '/pickcode-cache',
+    component: './pickcode-cache',
+  },
+  {
     path: '/',
     redirect: '/cloud-storage',
   },

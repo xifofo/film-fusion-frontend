@@ -18,3 +18,6 @@ export * from './auth115';
 
 // STRM 相关API
 export * from './strm';
+
+// Pickcode 缓存相关API
+export * from './pickcodeCache';
