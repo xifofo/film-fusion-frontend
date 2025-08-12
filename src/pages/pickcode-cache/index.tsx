@@ -164,7 +164,6 @@ const PickcodeCacheList: React.FC = () => {
     {
       title: 'Pickcode',
       dataIndex: 'pickcode',
-      width: 120,
       copyable: true,
       render: (text) => (
         <Tag color="blue">{text}</Tag>
