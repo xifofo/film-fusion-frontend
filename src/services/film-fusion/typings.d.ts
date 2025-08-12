@@ -354,4 +354,41 @@ declare namespace API {
     total_size: number;
     latest_update: string;
   };
+
+  /** Match302 重定向匹配配置 */
+  type Match302 = {
+    id: number;
+    source_path: string;        // 源路径（最大500字符）
+    target_path: string;        // 目标路径（最大500字符）
+    cloud_storage_id: number;   // 云存储ID（外键）
+    created_at?: string;
+    updated_at?: string;
+    cloud_storage?: {           // 关联的云存储信息
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
+  /** Match302 查询参数 */
+  type Match302QueryParams = PageParams & {
+    source_path?: string;
+    target_path?: string;
+    cloud_storage_id?: number;
+  };
+
+  /** 创建 Match302 参数 */
+  type CreateMatch302Params = {
+    source_path: string;
+    target_path: string;
+    cloud_storage_id: number;
+  };
+
+  /** 更新 Match302 参数 */
+  type UpdateMatch302Params = {
+    id: number;
+    source_path?: string;
+    target_path?: string;
+    cloud_storage_id?: number;
+  };
 }

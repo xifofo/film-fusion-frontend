@@ -52,5 +52,6 @@ export default {
   'menu.film-fusion': '影视库管理',
   'menu.云存储管理': '云存储管理',
   'menu.云路径映射': '云路径映射',
+  'menu.Match302重定向': 'Match302重定向',
   'menu.Pickcode缓存管理': 'Pickcode缓存管理',
 };

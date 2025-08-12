@@ -41,6 +41,12 @@ export default [
     component: './cloud-paths',
   },
   {
+    name: 'Match302重定向',
+    icon: 'swap',
+    path: '/match302',
+    component: './match302',
+  },
+  {
     name: 'Pickcode缓存管理',
     icon: 'database',
     path: '/pickcode-cache',

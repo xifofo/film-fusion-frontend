@@ -21,3 +21,6 @@ export * from './strm';
 
 // Pickcode 缓存相关API
 export * from './pickcodeCache';
+
+// Match302 重定向相关API
+export * from './match302';
