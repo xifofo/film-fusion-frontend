@@ -3,7 +3,6 @@ import {
   ProFormSelect,
   ProFormTextArea,
   ModalForm,
-  ProFormDependency,
   ProFormSwitch,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
@@ -134,7 +133,6 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
           link_type: 'strm',
           strm_content_type: 'path',
           filter_rules: defaultFilterRules,
-          is_windows_path: false,
         }}
       >
         <ProFormSelect
@@ -188,9 +186,8 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
           placeholder="请选择链接类型"
           options={linkTypeOptions.length > 0 ? linkTypeOptions : [
             { label: 'STRM文件', value: 'strm' },
-            { label: '软链接', value: 'symlink' },
           ]}
-          tooltip="STRM文件适用于Jellyfin/Emby等媒体服务器，软链接直接映射文件到本地文件系统"
+          tooltip="STRM文件适用于Jellyfin/Emby等媒体服务器"
         />
         <ProFormSelect
           width="md"
@@ -203,44 +200,24 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
           ]}
           tooltip="选择数据源类型，用于标识数据来源"
         />
-        <ProFormSwitch
-          name="is_windows_path"
-          label="Windows路径格式"
-          tooltip="启用后将使用Windows路径分隔符（反斜杠）处理路径"
-          fieldProps={{
-            checkedChildren: "是",
-            unCheckedChildren: "否",
-          }}
+        <ProFormText
+          width="md"
+          name="content_prefix"
+          label="STRM内容前缀"
+          placeholder="请输入STRM内容前缀，如：/vol1/1000/CloudNAS/CloudDrive"
+          tooltip="STRM文件中使用的内容前缀, 如：/vol1/1000/CloudNAS/CloudDrive"
         />
-        <ProFormDependency name={['link_type']}>
-          {({ link_type }) => {
-            if (link_type === 'strm') {
-              return (
-                <>
-                  <ProFormText
-                    width="md"
-                    name="content_prefix"
-                    label="STRM内容前缀"
-                    placeholder="请输入STRM内容前缀，如：/vol1/1000/CloudNAS/CloudDrive"
-                    tooltip="STRM文件中使用的内容前缀, 如：/vol1/1000/CloudNAS/CloudDrive"
-                  />
-                  <ProFormSelect
-                    width="md"
-                    name="strm_content_type"
-                    label="STRM内容类型"
-                    placeholder="请选择STRM内容类型"
-                    options={strmContentTypeOptions.length > 0 ? strmContentTypeOptions : [
-                      // { label: 'Openlist', value: 'openlist' },
-                      { label: 'Path', value: 'path' },
-                    ]}
-                    tooltip="STRM文件内容格式类型"
-                  />
-                </>
-              );
-            }
-            return null;
-          }}
-        </ProFormDependency>
+        <ProFormSelect
+          width="md"
+          name="strm_content_type"
+          label="STRM内容类型"
+          placeholder="请选择STRM内容类型"
+          options={strmContentTypeOptions.length > 0 ? strmContentTypeOptions : [
+            // { label: 'Openlist', value: 'openlist' },
+            { label: 'Path', value: 'path' },
+          ]}
+          tooltip="STRM文件内容格式类型"
+        />
         <ProFormTextArea
           width="md"
           name="filter_rules"

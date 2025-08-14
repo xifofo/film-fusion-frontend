@@ -73,15 +73,7 @@ export const errorConfig: RequestConfig = {
         // Axios 的错误
         // 请求成功发出且服务器也响应了状态码，但状态代码超出了 2xx 的范围
         const { status } = error.response;
-        if (status === 401) {
-          // token 过期或无效，清除本地存储的 token 并跳转到登录页
-          localStorage.removeItem('token');
-          const { location } = window;
-          if (location.pathname !== '/user/login') {
-            window.location.href = `/user/login?redirect=${encodeURIComponent(location.pathname + location.search)}`;
-          }
-          return;
-        }
+
         message.error(`Response status:${status}`);
       } else if (error.request) {
         // 请求已经成功发起，但没有收到响应

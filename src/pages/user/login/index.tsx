@@ -93,7 +93,7 @@ const Login: React.FC = () => {
     }
 
     const { data } = response;
-    console.log("response", data);
+
     if (data) {
       // 保存 token 到 localStorage
       localStorage.setItem("token", data.token);

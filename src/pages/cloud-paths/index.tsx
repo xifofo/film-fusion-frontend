@@ -113,10 +113,6 @@ const CloudPathList: React.FC = () => {
   });
 
   const openReplaceModal = (record: API.CloudPath) => {
-    if (record.link_type !== 'strm') {
-      messageApi.warning('仅 STRM 类型支持替换');
-      return;
-    }
     setReplaceTargetId(record.id);
     setReplaceOpen(true);
   };
@@ -190,7 +186,6 @@ const CloudPathList: React.FC = () => {
   const getLinkTypeTag = (type: string) => {
     const typeMap = {
       strm: { color: 'blue', text: 'STRM文件' },
-      symlink: { color: 'green', text: '软链接' },
     };
     const config = typeMap[type as keyof typeof typeMap] || { color: 'default', text: type };
     return <Tag color={config.color}>{config.text}</Tag>;
@@ -277,12 +272,7 @@ const CloudPathList: React.FC = () => {
       width: 200,
       ellipsis: true,
       copyable: true,
-      render: (text, record) => {
-        if (record.link_type === 'strm') {
-          return text || '-';
-        }
-        return '-';
-      },
+      render: (text) => text || '-',
       hideInSearch: true,
     },
     {
@@ -292,23 +282,19 @@ const CloudPathList: React.FC = () => {
       render: (_, record) => getLinkTypeTag(record.link_type),
       valueEnum: {
         strm: { text: 'STRM文件' },
-        symlink: { text: '软链接' },
       },
     },
     {
       title: 'STRM内容类型',
       dataIndex: 'strm_content_type',
       width: 120,
-      render: (text, record) => {
-        if (record.link_type === 'strm') {
-          const typeMap = {
-            path: { color: 'orange', text: 'Path' },
-            openlist: { color: 'purple', text: 'Openlist' },
-          };
-          const config = typeMap[text as keyof typeof typeMap] || { color: 'default', text: text || '-' };
-          return <Tag color={config.color}>{config.text}</Tag>;
-        }
-        return '-';
+      render: (text) => {
+        const typeMap = {
+          path: { color: 'orange', text: 'Path' },
+          openlist: { color: 'purple', text: 'Openlist' },
+        };
+        const config = typeMap[text as keyof typeof typeMap] || { color: 'default', text: text || '-' };
+        return <Tag color={config.color}>{config.text}</Tag>;
       },
       valueEnum: {
         path: { text: 'Path' },
@@ -323,15 +309,6 @@ const CloudPathList: React.FC = () => {
       valueEnum: {
         clouddrive2: { text: 'CloudDrive2' },
         moviepilot2: { text: 'MoviePilot2' },
-      },
-    },
-    {
-      title: 'Windows路径',
-      dataIndex: 'is_windows_path',
-      width: 120,
-      hideInSearch: true,
-      render: (value) => {
-        return <Tag color={value ? 'blue' : 'default'}>{value ? '是' : '否'}</Tag>;
       },
     },
     {
@@ -377,17 +354,15 @@ const CloudPathList: React.FC = () => {
           onOk={actionRef.current?.reload}
           values={record}
         />,
-        record.link_type === 'strm' && (
-          <Button
-            key="replace"
-            type="link"
-            size="small"
-            loading={replaceLoading}
-            onClick={() => openReplaceModal(record)}
-          >
-            替换内容
-          </Button>
-        ),
+        <Button
+          key="replace"
+          type="link"
+          size="small"
+          loading={replaceLoading}
+          onClick={() => openReplaceModal(record)}
+        >
+          替换内容
+        </Button>,
         <Popconfirm
           key="delete"
           title="确定删除这个云路径映射吗？"
@@ -589,7 +564,6 @@ const CloudPathList: React.FC = () => {
               placeholder="请选择链接类型"
               options={[
                 { label: 'STRM文件', value: 'strm' },
-                { label: '软链接', value: 'symlink' },
               ]}
             />
           </Form.Item>

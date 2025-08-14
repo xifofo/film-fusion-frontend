@@ -28,6 +28,7 @@ export async function getInitialState(): Promise<{
   loading?: boolean;
   fetchUserInfo?: () => Promise<API.User | undefined>;
 }> {
+  // 在调用 getCurrentUser 之前检查 token
   const fetchUserInfo = async () => {
     try {
       const response = await getCurrentUser();
@@ -39,6 +40,7 @@ export async function getInitialState(): Promise<{
     }
     return undefined;
   };
+
   // 如果不是登录页面，执行
   const { location } = history;
   if (
@@ -53,6 +55,7 @@ export async function getInitialState(): Promise<{
       settings: defaultSettings as Partial<LayoutSettings>,
     };
   }
+
   return {
     fetchUserInfo,
     settings: defaultSettings as Partial<LayoutSettings>,
