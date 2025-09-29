@@ -249,6 +249,15 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
             },
           ]}
         />
+        <ProFormSwitch
+          name="content_encode_uri"
+          label="内容URI编码"
+          tooltip="是否对STRM文件内容进行URI编码，用于处理包含特殊字符的文件路径"
+          fieldProps={{
+            checkedChildren: '开启',
+            unCheckedChildren: '关闭',
+          }}
+        />
       </ModalForm>
     </>
   );

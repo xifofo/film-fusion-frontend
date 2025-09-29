@@ -65,7 +65,7 @@ const CloudPathList: React.FC = () => {
   const { run: delRun, loading: delLoading } = useRequest(deleteCloudPath, {
     manual: true,
     onSuccess: () => {
-      actionRef.current?.reloadAndRest?.();
+      actionRef.current?.reload?.();
       messageApi.success('删除成功');
     },
     onError: () => {
@@ -78,7 +78,7 @@ const CloudPathList: React.FC = () => {
     manual: true,
     onSuccess: () => {
       messageApi.success('批量操作完成');
-      actionRef.current?.reloadAndRest?.();
+      actionRef.current?.reload?.();
       setSelectedRowKeys([]);
     },
     onError: () => {
@@ -318,6 +318,23 @@ const CloudPathList: React.FC = () => {
       ellipsis: true,
       hideInSearch: true,
       render: (_, record) => formatFilterRules(record.filter_rules),
+    },
+    {
+      title: 'URI编码',
+      dataIndex: 'content_encode_uri',
+      width: 100,
+      hideInSearch: true,
+      render: (_, record) => {
+        return record.content_encode_uri ? (
+          <Tag color="green">开启</Tag>
+        ) : (
+          <Tag color="default">关闭</Tag>
+        );
+      },
+      valueEnum: {
+        true: { text: '开启' },
+        false: { text: '关闭' },
+      },
     },
     {
       title: '用户ID',
