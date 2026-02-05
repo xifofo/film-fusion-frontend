@@ -13,6 +13,12 @@ export * from './scanTask';
 // 云存储相关API
 export * from './cloudStorage';
 
+// 目录配置相关API
+export * from './directory';
+
+// 整理处理相关API
+export * from './organize';
+
 // 115网盘授权相关API
 export * from './auth115';
 

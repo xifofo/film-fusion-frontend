@@ -51,6 +51,30 @@ declare namespace API {
     };
   };
 
+  /** 目录配置 */
+  type CloudDirectory = {
+    id: number;
+    user_id: number;
+    cloud_storage_id: number;
+    directory_name: string;
+    directory_id: string;
+    content_prefix?: string;
+    content_encode_uri?: boolean;
+    save_path?: string;
+    include_extensions?: string;
+    exclude_extensions?: string;
+    exclude_smaller_than_mb?: number;
+    classify_by_category?: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string;
+    cloud_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
   /** 扫描任务 */
   type ScanTask = {
     id: number;
@@ -121,6 +145,16 @@ declare namespace API {
     order_dir?: "asc" | "desc";
   };
 
+  /** 目录配置查询参数 */
+  type CloudDirectoryQueryParams = PageParams & {
+    cloud_storage_id?: number;
+    search?: string;
+    order_by?: string;
+    order_dir?: "asc" | "desc";
+    page?: number;
+    page_size?: number;
+  };
+
   /** 创建云盘路径参数 */
   type CreateCloudPathParams = {
     cloud_storage_id: number;
@@ -132,6 +166,20 @@ declare namespace API {
     strm_content_type?: "openlist" | "path";
     source_type?: "clouddrive2" | "moviepilot2";
     content_encode_uri?: boolean;
+  };
+
+  /** 创建目录配置参数 */
+  type CreateCloudDirectoryParams = {
+    cloud_storage_id: number;
+    directory_name: string;
+    directory_id: string;
+    content_prefix?: string;
+    content_encode_uri?: boolean;
+    save_path?: string;
+    include_extensions?: string;
+    exclude_extensions?: string;
+    exclude_smaller_than_mb?: number;
+    classify_by_category?: boolean;
   };
 
   /** 更新云盘路径参数 */
@@ -147,6 +195,69 @@ declare namespace API {
     source_type?: "clouddrive2" | "moviepilot2";
     content_encode_uri?: boolean;
   };
+
+  /** 更新目录配置参数 */
+  type UpdateCloudDirectoryParams = {
+    id: number;
+    cloud_storage_id?: number;
+    directory_name?: string;
+    directory_id?: string;
+    content_prefix?: string;
+    content_encode_uri?: boolean;
+    save_path?: string;
+    include_extensions?: string;
+    exclude_extensions?: string;
+    exclude_smaller_than_mb?: number;
+    classify_by_category?: boolean;
+  };
+
+  /** 整理 115 Cookie 目录参数 */
+  type Organize115CookieParams = {
+    cloud_directory_id: number;
+    folder_id: string;
+    dry_run?: boolean;
+  };
+
+  /** 整理 115 Cookie 目录响应 */
+  type Organize115CookieResult = {
+    cloud_directory_id: number;
+    cloud_storage_id: number;
+    folder_id: string;
+    dry_run: boolean;
+    total: number;
+    dir_debug?: Array<{
+      target_dir: string;
+      existing_dir: string;
+      existing_id: string;
+      missing_dirs: string[];
+      need_create: boolean;
+      final_id: string;
+      lookups?: Array<{
+        path: string;
+        id: string;
+      }>;
+    }>;
+    items?: Array<{
+      file_id: string;
+      file_name: string;
+      pickcode?: string;
+      media_type?: string;
+      category?: string;
+      title?: string;
+      year?: string;
+      title_year?: string;
+      transfer_name?: string;
+      target_path?: string;
+      target_dir?: string;
+      target_dir_id?: string;
+      need_create?: boolean;
+      missing_dirs?: string[];
+      rename_to?: string;
+      strm_path?: string;
+      strm_content?: string;
+      subtitle_queued?: boolean;
+      subtitle_error?: string;
+    }>;\n+  };
 
   /** 批量操作参数 */
   type BatchCloudPathParams = {
@@ -247,6 +358,7 @@ declare namespace API {
     app_secret?: string;
     access_token?: string;
     refresh_token?: string;
+    cookie?: string;
     token_expires_at?: string;
     refresh_expires_at?: string;
     last_refresh_at?: string;
@@ -291,6 +403,7 @@ declare namespace API {
     storage_name?: string;
     app_id?: string;
     app_secret?: string;
+    cookie?: string;
     auto_refresh?: boolean;
     refresh_before_min?: number;
     status?: 'active' | 'disabled' | 'error';

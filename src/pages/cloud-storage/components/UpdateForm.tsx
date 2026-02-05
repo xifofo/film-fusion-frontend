@@ -124,6 +124,12 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           label="刷新令牌"
           placeholder="请输入刷新令牌"
         />
+        <ProFormTextArea
+          width="md"
+          name="cookie"
+          label="Cookie"
+          placeholder="请输入Cookie"
+        />
         <ProFormDateTimePicker
           width="md"
           name="token_expires_at"

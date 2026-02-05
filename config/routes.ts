@@ -41,6 +41,12 @@ export default [
     component: './cloud-paths',
   },
   {
+    name: '目录配置',
+    icon: 'folder',
+    path: '/directories',
+    component: './directories',
+  },
+  {
     name: 'Match302重定向',
     icon: 'swap',
     path: '/match302',
