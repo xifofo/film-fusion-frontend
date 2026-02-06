@@ -454,6 +454,30 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
         <Tabs
           style={{ marginTop: 16 }}
           items={[
+              {
+              key: 'dir-debug',
+              label: `目录调试 (${resultData?.dir_debug?.length || 0})`,
+              children: (
+                <ProTable
+                  rowKey={(row) => row.target_dir}
+                  search={false}
+                  options={false}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  scroll={{ x: 'max-content', y: 360 }}
+                  dataSource={resultData?.dir_debug || []}
+                  columns={dirDebugColumns}
+                  expandable={{
+                    expandedRowRender: (record) => (
+                      <Typography.Paragraph style={{ margin: 0 }}>
+                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                          {JSON.stringify(record, null, 2)}
+                        </pre>
+                      </Typography.Paragraph>
+                    ),
+                  }}
+                />
+              ),
+            },
             {
               key: 'items',
               label: `处理明细 (${resultData?.items?.length || 0})`,
@@ -478,30 +502,7 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
                 />
               ),
             },
-            {
-              key: 'dir-debug',
-              label: `目录调试 (${resultData?.dir_debug?.length || 0})`,
-              children: (
-                <ProTable
-                  rowKey={(row) => row.target_dir}
-                  search={false}
-                  options={false}
-                  pagination={{ pageSize: 10, showSizeChanger: true }}
-                  scroll={{ x: 'max-content', y: 360 }}
-                  dataSource={resultData?.dir_debug || []}
-                  columns={dirDebugColumns}
-                  expandable={{
-                    expandedRowRender: (record) => (
-                      <Typography.Paragraph style={{ margin: 0 }}>
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                          {JSON.stringify(record, null, 2)}
-                        </pre>
-                      </Typography.Paragraph>
-                    ),
-                  }}
-                />
-              ),
-            },
+
             {
               key: 'raw',
               label: '原始响应',
