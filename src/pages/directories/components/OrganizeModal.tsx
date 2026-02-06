@@ -151,6 +151,15 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
   const renderBoolTag = (value?: boolean) => (
     <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
   );
+  const renderMissingDirs = (value?: string[] | string) => {
+    if (Array.isArray(value)) {
+      return value.length ? value.join(' / ') : '-';
+    }
+    if (typeof value === 'string') {
+      return value || '-';
+    }
+    return '-';
+  };
 
   const itemColumns = useMemo(
     () => [
@@ -238,7 +247,7 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
         title: '缺失目录',
         dataIndex: 'missing_dirs',
         width: 200,
-        render: (value: string[]) => (value?.length ? value.join(' / ') : '-'),
+        render: (value?: string[] | string) => renderMissingDirs(value),
       },
       {
         title: 'STRM 路径',
@@ -296,7 +305,7 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
         title: '缺失目录',
         dataIndex: 'missing_dirs',
         width: 200,
-        render: (value: string[]) => (value?.length ? value.join(' / ') : '-'),
+        render: (value?: string[] | string) => renderMissingDirs(value),
       },
       {
         title: '需创建',
