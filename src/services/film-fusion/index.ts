@@ -19,6 +19,9 @@ export * from './directory';
 // 整理处理相关API
 export * from './organize';
 
+// 115 Cookie 目录相关API
+export * from './cookie115';
+
 // 115网盘授权相关API
 export * from './auth115';
 

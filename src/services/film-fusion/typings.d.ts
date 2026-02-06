@@ -257,7 +257,34 @@ declare namespace API {
       strm_content?: string;
       subtitle_queued?: boolean;
       subtitle_error?: string;
-    }>;\n+  };
+    }>;
+  };
+
+  /** 115 Cookie 目录请求参数 */
+  type Cookie115DirRequest = {
+    cloud_storage_id: number;
+    cid?: string;
+    offset?: number;
+    limit?: number;
+  };
+
+  /** 115 Cookie 目录项（仅目录） */
+  type Cookie115DirItem = {
+    file_id: string;
+    name: string;
+    pick_code?: string;
+    is_file: boolean;
+  };
+
+  /** 115 Cookie 目录响应 */
+  type Cookie115DirResponse = {
+    cloud_storage_id: number;
+    cid: string;
+    offset: number;
+    limit: number;
+    total: number;
+    items: Cookie115DirItem[];
+  };
 
   /** 批量操作参数 */
   type BatchCloudPathParams = {

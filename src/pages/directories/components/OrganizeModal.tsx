@@ -5,10 +5,18 @@ import {
   ProFormText,
   ProTable,
 } from '@ant-design/pro-components';
-import { Button, message, Modal, Tabs, Tag, Tooltip, Typography } from 'antd';
+import { Button, Form, message, Modal, Tabs, Tag, Tooltip, TreeSelect, Typography } from 'antd';
 import React, { useMemo, useState } from 'react';
 import { useRequest } from '@umijs/max';
-import { organize115Cookie } from '@/services/film-fusion';
+import { get115CookieDirs, organize115Cookie } from '@/services/film-fusion';
+
+type DirTreeNode = {
+  id: string;
+  pId: string;
+  value: string;
+  title: string;
+  isLeaf?: boolean;
+};
 
 export type OrganizeModalProps = {
   record: API.CloudDirectory;
@@ -20,6 +28,10 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
   const [resultOpen, setResultOpen] = useState(false);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
   const [rawResponse, setRawResponse] = useState<any>();
+  const [lastRequest, setLastRequest] = useState<API.Organize115CookieParams>();
+  const [returnToFormOnSuccess, setReturnToFormOnSuccess] = useState(false);
+  const [treeData, setTreeData] = useState<DirTreeNode[]>([]);
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   const [messageApi, contextHolder] = message.useMessage();
 
   const { run, loading } = useRequest(organize115Cookie, {
@@ -38,14 +50,103 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
       messageApi.success(`${messageText}${suffix}${dryRunText}`);
       setResultData(payload);
       setRawResponse(result);
-      setOpen(false);
-      setResultOpen(true);
+      setLastRequest({
+        cloud_directory_id: record.id,
+        folder_id: payload?.folder_id || lastRequest?.folder_id || '',
+        dry_run: payload?.dry_run ?? lastRequest?.dry_run,
+      });
+      if (returnToFormOnSuccess) {
+        setResultOpen(false);
+        setOpen(true);
+        setReturnToFormOnSuccess(false);
+      } else {
+        setOpen(false);
+        setResultOpen(true);
+      }
       onSuccess?.();
     },
     onError: (error: any) => {
       messageApi.error(error?.message || '整理失败，请重试');
     },
   });
+
+  const appendChildren = (parentId: string, items: API.Cookie115DirItem[]) => {
+    setTreeData((prev) => {
+      const existingIds = new Set(prev.map((node) => node.id));
+      const next = [...prev];
+      items.forEach((item) => {
+        if (!existingIds.has(item.file_id)) {
+          next.push({
+            id: item.file_id,
+            pId: parentId,
+            value: item.file_id,
+            title: item.name,
+            isLeaf: false,
+          });
+        }
+      });
+      return next;
+    });
+  };
+
+  const markLeaf = (nodeId: string) => {
+    setTreeData((prev) =>
+      prev.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              isLeaf: true,
+            }
+          : node,
+      ),
+    );
+  };
+
+  const loadChildren = async (parentId: string, force = false) => {
+    if (!record.cloud_storage_id) {
+      messageApi.error('云存储 ID 无效');
+      return;
+    }
+    if (!force && loadedIds.has(parentId)) return;
+    try {
+      const result = await get115CookieDirs({
+        cloud_storage_id: record.cloud_storage_id,
+        cid: parentId,
+        offset: 0,
+        limit: 1150,
+      });
+      if (result.code !== 0) {
+        messageApi.error(result.message || '获取目录失败');
+        return;
+      }
+      const items = result.data?.items || [];
+      if (items.length === 0) {
+        if (parentId !== '0') {
+          markLeaf(parentId);
+        }
+      } else {
+        appendChildren(parentId, items);
+      }
+      setLoadedIds((prev) => new Set(prev).add(parentId));
+    } catch (error: any) {
+      messageApi.error(error?.message || '获取目录失败');
+    }
+  };
+
+  const handleOpenChange = async (visible: boolean) => {
+    setOpen(visible);
+    if (visible) {
+      setTreeData([]);
+      setLoadedIds(new Set());
+      await loadChildren('0', true);
+    }
+  };
+
+  const handleLoadData = async (node: any) => {
+    const nodeId = node?.id || node?.value;
+    if (!nodeId) return;
+    await loadChildren(String(nodeId));
+  };
 
   const renderBoolTag = (value?: boolean) => (
     <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
@@ -235,7 +336,7 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
       <ModalForm<{ folder_id: string; dry_run: boolean }>
         title="整理 115 Cookie 目录"
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={handleOpenChange}
         modalProps={{
           destroyOnClose: true,
         }}
@@ -246,11 +347,13 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
           dry_run: true,
         }}
         onFinish={async (values) => {
-          await run({
+          const params = {
             cloud_directory_id: record.id,
             folder_id: values.folder_id,
             dry_run: values.dry_run,
-          });
+          };
+          setLastRequest(params);
+          await run(params);
           return true;
         }}
       >
@@ -260,12 +363,25 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
           disabled
           initialValue={record.directory_name}
         />
-        <ProFormText
+        <Form.Item
           name="folder_id"
           label="115 目录 ID"
-          placeholder="请输入 115 目录 ID"
-          rules={[{ required: true, message: '请输入 115 目录 ID' }]}
-        />
+          rules={[{ required: true, message: '请选择 115 目录' }]}
+        >
+          <TreeSelect
+            treeDataSimpleMode={{ rootPId: '0' }}
+            treeData={treeData}
+            placeholder="请选择目录"
+            loadData={handleLoadData}
+            showSearch
+            treeLine
+            style={{ width: '100%' }}
+            filterTreeNode={(input, node) =>
+              String(node?.title || '').toLowerCase().includes(input.toLowerCase())
+            }
+            dropdownStyle={{ maxHeight: 420, overflow: 'auto' }}
+          />
+        </Form.Item>
         <ProFormSwitch
           name="dry_run"
           label="演练模式"
@@ -281,7 +397,33 @@ const OrganizeModal: React.FC<OrganizeModalProps> = ({ record, onSuccess }) => {
         title="整理结果预览"
         open={resultOpen}
         onCancel={() => setResultOpen(false)}
-        footer={null}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button
+              onClick={() => {
+                if (!lastRequest) return;
+                setReturnToFormOnSuccess(false);
+                run({ ...lastRequest });
+              }}
+              loading={loading}
+              disabled={!lastRequest}
+            >
+              重新整理
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                if (!lastRequest) return;
+                setReturnToFormOnSuccess(true);
+                run({ ...lastRequest, dry_run: false });
+              }}
+              loading={loading}
+              disabled={!lastRequest || lastRequest?.dry_run === false}
+            >
+              确认整理
+            </Button>
+          </div>
+        }
         width={1000}
         destroyOnClose
       >
