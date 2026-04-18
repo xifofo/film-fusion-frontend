@@ -8,7 +8,7 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
+import { history, useRequest } from '@umijs/max';
 import { Button, Drawer, message, Popconfirm, Space, Tag, Tooltip } from 'antd';
 import React, { useMemo, useRef, useState } from 'react';
 import {
@@ -18,7 +18,6 @@ import {
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
-import OrganizeModal from './components/OrganizeModal';
 
 const DirectoryList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
@@ -220,12 +219,13 @@ const DirectoryList: React.FC = () => {
               actionRef.current?.reload?.();
             }}
           />
-          <OrganizeModal
-            record={record}
-            onSuccess={() => {
-              actionRef.current?.reload?.();
-            }}
-          />
+          <Button
+            type="link"
+            size="small"
+            onClick={() => history.push(`/directories/organize/${record.id}`)}
+          >
+            整理
+          </Button>
           <Popconfirm
             title="确定要删除这条目录配置吗？"
             onConfirm={() => delRun(record.id)}

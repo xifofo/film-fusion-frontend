@@ -47,6 +47,13 @@ export default [
     component: './directories',
   },
   {
+    name: '整理目录',
+    path: '/directories/organize/:id',
+    component: './directories/Organize',
+    hideInMenu: true,
+    parentKeys: ['/directories'],
+  },
+  {
     name: 'Match302重定向',
     icon: 'swap',
     path: '/match302',
@@ -57,6 +64,12 @@ export default [
     icon: 'database',
     path: '/pickcode-cache',
     component: './pickcode-cache',
+  },
+  {
+    name: 'Emby封面生成',
+    icon: 'picture',
+    path: '/emby-cover',
+    component: './emby-cover',
   },
   {
     path: '/',

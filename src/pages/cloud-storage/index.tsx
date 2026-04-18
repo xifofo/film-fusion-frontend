@@ -141,6 +141,14 @@ const CloudStorageList: React.FC = () => {
       },
     },
     {
+      title: '云盘账号',
+      dataIndex: 'provider_uid',
+      width: 140,
+      ellipsis: true,
+      hideInSearch: true,
+      render: (_, record) => record.provider_uid || '-',
+    },
+    {
       title: '应用ID',
       dataIndex: 'app_id',
       width: 150,

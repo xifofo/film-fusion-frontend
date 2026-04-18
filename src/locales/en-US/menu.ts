@@ -55,4 +55,5 @@ export default {
   'menu.目录配置': 'Directory Config',
   'menu.Match302重定向': 'Match302 Redirect',
   'menu.Pickcode缓存管理': 'Pickcode Cache',
+  'menu.Emby封面生成': 'Emby Cover',
 };

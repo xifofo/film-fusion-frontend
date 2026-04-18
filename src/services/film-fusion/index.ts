@@ -33,3 +33,6 @@ export * from './pickcodeCache';
 
 // Match302 重定向相关API
 export * from './match302';
+
+// Emby 媒体库封面生成相关 API
+export * from './embyCover';

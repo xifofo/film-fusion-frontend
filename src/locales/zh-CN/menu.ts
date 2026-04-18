@@ -55,4 +55,5 @@ export default {
   'menu.目录配置': '目录配置',
   'menu.Match302重定向': 'Match302重定向',
   'menu.Pickcode缓存管理': 'Pickcode缓存管理',
+  'menu.Emby封面生成': 'Emby 封面生成',
 };

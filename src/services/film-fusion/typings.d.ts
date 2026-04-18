@@ -88,6 +88,45 @@ declare namespace API {
     updateTime: string;
   };
 
+  /** Emby 封面模板元信息 */
+  type EmbyCoverTemplate = {
+    id: string;
+    name: string;
+  };
+
+  /** Emby 媒体库（合并本地配置） */
+  type EmbyCoverLibraryView = {
+    /** Emby 侧媒体库 ID */
+    emby_library_id: string;
+    /** Emby 库名 */
+    emby_name: string;
+    /** movies / tvshows / boxsets 等 */
+    collection_type: string;
+    /** 中文主标，空表示未配置，将使用 emby_name */
+    cn_title: string;
+    /** 英文副标 */
+    en_subtitle: string;
+    /** 模板 ID */
+    template_id: string;
+    /** 是否参与批量生成 */
+    enabled: boolean;
+    /** 上次生成成功时间 */
+    last_generated_at?: string | null;
+    /** 上次错误信息 */
+    last_error?: string;
+    /** 本地是否存有配置记录 */
+    configured: boolean;
+  };
+
+  /** 上行：更新媒体库封面配置参数 */
+  type UpsertEmbyCoverLibraryParams = {
+    emby_name?: string;
+    cn_title?: string;
+    en_subtitle?: string;
+    template_id?: string;
+    enabled?: boolean;
+  };
+
   /** 通用响应结构 */
   type Response<T = any> = {
     code: number;
@@ -243,6 +282,7 @@ declare namespace API {
       pickcode?: string;
       media_type?: string;
       category?: string;
+      tmdb_id?: string;
       title?: string;
       year?: string;
       title_year?: string;
@@ -381,6 +421,7 @@ declare namespace API {
     user_id: number;
     storage_type: string;
     storage_name: string;
+    provider_uid?: string;
     app_id?: string;
     app_secret?: string;
     access_token?: string;
