@@ -250,54 +250,69 @@ declare namespace API {
     classify_by_category?: boolean;
   };
 
-  /** 整理 115 Cookie 目录参数 */
   type Organize115CookieParams = {
     cloud_directory_id: number;
-    folder_id: string;
+    folder_id?: string;
+    folder_ids?: string[];
     dry_run?: boolean;
   };
 
-  /** 整理 115 Cookie 目录响应 */
+  type Organize115DirDebug = {
+    target_dir: string;
+    existing_dir: string;
+    existing_id: string;
+    missing_dirs: string[];
+    need_create: boolean;
+    final_id: string;
+    lookups?: Array<{
+      path: string;
+      id: string;
+    }>;
+  };
+
+  type Organize115ItemResult = {
+    file_id: string;
+    file_name: string;
+    pickcode?: string;
+    media_type?: string;
+    category?: string;
+    tmdb_id?: string;
+    title?: string;
+    year?: string;
+    title_year?: string;
+    transfer_name?: string;
+    target_path?: string;
+    target_dir?: string;
+    target_dir_id?: string;
+    need_create?: boolean;
+    missing_dirs?: string[];
+    rename_to?: string;
+    strm_path?: string;
+    strm_content?: string;
+    subtitle_queued?: boolean;
+    subtitle_error?: string;
+    local_dir?: string;
+    local_exists?: boolean;
+  };
+
+  type Organize115CookieGroup = {
+    folder_id: string;
+    total: number;
+    dir_debug?: Organize115DirDebug[];
+    items?: Organize115ItemResult[];
+    error?: string;
+  };
+
   type Organize115CookieResult = {
     cloud_directory_id: number;
     cloud_storage_id: number;
     folder_id: string;
+    folder_ids?: string[];
     dry_run: boolean;
     total: number;
-    dir_debug?: Array<{
-      target_dir: string;
-      existing_dir: string;
-      existing_id: string;
-      missing_dirs: string[];
-      need_create: boolean;
-      final_id: string;
-      lookups?: Array<{
-        path: string;
-        id: string;
-      }>;
-    }>;
-    items?: Array<{
-      file_id: string;
-      file_name: string;
-      pickcode?: string;
-      media_type?: string;
-      category?: string;
-      tmdb_id?: string;
-      title?: string;
-      year?: string;
-      title_year?: string;
-      transfer_name?: string;
-      target_path?: string;
-      target_dir?: string;
-      target_dir_id?: string;
-      need_create?: boolean;
-      missing_dirs?: string[];
-      rename_to?: string;
-      strm_path?: string;
-      strm_content?: string;
-      subtitle_queued?: boolean;
-      subtitle_error?: string;
-    }>;
+    dir_debug?: Organize115DirDebug[];
+    items?: Organize115ItemResult[];
+    groups?: Organize115CookieGroup[];
   };
 
   /** 115 Cookie 目录请求参数 */
