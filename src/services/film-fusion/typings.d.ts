@@ -255,6 +255,9 @@ declare namespace API {
     folder_id?: string;
     folder_ids?: string[];
     dry_run?: boolean;
+    filename_regex_enabled?: boolean;
+    filename_regex_pattern?: string;
+    filename_regex_replacement?: string;
   };
 
   type Organize115DirDebug = {
@@ -273,6 +276,7 @@ declare namespace API {
   type Organize115ItemResult = {
     file_id: string;
     file_name: string;
+    recognize_name?: string;
     pickcode?: string;
     media_type?: string;
     category?: string;

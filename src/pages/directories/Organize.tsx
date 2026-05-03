@@ -47,6 +47,61 @@ import {
 
 const ROOT_KEY = '0';
 const PAGE_LIMIT = 1150;
+const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
+const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
+const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
+
+type FilenameRegexConfig = {
+  enabled: boolean;
+  pattern: string;
+  replacement: string;
+};
+
+const defaultFilenameRegexConfig: FilenameRegexConfig = {
+  enabled: false,
+  pattern: DEFAULT_FILENAME_REGEX_PATTERN,
+  replacement: DEFAULT_FILENAME_REGEX_REPLACEMENT,
+};
+
+function loadFilenameRegexConfig(): FilenameRegexConfig {
+  if (typeof window === 'undefined') {
+    return defaultFilenameRegexConfig;
+  }
+  try {
+    const raw = window.localStorage.getItem(FILENAME_REGEX_STORAGE_KEY);
+    if (!raw) {
+      return defaultFilenameRegexConfig;
+    }
+    const parsed = JSON.parse(raw) as Partial<FilenameRegexConfig>;
+    return {
+      enabled: !!parsed.enabled,
+      pattern:
+        typeof parsed.pattern === 'string'
+          ? parsed.pattern
+          : DEFAULT_FILENAME_REGEX_PATTERN,
+      replacement:
+        typeof parsed.replacement === 'string'
+          ? parsed.replacement
+          : DEFAULT_FILENAME_REGEX_REPLACEMENT,
+    };
+  } catch {
+    return defaultFilenameRegexConfig;
+  }
+}
+
+function saveFilenameRegexConfig(config: FilenameRegexConfig) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      FILENAME_REGEX_STORAGE_KEY,
+      JSON.stringify(config),
+    );
+  } catch {
+    return;
+  }
+}
 
 type TreeItemMeta = {
   name: string;
@@ -142,6 +197,8 @@ const OrganizePage: React.FC = () => {
   const [selectedKey, setSelectedKey] = useState<string>();
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [filenameRegexConfig, setFilenameRegexConfig] =
+    useState<FilenameRegexConfig>(() => loadFilenameRegexConfig());
 
   const [dryRun, setDryRun] = useState(true);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
@@ -237,6 +294,17 @@ const OrganizePage: React.FC = () => {
     loadChildren(ROOT_KEY).finally(() => setRootLoading(false));
   }, [cloudStorageId, loadChildren]);
 
+  useEffect(() => {
+    saveFilenameRegexConfig(filenameRegexConfig);
+  }, [filenameRegexConfig]);
+
+  const updateFilenameRegexConfig = useCallback(
+    (patch: Partial<FilenameRegexConfig>) => {
+      setFilenameRegexConfig((prev) => ({ ...prev, ...patch }));
+    },
+    [],
+  );
+
   const onLoadData = useCallback(
     async (node: DataNode) => {
       await loadChildren(String(node.key));
@@ -331,6 +399,32 @@ const OrganizePage: React.FC = () => {
     },
   );
 
+  const buildOrganizeParams = useCallback(
+    (
+      folderIds: string[],
+      dryRunValue: boolean,
+    ): API.Organize115CookieParams | undefined => {
+      const pattern = filenameRegexConfig.pattern.trim();
+      if (filenameRegexConfig.enabled && !pattern) {
+        messageApi.warning('启用文件名处理时，正则不能为空');
+        return undefined;
+      }
+      return {
+        cloud_directory_id: directoryId,
+        folder_ids: folderIds,
+        dry_run: dryRunValue,
+        filename_regex_enabled: filenameRegexConfig.enabled,
+        ...(filenameRegexConfig.enabled
+          ? {
+              filename_regex_pattern: pattern,
+              filename_regex_replacement: filenameRegexConfig.replacement,
+            }
+          : {}),
+      };
+    },
+    [directoryId, filenameRegexConfig, messageApi],
+  );
+
   const triggerOrganize = useCallback(
     (mode: 'dry' | 'apply') => {
       if (checkedKeys.length === 0) {
@@ -338,6 +432,10 @@ const OrganizePage: React.FC = () => {
         return;
       }
       const folderIds = [...checkedKeys];
+      const organizeParams = buildOrganizeParams(folderIds, mode === 'dry');
+      if (!organizeParams) {
+        return;
+      }
       if (mode === 'apply') {
         modalApi.confirm({
           title: `确认整理 ${folderIds.length} 个 115 目录？`,
@@ -347,22 +445,13 @@ const OrganizePage: React.FC = () => {
           okText: '执行整理',
           okButtonProps: { danger: true },
           cancelText: '取消',
-          onOk: () =>
-            runOrganize({
-              cloud_directory_id: directoryId,
-              folder_ids: folderIds,
-              dry_run: false,
-            }),
+          onOk: () => runOrganize(organizeParams),
         });
         return;
       }
-      runOrganize({
-        cloud_directory_id: directoryId,
-        folder_ids: folderIds,
-        dry_run: true,
-      });
+      runOrganize(organizeParams);
     },
-    [checkedKeys, directoryId, messageApi, modalApi, runOrganize],
+    [buildOrganizeParams, checkedKeys, messageApi, modalApi, runOrganize],
   );
 
   const itemColumns = useMemo<ProColumns<OrganizeItemRow>[]>(
@@ -420,6 +509,20 @@ const OrganizePage: React.FC = () => {
             <span>{row.file_name}</span>
           </Tooltip>
         ),
+      },
+      {
+        title: '识别名',
+        dataIndex: 'recognize_name',
+        width: 240,
+        ellipsis: true,
+        render: (_, row) =>
+          row.recognize_name ? (
+            <Tooltip title={row.recognize_name}>
+              <span>{row.recognize_name}</span>
+            </Tooltip>
+          ) : (
+            <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
+          ),
       },
       {
         title: 'Pickcode',
@@ -849,6 +952,62 @@ const OrganizePage: React.FC = () => {
               </Space>
             }
           >
+            <Alert
+              type={filenameRegexConfig.enabled ? 'warning' : 'info'}
+              showIcon={false}
+              style={{ marginBottom: 12 }}
+              message={
+                <Space size={[8, 8]} wrap>
+                  <Button
+                    size="small"
+                    type={filenameRegexConfig.enabled ? 'primary' : 'default'}
+                    onClick={() =>
+                      updateFilenameRegexConfig({
+                        enabled: !filenameRegexConfig.enabled,
+                      })
+                    }
+                  >
+                    文件名处理：{filenameRegexConfig.enabled ? '已开启' : '未开启'}
+                  </Button>
+                  <Input
+                    size="small"
+                    addonBefore="正则"
+                    value={filenameRegexConfig.pattern}
+                    onChange={(e) =>
+                      updateFilenameRegexConfig({ pattern: e.target.value })
+                    }
+                    style={{ width: 320 }}
+                  />
+                  <Input
+                    size="small"
+                    addonBefore="替换为"
+                    value={filenameRegexConfig.replacement}
+                    onChange={(e) =>
+                      updateFilenameRegexConfig({
+                        replacement: e.target.value,
+                      })
+                    }
+                    style={{ width: 200 }}
+                  />
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      setFilenameRegexConfig((prev) => ({
+                        ...prev,
+                        pattern: DEFAULT_FILENAME_REGEX_PATTERN,
+                        replacement: DEFAULT_FILENAME_REGEX_REPLACEMENT,
+                      }))
+                    }
+                  >
+                    恢复默认
+                  </Button>
+                  <Typography.Text type="secondary">
+                    开启后用替换结果调用 MoviePilot 识别/转名。
+                  </Typography.Text>
+                </Space>
+              }
+            />
+
             {checkedFolders.length > 0 ? (
               <Alert
                 type="info"
