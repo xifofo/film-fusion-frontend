@@ -116,6 +116,25 @@ type OrganizeDirDebug = NonNullable<
 type OrganizeItemRow = OrganizeItem & { __folder_id?: string };
 type OrganizeDirDebugRow = OrganizeDirDebug & { __folder_id?: string };
 
+function getOrganizeItemRowKey(row: OrganizeItemRow): string {
+  return `${row.__folder_id || ''}::${row.file_id}`;
+}
+
+function flattenOrganizeItems(
+  result?: API.Organize115CookieResult,
+): OrganizeItemRow[] {
+  const groups = result?.groups;
+  if (groups && groups.length > 0) {
+    return groups.flatMap((g) =>
+      (g.items || []).map((it) => ({ ...it, __folder_id: g.folder_id })),
+    );
+  }
+  return (result?.items || []).map((it) => ({
+    ...it,
+    __folder_id: result?.folder_id,
+  }));
+}
+
 const TV_MEDIA_TYPES = new Set([
   'tv',
   'tvshow',
@@ -181,6 +200,30 @@ const renderMissingDirs = (value?: string[] | string) => {
   return '-';
 };
 
+const renderFileSize = (value?: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return '-';
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const text =
+    unitIndex === 0
+      ? `${size} ${units[unitIndex]}`
+      : `${size.toFixed(size >= 100 ? 0 : size >= 10 ? 1 : 2)} ${
+          units[unitIndex]
+        }`;
+  return (
+    <Tooltip title={`${value} B`}>
+      <span>{text}</span>
+    </Tooltip>
+  );
+};
+
 const OrganizePage: React.FC = () => {
   const params = useParams<{ id: string }>();
   const directoryId = Number(params.id);
@@ -203,6 +246,9 @@ const OrganizePage: React.FC = () => {
   const [dryRun, setDryRun] = useState(true);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
   const [rawResponse, setRawResponse] = useState<unknown>();
+  const [selectedItemRowKeys, setSelectedItemRowKeys] = useState<React.Key[]>(
+    [],
+  );
 
   const {
     data: directoryDetail,
@@ -290,6 +336,7 @@ const OrganizePage: React.FC = () => {
     setExpandedKeys([]);
     setResultData(undefined);
     setRawResponse(undefined);
+    setSelectedItemRowKeys([]);
     setRootLoading(true);
     loadChildren(ROOT_KEY).finally(() => setRootLoading(false));
   }, [cloudStorageId, loadChildren]);
@@ -297,6 +344,12 @@ const OrganizePage: React.FC = () => {
   useEffect(() => {
     saveFilenameRegexConfig(filenameRegexConfig);
   }, [filenameRegexConfig]);
+
+  useEffect(() => {
+    setResultData(undefined);
+    setRawResponse(undefined);
+    setSelectedItemRowKeys([]);
+  }, [checkedKeys]);
 
   const updateFilenameRegexConfig = useCallback(
     (patch: Partial<FilenameRegexConfig>) => {
@@ -387,9 +440,13 @@ const OrganizePage: React.FC = () => {
         if (payload?.dry_run) {
           setResultData(payload);
           setRawResponse(response);
+          setSelectedItemRowKeys(
+            flattenOrganizeItems(payload).map(getOrganizeItemRowKey),
+          );
         } else {
           setResultData(undefined);
           setRawResponse(undefined);
+          setSelectedItemRowKeys([]);
           setCheckedKeys([]);
         }
       },
@@ -399,10 +456,23 @@ const OrganizePage: React.FC = () => {
     },
   );
 
+  const flatItemsForTable = useMemo<OrganizeItemRow[]>(
+    () => flattenOrganizeItems(resultData),
+    [resultData],
+  );
+
+  const selectedItemRowsForApply = useMemo(() => {
+    const selectedSet = new Set(selectedItemRowKeys.map((key) => String(key)));
+    return flatItemsForTable.filter((row) =>
+      selectedSet.has(getOrganizeItemRowKey(row)),
+    );
+  }, [flatItemsForTable, selectedItemRowKeys]);
+
   const buildOrganizeParams = useCallback(
     (
       folderIds: string[],
       dryRunValue: boolean,
+      fileIds?: string[],
     ): API.Organize115CookieParams | undefined => {
       const pattern = filenameRegexConfig.pattern.trim();
       if (filenameRegexConfig.enabled && !pattern) {
@@ -412,6 +482,7 @@ const OrganizePage: React.FC = () => {
       return {
         cloud_directory_id: directoryId,
         folder_ids: folderIds,
+        ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
         dry_run: dryRunValue,
         filename_regex_enabled: filenameRegexConfig.enabled,
         ...(filenameRegexConfig.enabled
@@ -427,20 +498,51 @@ const OrganizePage: React.FC = () => {
 
   const triggerOrganize = useCallback(
     (mode: 'dry' | 'apply') => {
-      if (checkedKeys.length === 0) {
-        messageApi.warning('请先在左侧勾选至少一个 115 目录');
+      if (mode === 'dry') {
+        if (checkedKeys.length === 0) {
+          messageApi.warning('请先在左侧勾选至少一个 115 目录');
+          return;
+        }
+        const folderIds = [...checkedKeys];
+        const organizeParams = buildOrganizeParams(folderIds, true);
+        if (!organizeParams) {
+          return;
+        }
+        runOrganize(organizeParams);
         return;
       }
-      const folderIds = [...checkedKeys];
-      const organizeParams = buildOrganizeParams(folderIds, mode === 'dry');
-      if (!organizeParams) {
-        return;
-      }
-      if (mode === 'apply') {
+
+      if (resultData?.dry_run) {
+        if (selectedItemRowsForApply.length === 0) {
+          messageApi.warning('请先在处理明细表格中选择至少一条记录');
+          return;
+        }
+        const folderIds = Array.from(
+          new Set(
+            selectedItemRowsForApply
+              .map((row) => row.__folder_id)
+              .filter((id): id is string => !!id),
+          ),
+        );
+        const fileIds = Array.from(
+          new Set(
+            selectedItemRowsForApply
+              .map((row) => row.file_id)
+              .filter((id): id is string => !!id),
+          ),
+        );
+        if (folderIds.length === 0 || fileIds.length === 0) {
+          messageApi.warning('预览结果缺少来源目录或文件 ID，无法按明细整理');
+          return;
+        }
+        const organizeParams = buildOrganizeParams(folderIds, false, fileIds);
+        if (!organizeParams) {
+          return;
+        }
         modalApi.confirm({
-          title: `确认整理 ${folderIds.length} 个 115 目录？`,
+          title: `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
           content:
-            '将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。' +
+            '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。' +
             '单个目录失败不会阻断其它，错误会标注在对应分组上。',
           okText: '执行整理',
           okButtonProps: { danger: true },
@@ -449,87 +551,40 @@ const OrganizePage: React.FC = () => {
         });
         return;
       }
-      runOrganize(organizeParams);
+
+      if (checkedKeys.length === 0) {
+        messageApi.warning('请先在左侧勾选至少一个 115 目录');
+        return;
+      }
+      const folderIds = [...checkedKeys];
+      const organizeParams = buildOrganizeParams(folderIds, false);
+      if (!organizeParams) {
+        return;
+      }
+      modalApi.confirm({
+        title: `确认整理 ${folderIds.length} 个 115 目录？`,
+        content:
+          '将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。' +
+          '单个目录失败不会阻断其它，错误会标注在对应分组上。',
+        okText: '执行整理',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => runOrganize(organizeParams),
+      });
     },
-    [buildOrganizeParams, checkedKeys, messageApi, modalApi, runOrganize],
+    [
+      buildOrganizeParams,
+      checkedKeys,
+      messageApi,
+      modalApi,
+      resultData?.dry_run,
+      runOrganize,
+      selectedItemRowsForApply,
+    ],
   );
 
   const itemColumns = useMemo<ProColumns<OrganizeItemRow>[]>(
     () => [
-      {
-        title: '来源目录',
-        dataIndex: '__folder_id',
-        width: 180,
-        fixed: 'left',
-        ellipsis: true,
-        render: (_, row) => {
-          const fid = row.__folder_id;
-          if (!fid) return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
-          const path = buildPathByKey(fid);
-          const label =
-            path.length > 0 ? path.map((p) => p.name).join(' / ') : fid;
-          return (
-            <Tooltip title={`folder_id: ${fid}`}>
-              <Tag color="blue">{label}</Tag>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        title: '本地入库',
-        dataIndex: 'local_exists',
-        width: 110,
-        fixed: 'left',
-        render: (_, row) => {
-          if (!row.local_dir) {
-            return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
-          }
-          return (
-            <Tooltip title={row.local_dir}>
-              <Tag color={row.local_exists ? 'success' : 'default'}>
-                {row.local_exists ? '已入库' : '未入库'}
-              </Tag>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        title: '文件 ID',
-        dataIndex: 'file_id',
-        width: 160,
-        ellipsis: true,
-      },
-      {
-        title: '文件名',
-        dataIndex: 'file_name',
-        width: 240,
-        ellipsis: true,
-        render: (_, row) => (
-          <Tooltip title={row.file_name}>
-            <span>{row.file_name}</span>
-          </Tooltip>
-        ),
-      },
-      {
-        title: '识别名',
-        dataIndex: 'recognize_name',
-        width: 240,
-        ellipsis: true,
-        render: (_, row) =>
-          row.recognize_name ? (
-            <Tooltip title={row.recognize_name}>
-              <span>{row.recognize_name}</span>
-            </Tooltip>
-          ) : (
-            <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
-          ),
-      },
-      {
-        title: 'Pickcode',
-        dataIndex: 'pickcode',
-        width: 140,
-        ellipsis: true,
-      },
       {
         title: '类型',
         dataIndex: 'media_type',
@@ -566,6 +621,78 @@ const OrganizePage: React.FC = () => {
         dataIndex: 'title_year',
         width: 160,
         ellipsis: true,
+      },
+      {
+        title: '文件大小',
+        dataIndex: 'file_size',
+        width: 110,
+        render: (_, row) => renderFileSize(row.file_size),
+      },
+      {
+        title: '文件名',
+        dataIndex: 'file_name',
+        width: 240,
+        ellipsis: true,
+        render: (_, row) => (
+          <Tooltip title={row.file_name}>
+            <span>{row.file_name}</span>
+          </Tooltip>
+        ),
+      },
+      {
+        title: '识别名',
+        dataIndex: 'recognize_name',
+        width: 240,
+        ellipsis: true,
+        render: (_, row) =>
+          row.recognize_name ? (
+            <Tooltip title={row.recognize_name}>
+              <span>{row.recognize_name}</span>
+            </Tooltip>
+          ) : (
+            <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
+          ),
+      },
+      {
+        title: 'Pickcode',
+        dataIndex: 'pickcode',
+        width: 140,
+        ellipsis: true,
+      },
+      {
+        title: '本地入库',
+        dataIndex: 'local_exists',
+        width: 110,
+        render: (_, row) => {
+          if (!row.local_dir) {
+            return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
+          }
+          return (
+            <Tooltip title={row.local_dir}>
+              <Tag color={row.local_exists ? 'success' : 'default'}>
+                {row.local_exists ? '已入库' : '未入库'}
+              </Tag>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        title: '来源目录',
+        dataIndex: '__folder_id',
+        width: 180,
+        ellipsis: true,
+        render: (_, row) => {
+          const fid = row.__folder_id;
+          if (!fid) return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
+          const path = buildPathByKey(fid);
+          const label =
+            path.length > 0 ? path.map((p) => p.name).join(' / ') : fid;
+          return (
+            <Tooltip title={`folder_id: ${fid}`}>
+              <Tag color="blue">{label}</Tag>
+            </Tooltip>
+          );
+        },
       },
       {
         title: '转名',
@@ -723,16 +850,6 @@ const OrganizePage: React.FC = () => {
     [buildPathByKey],
   );
 
-  const flatItemsForTable = useMemo<OrganizeItemRow[]>(() => {
-    const groups = resultData?.groups;
-    if (groups && groups.length > 0) {
-      return groups.flatMap((g) =>
-        (g.items || []).map((it) => ({ ...it, __folder_id: g.folder_id })),
-      );
-    }
-    return (resultData?.items as OrganizeItemRow[]) || [];
-  }, [resultData]);
-
   const flatDirDebugForTable = useMemo<OrganizeDirDebugRow[]>(() => {
     const groups = resultData?.groups;
     if (groups && groups.length > 0) {
@@ -784,6 +901,13 @@ const OrganizePage: React.FC = () => {
       <Tag>目录 ID: {directoryDetail.directory_id}</Tag>
     </Space>
   ) : null;
+  const hasPreviewResult = !!resultData?.dry_run;
+  const applyDisabled = hasPreviewResult
+    ? selectedItemRowsForApply.length === 0
+    : checkedKeys.length === 0;
+  const applyButtonText = hasPreviewResult
+    ? `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+    : `确认整理 (${checkedKeys.length})`;
 
   return (
     <PageContainer
@@ -945,9 +1069,9 @@ const OrganizePage: React.FC = () => {
                   icon={<ThunderboltOutlined />}
                   onClick={() => triggerOrganize('apply')}
                   loading={organizeLoading && !dryRun}
-                  disabled={checkedKeys.length === 0}
+                  disabled={applyDisabled}
                 >
-                  确认整理 ({checkedKeys.length})
+                  {applyButtonText}
                 </Button>
               </Space>
             }
@@ -967,7 +1091,8 @@ const OrganizePage: React.FC = () => {
                       })
                     }
                   >
-                    文件名处理：{filenameRegexConfig.enabled ? '已开启' : '未开启'}
+                    文件名处理：
+                    {filenameRegexConfig.enabled ? '已开启' : '未开启'}
                   </Button>
                   <Input
                     size="small"
@@ -1128,9 +1253,12 @@ const OrganizePage: React.FC = () => {
                       label: `处理明细 (${flatItemsForTable.length})`,
                       children: (
                         <ProTable<OrganizeItemRow>
-                          rowKey={(row) =>
-                            `${row.__folder_id || ''}::${row.file_id}`
-                          }
+                          rowKey={getOrganizeItemRowKey}
+                          rowSelection={{
+                            selectedRowKeys: selectedItemRowKeys,
+                            onChange: (keys) => setSelectedItemRowKeys(keys),
+                            preserveSelectedRowKeys: true,
+                          }}
                           search={false}
                           options={false}
                           pagination={{ pageSize: 10, showSizeChanger: true }}

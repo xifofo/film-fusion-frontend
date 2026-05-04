@@ -254,6 +254,7 @@ declare namespace API {
     cloud_directory_id: number;
     folder_id?: string;
     folder_ids?: string[];
+    file_ids?: string[];
     dry_run?: boolean;
     filename_regex_enabled?: boolean;
     filename_regex_pattern?: string;
@@ -276,6 +277,7 @@ declare namespace API {
   type Organize115ItemResult = {
     file_id: string;
     file_name: string;
+    file_size?: number;
     recognize_name?: string;
     pickcode?: string;
     media_type?: string;
