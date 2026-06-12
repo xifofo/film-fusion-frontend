@@ -9,6 +9,22 @@ declare namespace API {
     updateTime?: string;
   };
 
+  /** Ant Design Pro 默认规则 mock 数据 */
+  type RuleListItem = {
+    key: number;
+    disabled?: boolean;
+    href?: string;
+    avatar?: string;
+    name?: string;
+    owner?: string;
+    desc?: string;
+    callNo?: number;
+    status?: number;
+    updatedAt?: string;
+    createdAt?: string;
+    progress?: number;
+  };
+
   /** 媒体文件信息 */
   type Media = {
     id: number;
@@ -88,6 +104,19 @@ declare namespace API {
     updateTime: string;
   };
 
+  /** 扫描任务查询参数 */
+  type ScanTaskQueryParams = PageParams & {
+    status?: string;
+    pathId?: number;
+    keyword?: string;
+  };
+
+  /** 创建扫描任务参数 */
+  type CreateScanTaskParams = {
+    name: string;
+    pathId: number;
+  };
+
   /** Emby 封面模板元信息 */
   type EmbyCoverTemplate = {
     id: string;
@@ -118,6 +147,60 @@ declare namespace API {
     configured: boolean;
   };
 
+  /** SortName 单次 backfill 任务（运行中/已结束的统一形态） */
+  type EmbySortNameJob = {
+    id: string;
+    library_ids: string[];
+    /** true 时忽略 LockedFields 强制覆盖 */
+    force: boolean;
+    started_at: string;
+    finished_at: string | null;
+    running: boolean;
+    total: number;
+    updated: number;
+    skipped: number;
+    errors: number;
+    error_msg?: string;
+    duration_ms: number;
+  };
+
+  /** SortName 状态查询响应 */
+  type EmbySortNameStatus = {
+    running: boolean;
+    job: EmbySortNameJob | null;
+  };
+
+  /** SortName 单 Item 处理结果 */
+  type EmbySortNameItemResult = {
+    item_id: string;
+    name: string;
+    action: 'updated' | 'skipped' | 'error';
+    reason: string;
+    new_sort: string;
+    error?: string;
+  };
+
+  /** Emby 单个媒体库的电影 / 电视剧数量 */
+  type EmbyLibraryStat = {
+    emby_library_id: string;
+    emby_name: string;
+    /** movies / tvshows / mixed / homevideos / boxsets / music ... */
+    collection_type: string;
+    movie_count: number;
+    series_count: number;
+  };
+
+  /** Emby 媒体库电影 / 电视剧统计快照 */
+  type EmbyStats = {
+    generated_at: string;
+    total_libraries: number;
+    total_movies: number;
+    total_series: number;
+    libraries: EmbyLibraryStat[];
+    /** 部分库统计失败的提示信息（可降级展示） */
+    partial_errors?: string[];
+  };
+
   /** 上行：更新媒体库封面配置参数 */
   type UpsertEmbyCoverLibraryParams = {
     emby_name?: string;
@@ -125,6 +208,26 @@ declare namespace API {
     en_subtitle?: string;
     template_id?: string;
     enabled?: boolean;
+  };
+
+  /** Emby 代理 302 重定向日志条目 */
+  type EmbyProxy302LogEntry = {
+    id: number;
+    timestamp: string;
+    /** 来源标识：cache（命中缓存）/ proxyPlay（实时计算） */
+    source: string;
+    method: string;
+    uri: string;
+    user_agent: string;
+    remote_ip: string;
+    target: string;
+  };
+
+  /** Emby 代理 302 重定向日志查询响应 */
+  type EmbyProxy302LogList = {
+    count: number;
+    capacity: number;
+    entries: EmbyProxy302LogEntry[];
   };
 
   /** 通用响应结构 */
@@ -591,5 +694,57 @@ declare namespace API {
     source_path?: string;
     target_path?: string;
     cloud_storage_id?: number;
+  };
+
+  /** 整理日志记录 */
+  type OrganizeLog = {
+    id: number;
+    action: string;             // strm_create / strm_delete / strm_rename / file_download / walk_dir
+    status: string;             // success / skipped / failed
+    trigger?: string;           // cd2_notify / mp2_notify / manual / download_worker / webhook
+    source?: string;
+    target?: string;
+    cloud_path_id?: number;
+    cloud_storage_id?: number;
+    pick_code?: string;
+    message?: string;
+    error?: string;
+    duration_ms?: number;
+    size_bytes?: number;
+    created_at: string;
+    cloud_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
+  /** 整理日志查询参数 */
+  type OrganizeLogQueryParams = PageParams & {
+    page?: number;
+    size?: number;
+    action?: string;
+    status?: string;
+    trigger?: string;
+    cloud_path_id?: number;
+    cloud_storage_id?: number;
+    search?: string;
+    start?: string;             // RFC3339
+    end?: string;
+  };
+
+  /** 整理日志统计 */
+  type OrganizeLogStats = {
+    total: number;
+    breakdown: { action: string; status: string; count: number }[];
+    recent_24h: { action: string; status: string; count: number }[];
+  };
+
+  /** 清理整理日志参数 */
+  type ClearOrganizeLogParams = {
+    status?: string;
+    action?: string;
+    before_days?: number;
+    confirm_all?: boolean;
   };
 }

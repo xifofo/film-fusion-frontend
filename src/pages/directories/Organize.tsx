@@ -663,6 +663,7 @@ const OrganizePage: React.FC = () => {
         title: '本地入库',
         dataIndex: 'local_exists',
         width: 110,
+        fixed: 'left',
         render: (_, row) => {
           if (!row.local_dir) {
             return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;

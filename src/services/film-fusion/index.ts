@@ -36,3 +36,15 @@ export * from './match302';
 
 // Emby 媒体库封面生成相关 API
 export * from './embyCover';
+
+// Emby 媒体 SortName 拼音首字母回填
+export * from './embySortName';
+
+// Emby 媒体库电影 / 电视剧数量统计
+export * from './embyStats';
+
+// Emby 代理 302 重定向日志
+export * from './embyProxyLog';
+
+// 整理日志（STRM 生成 / 文件下载等业务事件）
+export * from './organizeLog';

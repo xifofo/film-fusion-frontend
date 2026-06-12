@@ -1,5 +1,7 @@
 import {
+  backfillEmbySortName,
   batchGenerateEmbyCovers,
+  getEmbySortNameStatus,
   listEmbyCoverLibraries,
   listEmbyCoverTemplates,
 } from '@/services/film-fusion';
@@ -7,6 +9,7 @@ import {
   CloudUploadOutlined,
   EditOutlined,
   EyeOutlined,
+  SortAscendingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
@@ -23,11 +26,75 @@ import {
   Typography,
   message,
 } from 'antd';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import EditConfigForm from './components/EditConfigForm';
 import PreviewModal from './components/PreviewModal';
 
 const { Text } = Typography;
+
+/** SortName backfill 任务状态条：运行中显示进度，已结束显示最终统计 */
+const SortNameJobAlert: React.FC<{ job: API.EmbySortNameJob }> = ({ job }) => {
+  const seconds = Math.round((job.duration_ms || 0) / 1000);
+  const baseScope =
+    job.library_ids && job.library_ids.length > 0
+      ? `指定 ${job.library_ids.length} 个库`
+      : '全库';
+  const scope = job.force ? `${baseScope} · 强制覆盖` : baseScope;
+
+  if (job.running) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={`SortName 拼音回填进行中（${scope}）`}
+        description={
+          <Text type="secondary">
+            已处理 <Text strong>{job.total}</Text>，更新 {job.updated}，跳过{' '}
+            {job.skipped}，错误 {job.errors}，已耗时 {seconds}s。后端后台运行，刷新页面不影响。
+          </Text>
+        }
+      />
+    );
+  }
+
+  if (job.error_msg) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        closable
+        style={{ marginBottom: 16 }}
+        message={`SortName 拼音回填终止（${scope}）`}
+        description={
+          <div>
+            <div>
+              已处理 {job.total}，更新 {job.updated}，跳过 {job.skipped}，错误{' '}
+              {job.errors}，耗时 {seconds}s
+            </div>
+            <Text type="danger">原因：{job.error_msg}</Text>
+          </div>
+        }
+      />
+    );
+  }
+
+  return (
+    <Alert
+      type={job.errors > 0 ? 'warning' : 'success'}
+      showIcon
+      closable
+      style={{ marginBottom: 16 }}
+      message={`SortName 拼音回填完成（${scope}）`}
+      description={
+        <Text type="secondary">
+          总计 <Text strong>{job.total}</Text>，更新 {job.updated}，跳过{' '}
+          {job.skipped}，错误 {job.errors}，耗时 {seconds}s
+        </Text>
+      }
+    />
+  );
+};
 
 /** 媒体库类型标签 */
 const collectionTypeTag = (t: string) => {
@@ -47,6 +114,10 @@ const EmbyCoverPage: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<API.EmbyCoverLibraryView>();
+  // SortName backfill 全局状态（后端同时只跑一个任务）
+  const [sortNameJob, setSortNameJob] = useState<API.EmbySortNameJob | null>(null);
+  // 正在启动哪一行的 backfill（仅启动瞬间，为”按下后立即返回“提供视觉反馈）
+  const [sortNameStarting, setSortNameStarting] = useState<string | null>(null);
 
   // 模板列表（全局拉一次）
   const { data: templates = [] } = useRequest(listEmbyCoverTemplates, {
@@ -58,6 +129,53 @@ const EmbyCoverPage: React.FC = () => {
     templates.forEach((t) => (m[t.id] = t.name));
     return m;
   }, [templates]);
+
+  // SortName 状态轮询：进页拉一次；running 时 3 秒一次
+  const fetchSortNameStatus = useCallback(async () => {
+    try {
+      const resp = await getEmbySortNameStatus();
+      setSortNameJob(resp?.data?.job || null);
+    } catch {
+      // 静默：状态接口失败不应中断页面
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSortNameStatus();
+  }, [fetchSortNameStatus]);
+
+  useEffect(() => {
+    if (!sortNameJob?.running) return;
+    const timer = setInterval(fetchSortNameStatus, 3000);
+    return () => clearInterval(timer);
+  }, [sortNameJob?.running, sortNameJob?.id, fetchSortNameStatus]);
+
+  // 启动 SortName backfill（后端立即返回，后台跑）
+  const startSortNameBackfill = async (
+    libraryIds: string[] | undefined,
+    actionKey: string,
+    force = false,
+  ) => {
+    setSortNameStarting(actionKey);
+    try {
+      const resp = await backfillEmbySortName(libraryIds, force);
+      if (resp?.data) {
+        setSortNameJob(resp.data);
+        message.success(
+          force
+            ? 'SortName 强制覆盖已启动，后端后台执行'
+            : 'SortName 回填已启动，后端后台执行，可关闭页面',
+        );
+      }
+    } catch (e: any) {
+      message.error(e?.message || '启动 SortName 回填失败');
+      fetchSortNameStatus();
+    } finally {
+      setSortNameStarting(null);
+    }
+  };
+
+  const sortNameRunning = !!sortNameJob?.running;
 
   // 批量生成
   const { run: batchRun, loading: batchLoading } = useRequest(batchGenerateEmbyCovers, {
@@ -105,6 +223,7 @@ const EmbyCoverPage: React.FC = () => {
     setPreviewRow(row);
     setPreviewOpen(true);
   };
+
 
   const columns: ProColumns<API.EmbyCoverLibraryView>[] = [
     {
@@ -192,7 +311,7 @@ const EmbyCoverPage: React.FC = () => {
     {
       title: '操作',
       valueType: 'option',
-      width: 220,
+      width: 280,
       fixed: 'right',
       render: (_, record) => [
         <Button
@@ -215,6 +334,61 @@ const EmbyCoverPage: React.FC = () => {
           }
           onSuccess={() => actionRef.current?.reload?.()}
         />,
+        <Popconfirm
+          key="sortname"
+          title={`对「${record.emby_name}」回填拼音 SortName？`}
+          description="仅扫描本库下 Movie/Series/BoxSet，已锁定的不覆盖。后端后台跑，可关闭页面。"
+          okText="启动"
+          cancelText="取消"
+          onConfirm={() =>
+            startSortNameBackfill(
+              [record.emby_library_id],
+              `row-${record.emby_library_id}`,
+              false,
+            )
+          }
+          disabled={sortNameRunning}
+        >
+          <Button
+            type="link"
+            size="small"
+            icon={<SortAscendingOutlined />}
+            loading={sortNameStarting === `row-${record.emby_library_id}`}
+            disabled={sortNameRunning}
+          >
+            拼音回填
+          </Button>
+        </Popconfirm>,
+        <Popconfirm
+          key="sortname-force"
+          title={`强制覆盖「${record.emby_name}」的 SortName？`}
+          description={
+            <div style={{ maxWidth: 320 }}>
+              <Text type="warning">忽略锁定状态</Text>，包括被其它工具锁定的条目也会被覆写。
+            </div>
+          }
+          okText="强制覆盖"
+          okButtonProps={{ danger: true }}
+          cancelText="取消"
+          onConfirm={() =>
+            startSortNameBackfill(
+              [record.emby_library_id],
+              `row-force-${record.emby_library_id}`,
+              true,
+            )
+          }
+          disabled={sortNameRunning}
+        >
+          <Button
+            type="link"
+            size="small"
+            danger
+            loading={sortNameStarting === `row-force-${record.emby_library_id}`}
+            disabled={sortNameRunning}
+          >
+            强制覆盖
+          </Button>
+        </Popconfirm>,
       ],
     },
   ];
@@ -226,6 +400,8 @@ const EmbyCoverPage: React.FC = () => {
         subTitle: '根据媒体库内的最新海报，自动合成带中英文标题的封面图并上传到 Emby',
       }}
     >
+      {sortNameJob && <SortNameJobAlert job={sortNameJob} />}
+
       <Alert
         type="info"
         showIcon
@@ -257,6 +433,50 @@ const EmbyCoverPage: React.FC = () => {
           setting: false,
         }}
         toolBarRender={() => [
+          <Popconfirm
+            key="sortname"
+            title="按拼音首字母回填所有媒体的 SortName？"
+            description={
+              <div style={{ maxWidth: 360 }}>
+                将扫描 Emby 所有 Movie/Series/BoxSet，对未锁定的条目写入拼音首字母。已锁定 SortName 的条目会被跳过。后端后台执行，可关闭页面或刷新。
+              </div>
+            }
+            okText="启动"
+            cancelText="取消"
+            onConfirm={() => startSortNameBackfill(undefined, 'all', false)}
+            disabled={sortNameRunning}
+          >
+            <Button
+              icon={<SortAscendingOutlined />}
+              loading={sortNameStarting === 'all'}
+              disabled={sortNameRunning}
+            >
+              拼音回填 SortName
+            </Button>
+          </Popconfirm>,
+          <Popconfirm
+            key="sortname-force"
+            title="强制覆盖所有媒体的 SortName？"
+            description={
+              <div style={{ maxWidth: 360 }}>
+                <Text type="warning">忽略锁定状态</Text>，对所有 Movie/Series/BoxSet 强制写入拼音首字母。包括被别的工具（如 MoviePilot）锁定过的条目也会被覆写。适合首次统一设置场景。
+              </div>
+            }
+            okText="强制覆盖"
+            okButtonProps={{ danger: true }}
+            cancelText="取消"
+            onConfirm={() => startSortNameBackfill(undefined, 'all-force', true)}
+            disabled={sortNameRunning}
+          >
+            <Button
+              danger
+              icon={<SortAscendingOutlined />}
+              loading={sortNameStarting === 'all-force'}
+              disabled={sortNameRunning}
+            >
+              强制覆盖
+            </Button>
+          </Popconfirm>,
           <Popconfirm
             key="batch"
             title="批量生成所有启用的媒体库封面？"

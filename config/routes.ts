@@ -72,6 +72,24 @@ export default [
     component: './emby-cover',
   },
   {
+    name: 'Emby媒体统计',
+    icon: 'barChart',
+    path: '/emby-stats',
+    component: './emby-stats',
+  },
+  {
+    name: 'Emby代理日志',
+    icon: 'thunderbolt',
+    path: '/emby-proxy-log',
+    component: './emby-proxy-log',
+  },
+  {
+    name: '整理日志',
+    icon: 'fileText',
+    path: '/organize-logs',
+    component: './organize-logs',
+  },
+  {
     path: '/',
     redirect: '/cloud-storage',
   },
