@@ -675,7 +675,6 @@ declare namespace API {
     config?: string;
     match302_max_active: number;
     match302_cache_max_gb: number;
-    is_default: boolean;
     sort_order: number;
     created_at: string;
     updated_at: string;
@@ -688,7 +687,6 @@ declare namespace API {
     storage_name?: string;
     storage_type?: string;
     status?: string;
-    is_default?: boolean;
   };
 
   /** 创建云存储参数 */
@@ -702,7 +700,6 @@ declare namespace API {
     config?: string;
     match302_max_active?: number;
     match302_cache_max_gb?: number;
-    is_default?: boolean;
     sort_order?: number;
   };
 
@@ -719,7 +716,6 @@ declare namespace API {
     config?: string;
     match302_max_active?: number;
     match302_cache_max_gb?: number;
-    is_default?: boolean;
     sort_order?: number;
   };
 

@@ -5,9 +5,15 @@ export async function getCloudStorageList(
   params: API.CloudStorageQueryParams,
   options?: { [key: string]: any },
 ) {
+  const { current, pageSize, ...rest } = params || {};
+
   return request<API.Response<API.PageResult<API.CloudStorage>>>('/api/cloud-storage', {
     method: 'GET',
-    params,
+    params: {
+      ...rest,
+      page: current,
+      page_size: pageSize,
+    },
     ...(options || {}),
   });
 }
@@ -54,17 +60,6 @@ export async function getCloudStorageDetail(
 ) {
   return request<API.Response<API.CloudStorage>>(`/api/cloud-storage/${id}`, {
     method: 'GET',
-    ...(options || {}),
-  });
-}
-
-/** 设置默认云存储 */
-export async function setDefaultCloudStorage(
-  id: number,
-  options?: { [key: string]: any },
-) {
-  return request<API.Response<boolean>>(`/api/cloud-storage/${id}/set-default`, {
-    method: 'PUT',
     ...(options || {}),
   });
 }

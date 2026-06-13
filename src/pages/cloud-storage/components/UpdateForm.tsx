@@ -92,7 +92,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           placeholder="请选择存储类型"
           disabled
           options={[
-            { label: '115网盘', value: '115' },
+            { label: '115网盘 OpenAPI', value: '115open' },
             { label: '百度网盘', value: 'baidu' },
             { label: '阿里云盘', value: 'aliyun' },
             { label: '腾讯云', value: 'tencent' },
@@ -208,10 +208,6 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           max={1024}
           fieldProps={{ precision: 0 }}
           extra="仅统计 FilmFusion 秒传到该账号并记录的缓存文件；超出后会优先清理最早缓存。"
-        />
-        <ProFormSwitch
-          name="is_default"
-          label="设为默认存储"
         />
         <ProFormDigit
           width="md"

@@ -67,7 +67,7 @@ const CloudStorageList: React.FC = () => {
 
   const getStorageTypeLabel = (type: string) => {
     const typeMap: Record<string, string> = {
-      '115': '115网盘',
+      '115open': '115网盘 OpenAPI',
       'baidu': '百度网盘',
       'aliyun': '阿里云盘',
       'tencent': '腾讯云',
@@ -109,7 +109,6 @@ const CloudStorageList: React.FC = () => {
             }}
           >
             {dom}
-            {entity.is_default && <Tag color="blue" style={{ marginLeft: 8 }}>默认</Tag>}
           </a>
         );
       },
