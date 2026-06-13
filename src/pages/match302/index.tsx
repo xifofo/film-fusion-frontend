@@ -15,6 +15,7 @@ import {
   getMatch302List,
   deleteMatch302,
   batchDeleteMatch302,
+  getMatch302Assignments,
   updateMatch302BalanceEnabled,
 } from '@/services/film-fusion';
 import CreateForm from '@/pages/match302/components/CreateForm';
@@ -24,6 +25,13 @@ const { Text } = Typography;
 
 const balanceLimitModeLabel = (mode?: string) => mode === 'strict' ? '严格' : '宽松';
 const cleanupModeLabel = (mode?: string) => mode === 'hard_delete' ? '彻底删除' : '移动到回收站';
+const assignmentStatusColor = (status?: string) => {
+  if (status === 'ready') return 'green';
+  if (status === 'pending') return 'gold';
+  if (status === 'transferring') return 'processing';
+  if (status === 'failed') return 'red';
+  return 'default';
+};
 
 const Match302List: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
@@ -250,7 +258,7 @@ const Match302List: React.FC = () => {
                   权重 {member.weight || 1}
                   {' / '}
                   {member.enabled ? '启用' : '停用'}
-                  {member.target_root_path ? ` / ${member.target_root_path}` : ''}
+                  {member.target_root_path ? ` / 缓存目录 ${member.target_root_path}` : ''}
                 </Text>
               ))}
             </Space>
@@ -278,6 +286,63 @@ const Match302List: React.FC = () => {
       />
     );
   };
+
+  const assignmentColumns: ProColumns<API.Match302BalanceAssignment>[] = [
+    {
+      title: '源文件',
+      dataIndex: 'source_file_path',
+      width: 280,
+      ellipsis: true,
+      copyable: true,
+    },
+    {
+      title: '缓存账号',
+      width: 160,
+      render: (_, record) => record.is_source_playback
+        ? <Tag color="green">源账号</Tag>
+        : <Tag color="blue">{record.playback_storage?.storage_name || `ID: ${record.playback_storage_id}`}</Tag>,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 130,
+      render: (_, record) => (
+        <Space size={4} wrap>
+          <Tag color={assignmentStatusColor(record.status)}>{record.status}</Tag>
+          {record.cleanup_status && record.cleanup_status !== 'none' && (
+            <Tag>{record.cleanup_status}</Tag>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '目标路径',
+      dataIndex: 'target_path',
+      width: 240,
+      ellipsis: true,
+      copyable: true,
+      render: (_, record) => record.target_path || '-',
+    },
+    {
+      title: '目标 pickcode',
+      dataIndex: 'target_pickcode',
+      width: 150,
+      copyable: true,
+      render: (_, record) => record.target_pickcode || '-',
+    },
+    {
+      title: '过期时间',
+      dataIndex: 'expires_at',
+      width: 180,
+      render: (_, record) => record.expires_at || '-',
+    },
+    {
+      title: '最近播放',
+      dataIndex: 'last_played_at',
+      width: 180,
+      render: (_, record) => record.last_played_at || '-',
+    },
+  ];
 
   return (
     <PageContainer
@@ -361,7 +426,7 @@ const Match302List: React.FC = () => {
       />
 
       <Drawer
-        width={600}
+        width={1000}
         open={showDetail}
         onClose={() => {
           setCurrentRow(undefined);
@@ -370,17 +435,40 @@ const Match302List: React.FC = () => {
         closable={false}
       >
         {currentRow?.id && (
-          <ProDescriptions<API.Match302>
-            column={1}
-            title="Match302 详细信息"
-            request={async () => ({
-              data: currentRow || {},
-            })}
-            params={{
-              id: currentRow?.id,
-            }}
-            columns={expandedRowRender(currentRow).props.columns}
-          />
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <ProDescriptions<API.Match302>
+              column={1}
+              title="Match302 详细信息"
+              request={async () => ({
+                data: currentRow || {},
+              })}
+              params={{
+                id: currentRow?.id,
+              }}
+              columns={expandedRowRender(currentRow).props.columns}
+            />
+            <ProTable<API.Match302BalanceAssignment>
+              rowKey="id"
+              size="small"
+              search={false}
+              options={false}
+              headerTitle="秒传缓存记录"
+              columns={assignmentColumns}
+              scroll={{ x: 1300 }}
+              pagination={{ pageSize: 10 }}
+              request={async (params) => {
+                const response = await getMatch302Assignments(currentRow.id, {
+                  page: params.current,
+                  page_size: params.pageSize,
+                });
+                return {
+                  data: response.data?.list || [],
+                  success: response.code === 0,
+                  total: response.data?.total || 0,
+                };
+              }}
+            />
+          </Space>
         )}
       </Drawer>
 

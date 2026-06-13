@@ -115,10 +115,9 @@ const UpdateForm: FC<UpdateFormProps> = (props) => {
             <DirectoryPathField
               name="target_path"
               label="目标路径"
-              required
               cloudStorageId={cloud_storage_id}
-              placeholder="请选择或输入目标路径，例如：/Movies"
-              extra="从当前源账号目录中选择；也可手动输入。"
+              placeholder="留空表示把源路径前缀替换为空"
+              extra="从当前源账号目录中选择；也可手动输入。留空时表示把源路径前缀替换为空。"
             />
           )}
         </ProFormDependency>
@@ -192,10 +191,10 @@ const UpdateForm: FC<UpdateFormProps> = (props) => {
             {({ cloud_storage_id }) => (
               <DirectoryPathField
                 name="target_root_path"
-                label="目标根目录"
+                label="秒传缓存目录"
                 cloudStorageId={cloud_storage_id}
                 placeholder="/FilmFusion-302/{match302_id}"
-                extra="从当前子账号目录中选择；留空时后端使用默认目录。"
+                extra="秒传到当前子账号时保存文件的目录；留空时后端使用默认缓存目录。"
               />
             )}
           </ProFormDependency>
