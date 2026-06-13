@@ -190,6 +190,25 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           label="额外配置"
           placeholder="请输入JSON格式的额外配置信息"
         />
+        <ProFormDigit
+          width="md"
+          name="match302_max_active"
+          label="Match302 最大同时播放"
+          placeholder="0 表示不限制"
+          min={0}
+          max={100}
+          fieldProps={{ precision: 0 }}
+        />
+        <ProFormDigit
+          width="md"
+          name="match302_cache_max_gb"
+          label="Match302 子账号缓存空间上限(GB)"
+          placeholder="0 表示不限制"
+          min={0}
+          max={1024}
+          fieldProps={{ precision: 0 }}
+          extra="仅统计 FilmFusion 秒传到该账号并记录的缓存文件；超出后会优先清理最早缓存。"
+        />
         <ProFormSwitch
           name="is_default"
           label="设为默认存储"

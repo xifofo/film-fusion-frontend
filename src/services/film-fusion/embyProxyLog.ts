@@ -20,3 +20,13 @@ export async function clearEmbyProxy302Logs() {
     method: 'DELETE',
   });
 }
+
+/** 拉取 Emby 代理 302 负载均衡看板。 */
+export async function getEmbyProxyBalanceStatus() {
+  return request<API.Response<API.EmbyProxyBalanceStatus>>(
+    '/api/emby-proxy/balance-status',
+    {
+      method: 'GET',
+    },
+  );
+}

@@ -9,14 +9,11 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
-import { Button, Drawer, message, Tag, Popconfirm, Space, Tooltip } from 'antd';
+import { Drawer, message, Tag, Popconfirm, Space, Tooltip } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   getCloudStorageList,
   deleteCloudStorage,
-  setDefaultCloudStorage,
-  refreshCloudStorageToken,
-  testCloudStorageConnection
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
@@ -32,7 +29,7 @@ const CloudStorageList: React.FC = () => {
 
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run: delRun, loading: delLoading } = useRequest(deleteCloudStorage, {
+  const { run: delRun } = useRequest(deleteCloudStorage, {
     manual: true,
     onSuccess: () => {
       actionRef.current?.reloadAndRest?.();
@@ -40,42 +37,6 @@ const CloudStorageList: React.FC = () => {
     },
     onError: () => {
       messageApi.error('删除失败，请重试');
-    },
-  });
-
-  const { run: setDefaultRun, loading: setDefaultLoading } = useRequest(setDefaultCloudStorage, {
-    manual: true,
-    onSuccess: () => {
-      actionRef.current?.reload?.();
-      messageApi.success('设置默认存储成功');
-    },
-    onError: () => {
-      messageApi.error('设置默认存储失败');
-    },
-  });
-
-  const { run: refreshTokenRun, loading: refreshLoading } = useRequest(refreshCloudStorageToken, {
-    manual: true,
-    onSuccess: () => {
-      actionRef.current?.reload?.();
-      messageApi.success('刷新令牌成功');
-    },
-    onError: () => {
-      messageApi.error('刷新令牌失败');
-    },
-  });
-
-  const { run: testConnectionRun, loading: testLoading } = useRequest(testCloudStorageConnection, {
-    manual: true,
-    onSuccess: (result) => {
-      if (result.connected) {
-        messageApi.success('连接测试成功');
-      } else {
-        messageApi.error(`连接测试失败: ${result.message}`);
-      }
-    },
-    onError: () => {
-      messageApi.error('连接测试失败');
     },
   });
 
@@ -100,6 +61,8 @@ const CloudStorageList: React.FC = () => {
     const config = statusMap[status as keyof typeof statusMap] || { color: 'default', text: status };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
+
+  const limitText = (value?: number) => value && value > 0 ? `${value}` : '不限';
 
   const columns: ProColumns<API.CloudStorage>[] = [
     {
@@ -231,6 +194,17 @@ const CloudStorageList: React.FC = () => {
       ellipsis: true,
       hideInSearch: true,
       render: (_, record) => record.error_message || '-',
+    },
+    {
+      title: '302限制',
+      width: 190,
+      hideInSearch: true,
+      render: (_, record) => (
+        <Space size={4} wrap>
+          <Tag>播放 {limitText(record.match302_max_active)}</Tag>
+          <Tag>缓存 {limitText(record.match302_cache_max_gb)} GB</Tag>
+        </Space>
+      ),
     },
     {
       title: '最后错误时间',

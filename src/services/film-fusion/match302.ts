@@ -36,6 +36,19 @@ export async function updateMatch302(
   });
 }
 
+/** 更新 Match302 负载均衡开关 */
+export async function updateMatch302BalanceEnabled(
+  id: number,
+  balanceEnabled: boolean,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.Match302>>(`/api/match-302/${id}/balance-enabled`, {
+    method: 'PATCH',
+    data: { balance_enabled: balanceEnabled },
+    ...(options || {}),
+  });
+}
+
 /** 删除 Match302 */
 export async function deleteMatch302(
   id: number,
@@ -92,4 +105,67 @@ export async function testMatch302Redirect(
     data: { test_path: testPath },
     ...(options || {}),
   });
+}
+
+/** 获取 Match302 负载均衡分配记录 */
+export async function getMatch302Assignments(
+  id: number,
+  params?: { page?: number; page_size?: number; status?: string },
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.PageResult<API.Match302BalanceAssignment>>>(
+    `/api/match-302/${id}/assignments`,
+    {
+      method: 'GET',
+      params,
+      ...(options || {}),
+    },
+  );
+}
+
+/** 重试 assignment 秒传 */
+export async function retryMatch302Assignment(
+  id: number,
+  assignmentId: number,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.Match302BalanceAssignment>>(
+    `/api/match-302/${id}/assignments/${assignmentId}/retry`,
+    {
+      method: 'POST',
+      ...(options || {}),
+    },
+  );
+}
+
+/** 立即清理 assignment 对应的子账号缓存文件 */
+export async function cleanupMatch302Assignment(
+  id: number,
+  assignmentId: number,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.Match302BalanceAssignment>>(
+    `/api/match-302/${id}/assignments/${assignmentId}/cleanup`,
+    {
+      method: 'POST',
+      ...(options || {}),
+    },
+  );
+}
+
+/** 延长 assignment 保留时间 */
+export async function extendMatch302AssignmentRetention(
+  id: number,
+  assignmentId: number,
+  hours?: number,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.Match302BalanceAssignment>>(
+    `/api/match-302/${id}/assignments/${assignmentId}/extend-retention`,
+    {
+      method: 'POST',
+      data: { hours },
+      ...(options || {}),
+    },
+  );
 }

@@ -221,6 +221,18 @@ declare namespace API {
     user_agent: string;
     remote_ip: string;
     target: string;
+    item_id?: string;
+    media_source_id?: string;
+    media_path?: string;
+    match302_id?: number;
+    assignment_id?: number;
+    assigned_storage_id?: number;
+    assigned_storage_name?: string;
+    actual_storage_id?: number;
+    actual_storage_name?: string;
+    account_type?: 'source' | 'member' | string;
+    balance_status?: string;
+    fallback_reason?: string;
   };
 
   /** Emby 代理 302 重定向日志查询响应 */
@@ -228,6 +240,89 @@ declare namespace API {
     count: number;
     capacity: number;
     entries: EmbyProxy302LogEntry[];
+  };
+
+  type BalanceActivePlayback = {
+    key: string;
+    state: 'active' | 'recent';
+    media_path: string;
+    emby_item_id: string;
+    media_source_id: string;
+    remote_ip: string;
+    user_agent: string;
+    match302_id: number;
+    assignment_id: number;
+    assigned_storage_id: number;
+    assigned_storage_name: string;
+    actual_storage_id: number;
+    actual_storage_name: string;
+    account_type: string;
+    status: string;
+    fallback_reason?: string;
+    last_request_at: string;
+  };
+
+  type BalanceAccountLoad = {
+    match302_id: number;
+    storage_id: number;
+    storage_name: string;
+    account_type: string;
+    active_playbacks: number;
+    max_active: number;
+    cache_used_gb: number;
+    cache_max_gb: number;
+    total_assignments: number;
+    ready_count: number;
+    pending_count: number;
+    transferring_count: number;
+    failed_count: number;
+    cooldown_until?: string;
+    last_ready_at?: string;
+    last_error_at?: string;
+    last_error?: string;
+  };
+
+  type BalanceTransferQueueItem = {
+    id: number;
+    match302_id: number;
+    media_path: string;
+    source_storage_id: number;
+    source_storage_name: string;
+    target_storage_id: number;
+    target_storage_name: string;
+    status: string;
+    attempts: number;
+    last_error?: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type BalanceTransferSummary = {
+    pending: number;
+    transferring: number;
+    failed: number;
+    queue: BalanceTransferQueueItem[];
+  };
+
+  type BalanceCleanupSummary = {
+    cache_count: number;
+    expiring_soon: number;
+    cleanup_failed: number;
+    last_cleaned_at?: string;
+    by_account: Array<{
+      storage_id: number;
+      storage_name: string;
+      count: number;
+    }>;
+  };
+
+  type EmbyProxyBalanceStatus = {
+    active_playbacks: BalanceActivePlayback[];
+    account_loads: BalanceAccountLoad[];
+    transfer_summary: BalanceTransferSummary;
+    cleanup_summary: BalanceCleanupSummary;
+    recent_fallbacks: EmbyProxy302LogEntry[];
+    recent_events: EmbyProxy302LogEntry[];
   };
 
   /** 通用响应结构 */
@@ -560,6 +655,8 @@ declare namespace API {
     error_message?: string;
     last_error_at?: string;
     config?: string;
+    match302_max_active: number;
+    match302_cache_max_gb: number;
     is_default: boolean;
     sort_order: number;
     created_at: string;
@@ -585,6 +682,8 @@ declare namespace API {
     auto_refresh?: boolean;
     refresh_before_min?: number;
     config?: string;
+    match302_max_active?: number;
+    match302_cache_max_gb?: number;
     is_default?: boolean;
     sort_order?: number;
   };
@@ -600,6 +699,8 @@ declare namespace API {
     refresh_before_min?: number;
     status?: 'active' | 'disabled' | 'error';
     config?: string;
+    match302_max_active?: number;
+    match302_cache_max_gb?: number;
     is_default?: boolean;
     sort_order?: number;
   };
@@ -660,11 +761,77 @@ declare namespace API {
   };
 
   /** Match302 重定向匹配配置 */
+  type Match302BalanceMember = {
+    id?: number;
+    match302_id?: number;
+    cloud_storage_id: number;
+    enabled: boolean;
+    weight: number;
+    target_root_path?: string;
+    last_error?: string;
+    last_error_at?: string;
+    cooldown_until?: string;
+    cloud_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
+  type Match302BalanceAssignment = {
+    id: number;
+    match302_id: number;
+    emby_item_id?: string;
+    media_source_id?: string;
+    source_file_path: string;
+    source_storage_id: number;
+    playback_storage_id: number;
+    is_source_playback: boolean;
+    source_pickcode?: string;
+    target_pickcode?: string;
+    source_file_id?: string;
+    target_file_id?: string;
+    target_path?: string;
+    sha1?: string;
+    size: number;
+    status: 'pending' | 'transferring' | 'ready' | 'failed' | string;
+    attempts: number;
+    last_error?: string;
+    last_error_at?: string;
+    last_ready_at?: string;
+    last_played_at?: string;
+    expires_at?: string;
+    cleanup_status: 'none' | 'pending' | 'cleaning' | 'cleaned' | 'failed' | string;
+    cleanup_error?: string;
+    cleaned_at?: string;
+    created_at: string;
+    updated_at: string;
+    source_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+    playback_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
   type Match302 = {
     id: number;
     source_path: string;        // 源路径（最大500字符）
     target_path: string;        // 目标路径（最大500字符）
     cloud_storage_id: number;   // 云存储ID（外键）
+    balance_enabled: boolean;
+    balance_strategy: string;
+    balance_limit_mode: 'loose' | 'strict' | string;
+    source_weight: number;
+    cleanup_enabled: boolean;
+    retention_hours: number;
+    cleanup_mode: string;
+    cleanup_interval_min: number;
+    min_keep_ready: number;
     created_at?: string;
     updated_at?: string;
     cloud_storage?: {           // 关联的云存储信息
@@ -672,6 +839,7 @@ declare namespace API {
       storage_name: string;
       storage_type: string;
     };
+    pool_members?: Match302BalanceMember[];
   };
 
   /** Match302 查询参数 */
@@ -686,6 +854,16 @@ declare namespace API {
     source_path: string;
     target_path: string;
     cloud_storage_id: number;
+    balance_enabled?: boolean;
+    balance_strategy?: string;
+    balance_limit_mode?: 'loose' | 'strict' | string;
+    source_weight?: number;
+    cleanup_enabled?: boolean;
+    retention_hours?: number;
+    cleanup_mode?: string;
+    cleanup_interval_min?: number;
+    min_keep_ready?: number;
+    pool_members?: Match302BalanceMember[];
   };
 
   /** 更新 Match302 参数 */
@@ -694,6 +872,16 @@ declare namespace API {
     source_path?: string;
     target_path?: string;
     cloud_storage_id?: number;
+    balance_enabled?: boolean;
+    balance_strategy?: string;
+    balance_limit_mode?: 'loose' | 'strict' | string;
+    source_weight?: number;
+    cleanup_enabled?: boolean;
+    retention_hours?: number;
+    cleanup_mode?: string;
+    cleanup_interval_min?: number;
+    min_keep_ready?: number;
+    pool_members?: Match302BalanceMember[];
   };
 
   /** 整理日志记录 */

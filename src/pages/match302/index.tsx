@@ -9,23 +9,29 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
-import { Button, Drawer, message, Tag, Popconfirm, Space } from 'antd';
+import { Button, Drawer, message, Popconfirm, Space, Switch, Tag, Typography } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   getMatch302List,
   deleteMatch302,
   batchDeleteMatch302,
+  updateMatch302BalanceEnabled,
 } from '@/services/film-fusion';
 import CreateForm from '@/pages/match302/components/CreateForm';
 import UpdateForm from '@/pages/match302/components/UpdateForm';
+
+const { Text } = Typography;
+
+const balanceLimitModeLabel = (mode?: string) => mode === 'strict' ? '严格' : '宽松';
+const cleanupModeLabel = (mode?: string) => mode === 'hard_delete' ? '彻底删除' : '移动到回收站';
 
 const Match302List: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
 
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<API.Match302>();
-  const [showTest, setShowTest] = useState<boolean>(false);
-  const [testRow, setTestRow] = useState<API.Match302>();
+  const [balanceTogglingID, setBalanceTogglingID] = useState<number>();
+  const [balanceEnabledOverrides, setBalanceEnabledOverrides] = useState<Record<number, boolean>>({});
 
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -51,9 +57,31 @@ const Match302List: React.FC = () => {
     },
   });
 
-  const handleTestRedirect = (record: API.Match302) => {
-    setTestRow(record);
-    setShowTest(true);
+  const handleBalanceEnabledChange = async (record: API.Match302, checked: boolean) => {
+    setBalanceTogglingID(record.id);
+    setBalanceEnabledOverrides((current) => ({
+      ...current,
+      [record.id]: checked,
+    }));
+    try {
+      await updateMatch302BalanceEnabled(record.id, checked);
+      messageApi.success(checked ? '已开启负载均衡' : '已关闭负载均衡');
+      await actionRef.current?.reload?.();
+      setBalanceEnabledOverrides((current) => {
+        const next = { ...current };
+        delete next[record.id];
+        return next;
+      });
+    } catch (_error) {
+      setBalanceEnabledOverrides((current) => {
+        const next = { ...current };
+        delete next[record.id];
+        return next;
+      });
+      messageApi.error(checked ? '开启失败，请重试' : '关闭失败，请重试');
+    } finally {
+      setBalanceTogglingID(undefined);
+    }
   };
 
   const columns: ProColumns<API.Match302>[] = [
@@ -88,6 +116,35 @@ const Match302List: React.FC = () => {
       renderFormItem: () => {
         // 这里可以添加云存储选择器组件
         return <div>云存储选择器</div>;
+      },
+    },
+    {
+      title: '负载均衡',
+      dataIndex: 'balance_enabled',
+      width: 150,
+      search: false,
+      render: (_, record) => {
+        const balanceEnabled = balanceEnabledOverrides[record.id] ?? record.balance_enabled;
+        return (
+          <Space size={4} wrap>
+            <Switch
+              size="small"
+              checked={balanceEnabled}
+              loading={balanceTogglingID === record.id}
+              checkedChildren="开"
+              unCheckedChildren="关"
+              onChange={(checked) => handleBalanceEnabledChange(record, checked)}
+            />
+            {balanceEnabled && (
+              <>
+                <Tag color={record.balance_limit_mode === 'strict' ? 'red' : 'blue'}>
+                  {balanceLimitModeLabel(record.balance_limit_mode)}
+                </Tag>
+                <Tag color="blue">{record.pool_members?.length || 0} 子账号</Tag>
+              </>
+            )}
+          </Space>
+        );
       },
     },
     {
@@ -158,6 +215,49 @@ const Match302List: React.FC = () => {
         render: () => record.cloud_storage?.storage_type || '-',
       },
       {
+        title: '负载均衡',
+        render: () => record.balance_enabled ? '已启用' : '未启用',
+      },
+      {
+        title: '策略',
+        render: () => record.balance_strategy || '-',
+      },
+      {
+        title: '并发限制模式',
+        render: () => balanceLimitModeLabel(record.balance_limit_mode),
+      },
+      {
+        title: '源账号权重',
+        dataIndex: 'source_weight',
+      },
+      {
+        title: '清理策略',
+        render: () => record.cleanup_enabled
+          ? `${record.retention_hours || 72} 小时后 ${cleanupModeLabel(record.cleanup_mode)}`
+          : '未启用',
+      },
+      {
+        title: '子账号池',
+        render: () => {
+          const members = record.pool_members || [];
+          if (!members.length) return '-';
+          return (
+            <Space direction="vertical" size={2}>
+              {members.map((member) => (
+                <Text key={`${member.cloud_storage_id}-${member.id || ''}`}>
+                  {member.cloud_storage?.storage_name || `ID: ${member.cloud_storage_id}`}
+                  {' / '}
+                  权重 {member.weight || 1}
+                  {' / '}
+                  {member.enabled ? '启用' : '停用'}
+                  {member.target_root_path ? ` / ${member.target_root_path}` : ''}
+                </Text>
+              ))}
+            </Space>
+          );
+        },
+      },
+      {
         title: '创建时间',
         dataIndex: 'created_at',
         valueType: 'dateTime',
@@ -226,7 +326,7 @@ const Match302List: React.FC = () => {
 
           return {
             data: response.data.list,
-            success: response.code == 0,
+            success: response.code === 0,
             total: response.data.total,
           };
         }}
@@ -234,11 +334,7 @@ const Match302List: React.FC = () => {
         expandable={{
           expandedRowRender,
         }}
-        rowSelection={{
-          onChange: (selectedRowKeys, selectedRows) => {
-            // 处理行选择
-          },
-        }}
+        rowSelection={{}}
         tableAlertRender={({ selectedRowKeys, onCleanSelected }) => (
           <Space size={24}>
             <span>
