@@ -276,7 +276,6 @@ declare namespace API {
     pending_count: number;
     transferring_count: number;
     failed_count: number;
-    cooldown_until?: string;
     last_ready_at?: string;
     last_error_at?: string;
     last_error?: string;

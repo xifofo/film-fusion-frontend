@@ -291,13 +291,8 @@ const EmbyProxyLogPage: React.FC = () => {
       ),
     },
     {
-      title: '冷却 / 错误',
-      render: (_, record) => {
-        if (record.cooldown_until && dayjs(record.cooldown_until).isAfter(dayjs())) {
-          return <Text type="warning">冷却至 {dayjs(record.cooldown_until).format('HH:mm:ss')}</Text>;
-        }
-        return <LongText value={record.last_error || ''} maxWidth={260} />;
-      },
+      title: '最近错误',
+      render: (_, record) => <LongText value={record.last_error || ''} maxWidth={260} />,
     },
   ];
 
