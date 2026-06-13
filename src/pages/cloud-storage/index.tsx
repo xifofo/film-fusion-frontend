@@ -10,14 +10,16 @@ import {
 } from '@ant-design/pro-components';
 import { useRequest } from '@umijs/max';
 import { Drawer, message, Tag, Popconfirm, Space, Tooltip } from 'antd';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   getCloudStorageList,
   deleteCloudStorage,
+  getWeb115KeepaliveStatus,
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
 import ReloginModal from './components/ReloginModal';
+import CookieKeepAlive from './components/CookieKeepAlive';
 
 const CloudStorageList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
@@ -28,6 +30,29 @@ const CloudStorageList: React.FC = () => {
   const [reloginRow, setReloginRow] = useState<API.CloudStorage>();
 
   const [messageApi, contextHolder] = message.useMessage();
+
+  const [cookieStatusMap, setCookieStatusMap] = useState<
+    Record<number, API.Web115CookieStatus>
+  >({});
+
+  const loadCookieStatus = async () => {
+    try {
+      const resp = await getWeb115KeepaliveStatus();
+      if (resp.code === 0 && resp.data?.list) {
+        const map: Record<number, API.Web115CookieStatus> = {};
+        resp.data.list.forEach((s) => {
+          map[s.storage_id] = s;
+        });
+        setCookieStatusMap(map);
+      }
+    } catch {
+      // 保活状态加载失败不影响主表格
+    }
+  };
+
+  useEffect(() => {
+    loadCookieStatus();
+  }, []);
 
   const { run: delRun } = useRequest(deleteCloudStorage, {
     manual: true,
@@ -186,6 +211,19 @@ const CloudStorageList: React.FC = () => {
         disabled: { text: '禁用', status: 'Default' },
         error: { text: '错误', status: 'Error' },
       },
+    },
+    {
+      title: 'Cookie 保活',
+      dataIndex: 'cookie_keepalive',
+      width: 110,
+      hideInSearch: true,
+      render: (_, record) => (
+        <CookieKeepAlive
+          record={record}
+          status={cookieStatusMap[record.id]}
+          onChanged={loadCookieStatus}
+        />
+      ),
     },
     {
       title: '错误信息',

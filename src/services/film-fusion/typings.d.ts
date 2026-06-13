@@ -518,6 +518,25 @@ declare namespace API {
     groups?: Organize115CookieGroup[];
   };
 
+  /** 115 Cookie 保活状态 */
+  type Web115CookieStatus = {
+    storage_id: number;
+    storage_name: string;
+    app: string;
+    healthy: boolean;
+    has_cookie: boolean;
+    last_refresh_at?: string;
+    last_check_at?: string;
+    last_result?: string;
+    last_error?: string;
+  };
+
+  /** 115 Cookie 换端续期请求 */
+  type Web115CookieRefreshRequest = {
+    cloud_storage_id: number;
+    app?: string;
+  };
+
   /** 115 Cookie 目录请求参数 */
   type Cookie115DirRequest = {
     cloud_storage_id: number;
