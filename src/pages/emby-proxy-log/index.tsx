@@ -452,7 +452,7 @@ const EmbyProxyLogPage: React.FC = () => {
       />
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="当前 active"
               value={balanceStatus?.active_playbacks?.filter((item) => item.state === 'active').length || 0}
@@ -460,23 +460,23 @@ const EmbyProxyLogPage: React.FC = () => {
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="秒传中" value={balanceStatus?.transfer_summary?.transferring || 0} />
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="缓存资源" value={balanceStatus?.cleanup_summary?.cache_count || 0} />
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic title="回退事件" value={balanceStatus?.recent_fallbacks?.length || 0} />
           </Card>
         </Col>
       </Row>
 
-      <Card bordered={false} title="当前播放" style={{ marginBottom: 16 }}>
+      <Card variant="borderless" title="当前播放" style={{ marginBottom: 16 }}>
         <Table
           rowKey="key"
           size="small"
@@ -488,7 +488,7 @@ const EmbyProxyLogPage: React.FC = () => {
         />
       </Card>
 
-      <Card bordered={false} title="账号负载" style={{ marginBottom: 16 }}>
+      <Card variant="borderless" title="账号负载" style={{ marginBottom: 16 }}>
         <Table
           rowKey={(record) => `${record.match302_id}-${record.storage_id}`}
           size="small"
@@ -500,7 +500,7 @@ const EmbyProxyLogPage: React.FC = () => {
         />
       </Card>
 
-      <Card bordered={false} title="秒传队列" style={{ marginBottom: 16 }}>
+      <Card variant="borderless" title="秒传队列" style={{ marginBottom: 16 }}>
         <Table
           rowKey="id"
           size="small"
@@ -513,7 +513,7 @@ const EmbyProxyLogPage: React.FC = () => {
       </Card>
 
       <Card
-        bordered={false}
+        variant="borderless"
         title={
           <Space>
             <span>302 重定向记录</span>

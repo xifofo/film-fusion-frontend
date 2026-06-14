@@ -22,6 +22,7 @@ export async function login(params: API.LoginParams) {
 export async function getCurrentUser() {
   return request<API.Response<API.User>>('/api/me', {
     method: 'GET',
+    skipErrorHandler: true,
   });
 }
 

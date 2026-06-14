@@ -399,11 +399,11 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
         destroyOnHidden
         maskClosable={false}
       >
-        <Steps current={current} style={{ marginBottom: 24 }}>
-          {steps.map(item => (
-            <Steps.Step key={item.title} title={item.title} />
-          ))}
-        </Steps>
+        <Steps
+          current={current}
+          style={{ marginBottom: 24 }}
+          items={steps.map((item) => ({ key: item.title, title: item.title }))}
+        />
         <div>
           {qrLoading && current === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>

@@ -37,18 +37,12 @@ export interface Auth115CompleteData {
   expires_in: number;
 }
 
-// 获取JWT Token
-const getAuthToken = () => {
-  return localStorage.getItem('token') || '';
-};
-
 // 获取授权二维码
 export async function getAuth115QRCode(params: Auth115QRCodeRequest): Promise<Auth115QRCodeData> {
   const response = await request<ApiResponse<Auth115QRCodeData>>('/api/auth/115/qrcode', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getAuthToken()}`,
     },
     data: params,
     skipErrorHandler: true,
@@ -71,7 +65,6 @@ export async function checkAuth115Status(params: Auth115StatusRequest): Promise<
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getAuthToken()}`,
     },
     data: params,
     skipErrorHandler: true,
@@ -94,7 +87,6 @@ export async function completeAuth115(params: Auth115CompleteRequest): Promise<A
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getAuthToken()}`,
     },
     data: params,
     skipErrorHandler: true,

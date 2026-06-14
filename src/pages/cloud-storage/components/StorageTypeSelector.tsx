@@ -54,11 +54,13 @@ const StorageTypeSelector: React.FC<StorageTypeSelectorProps> = ({
                   cursor: type.available ? 'pointer' : 'not-allowed',
                   opacity: type.available ? 1 : 0.5,
                 }}
-                bodyStyle={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  height: '100%',
-                  padding: '16px',
+                styles={{
+                  body: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    height: '100%',
+                    padding: '16px',
+                  },
                 }}
               >
                 <div style={{ marginRight: 16 }}>

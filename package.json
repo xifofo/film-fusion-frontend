@@ -1,9 +1,8 @@
 {
-  "name": "ant-design-pro",
+  "name": "film-fusion-frontend",
   "version": "6.0.0",
   "private": true,
-  "description": "An out-of-box UI solution for enterprise applications",
-  "repository": "git@github.com:ant-design/ant-design-pro.git",
+  "description": "Film Fusion 前端：Emby + 网盘管理控制台",
   "scripts": {
     "analyze": "cross-env ANALYZE=1 max build",
     "biome:lint": "npx @biomejs/biome lint",

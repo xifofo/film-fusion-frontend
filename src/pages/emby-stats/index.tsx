@@ -50,18 +50,20 @@ const SummaryCard: React.FC<{
 }> = ({ title, value, icon, gradient, suffix }) => {
   return (
     <Card
-      bordered={false}
+      variant="borderless"
       style={{
         borderRadius: 16,
         overflow: 'hidden',
         background: `linear-gradient(135deg, ${gradient[0]} 0%, ${gradient[1]} 100%)`,
         boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
       }}
-      bodyStyle={{
-        padding: '24px 28px',
-        color: '#fff',
-        position: 'relative',
-        minHeight: 132,
+      styles={{
+        body: {
+          padding: '24px 28px',
+          color: '#fff',
+          position: 'relative',
+          minHeight: 132,
+        },
       }}
     >
       <div
@@ -140,13 +142,13 @@ const LibraryCard: React.FC<{
   return (
     <Card
       hoverable
-      bordered={false}
+      variant="borderless"
       style={{
         borderRadius: 14,
         boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
         height: '100%',
       }}
-      bodyStyle={{ padding: 20 }}
+      styles={{ body: { padding: 20 } }}
     >
       <Space
         direction="horizontal"
@@ -387,7 +389,7 @@ const EmbyStatsPage: React.FC = () => {
           </Space>
 
           {!loading && (!stats?.libraries || stats.libraries.length === 0) ? (
-            <Card bordered={false} style={{ borderRadius: 14 }}>
+            <Card variant="borderless" style={{ borderRadius: 14 }}>
               <Empty description="暂无 Emby 媒体库数据" />
             </Card>
           ) : (
