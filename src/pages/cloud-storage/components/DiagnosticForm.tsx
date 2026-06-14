@@ -1,9 +1,11 @@
 import {
   ProForm,
   ProFormDateTimePicker,
+  ProFormItem,
   ProFormTextArea,
 } from '@ant-design/pro-components';
 import React from 'react';
+import JsonEditor from './JsonEditor';
 import {
   FULL_COL,
   HALF_COL,
@@ -20,7 +22,9 @@ const DiagnosticForm: React.FC<StorageSectionFormProps> = ({
     rowProps={{ gutter: [16, 0] }}
     layout="vertical"
     initialValues={values}
-    submitter={{ searchConfig: { submitText: '保存诊断信息', resetText: '重置' } }}
+    submitter={{
+      searchConfig: { submitText: '保存诊断信息', resetText: '重置' },
+    }}
     onFinish={async (value) => onSave(value)}
   >
     <ProFormTextArea
@@ -36,12 +40,26 @@ const DiagnosticForm: React.FC<StorageSectionFormProps> = ({
       placeholder="最后错误时间"
       disabled
     />
-    <ProFormTextArea
+    <ProFormItem
       colProps={FULL_COL}
       name="config"
       label="额外配置"
-      placeholder="请输入JSON格式的额外配置信息"
-    />
+      tooltip="JSON 格式的额外配置信息"
+      rules={[
+        {
+          validator: async (_, val) => {
+            if (!val || !String(val).trim()) return;
+            try {
+              JSON.parse(val);
+            } catch {
+              throw new Error('额外配置必须是合法的 JSON');
+            }
+          },
+        },
+      ]}
+    >
+      <JsonEditor />
+    </ProFormItem>
   </ProForm>
 );
 
