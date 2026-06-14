@@ -87,6 +87,12 @@ export default [
         component: './emby-proxy-log',
       },
       {
+        name: '缺集扫描',
+        icon: 'search',
+        path: '/emby/missing',
+        component: './emby-missing',
+      },
+      {
         name: '账号绑定',
         icon: 'userSwitch',
         path: '/emby/bindings',

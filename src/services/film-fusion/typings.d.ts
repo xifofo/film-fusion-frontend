@@ -981,4 +981,85 @@ declare namespace API {
     enabled?: boolean;
     remark?: string;
   };
+
+  /** 可扫描的电视剧媒体库 */
+  type EmbyTvLibrary = {
+    id: string;
+    name: string;
+  };
+
+  /** 缺集扫描定时设置与最近状态 */
+  type EmbyMissingSetting = {
+    id: number;
+    schedule_enabled: boolean;
+    cron: string;
+    library_id: string;
+    include_specials: boolean;
+    include_unaired: boolean;
+    scanning: boolean;
+    last_scan_at?: string | null;
+    last_status?: string;
+    last_error?: string;
+    last_series_count: number;
+    last_missing_count: number;
+    created_at?: string;
+    updated_at?: string;
+  };
+
+  /** 缺集明细(单集) */
+  type EmbyMissingEpisode = {
+    season_number: number;
+    episode_number: number;
+    episode_name: string;
+    premiere_date?: string;
+  };
+
+  /** 按剧集分组的缺集 */
+  type EmbyMissingSeriesGroup = {
+    series_id: string;
+    series_name: string;
+    library_id: string;
+    library_name: string;
+    missing_count: number;
+    episodes: EmbyMissingEpisode[];
+  };
+
+  /** 缺集列表结果 */
+  type EmbyMissingListResult = {
+    setting: EmbyMissingSetting;
+    groups: EmbyMissingSeriesGroup[];
+  };
+
+  /** 手动扫描参数 */
+  type EmbyMissingScanParams = {
+    library_id?: string;
+    include_specials?: boolean;
+    include_unaired?: boolean;
+  };
+
+  /** 更新缺集定时设置参数 */
+  type EmbyMissingSettingParams = {
+    schedule_enabled?: boolean;
+    cron?: string;
+    library_id?: string;
+    include_specials?: boolean;
+    include_unaired?: boolean;
+  };
+
+  /** 缺集检查黑名单 */
+  type EmbyMissingBlacklist = {
+    id: number;
+    series_id: string;
+    series_name?: string;
+    remark?: string;
+    created_at?: string;
+    updated_at?: string;
+  };
+
+  /** 加入黑名单参数 */
+  type EmbyMissingBlacklistParams = {
+    series_id: string;
+    series_name?: string;
+    remark?: string;
+  };
 }

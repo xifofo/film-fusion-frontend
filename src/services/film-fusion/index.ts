@@ -49,5 +49,8 @@ export * from './embyProxyLog';
 // Emby 账号 -> 115 存储 绑定
 export * from './embyBinding';
 
+// Emby 缺集扫描
+export * from './embyMissing';
+
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';
