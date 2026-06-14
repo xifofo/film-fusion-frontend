@@ -60,28 +60,39 @@ export default [
     component: './pickcode-cache',
   },
   {
-    name: 'Emby封面生成',
-    icon: 'picture',
-    path: '/emby-cover',
-    component: './emby-cover',
-  },
-  {
-    name: 'Emby媒体统计',
-    icon: 'barChart',
-    path: '/emby-stats',
-    component: './emby-stats',
-  },
-  {
-    name: 'Emby代理日志',
-    icon: 'thunderbolt',
-    path: '/emby-proxy-log',
-    component: './emby-proxy-log',
-  },
-  {
-    name: 'Emby账号绑定',
-    icon: 'userSwitch',
-    path: '/emby-bindings',
-    component: './emby-bindings',
+    name: 'Emby',
+    icon: 'playSquare',
+    path: '/emby',
+    routes: [
+      {
+        path: '/emby',
+        redirect: '/emby/cover',
+      },
+      {
+        name: '封面生成',
+        icon: 'picture',
+        path: '/emby/cover',
+        component: './emby-cover',
+      },
+      {
+        name: '媒体统计',
+        icon: 'barChart',
+        path: '/emby/stats',
+        component: './emby-stats',
+      },
+      {
+        name: '代理日志',
+        icon: 'thunderbolt',
+        path: '/emby/proxy-log',
+        component: './emby-proxy-log',
+      },
+      {
+        name: '账号绑定',
+        icon: 'userSwitch',
+        path: '/emby/bindings',
+        component: './emby-bindings',
+      },
+    ],
   },
   {
     name: '整理日志',
