@@ -11,6 +11,7 @@ import { useRequest } from '@umijs/max';
 import { message } from 'antd';
 import React, { cloneElement, useCallback, useState } from 'react';
 import { updateCloudStorage } from '@/services/film-fusion';
+import CookieField from './CookieField';
 
 export type UpdateFormProps = {
   trigger?: React.ReactElement<any>;
@@ -124,12 +125,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
           label="刷新令牌"
           placeholder="请输入刷新令牌"
         />
-        <ProFormTextArea
-          width="md"
-          name="cookie"
-          label="Cookie"
-          placeholder="请输入Cookie"
-        />
+        <CookieField record={values} />
         <ProFormDateTimePicker
           width="md"
           name="token_expires_at"
