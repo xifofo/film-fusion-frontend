@@ -1,10 +1,4 @@
 import {
-  clearEmbyProxy302Logs,
-  getEmbyProxyBalanceStatus,
-  getEmbyProxy302Logs,
-  retryMatch302Assignment,
-} from '@/services/film-fusion';
-import {
   DeleteOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
@@ -16,6 +10,7 @@ import {
   Card,
   Col,
   Modal,
+  message,
   Popover,
   Row,
   Space,
@@ -24,11 +19,16 @@ import {
   Table,
   Tag,
   Typography,
-  message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  clearEmbyProxy302Logs,
+  getEmbyProxy302Logs,
+  getEmbyProxyBalanceStatus,
+  retryMatch302Assignment,
+} from '@/services/film-fusion';
 
 const { Text, Paragraph } = Typography;
 
@@ -46,6 +46,8 @@ const statusTag = (status?: string) => {
   const colorMap: Record<string, string> = {
     源账号播放: 'green',
     子账号播放: 'blue',
+    指定账号播放: 'purple',
+    '指定账号播放(源)': 'purple',
     秒传中: 'processing',
     等待秒传: 'gold',
     失败回退: 'red',
@@ -62,10 +64,12 @@ const statusTag = (status?: string) => {
 const accountTypeTag = (type?: string) => {
   if (type === 'source') return <Tag color="green">源账号</Tag>;
   if (type === 'member') return <Tag color="blue">子账号</Tag>;
+  if (type === 'binding') return <Tag color="purple">指定账号</Tag>;
   return <Tag>{type || '-'}</Tag>;
 };
 
-const maxActiveText = (value?: number) => value && value > 0 ? `${value}` : '不限';
+const maxActiveText = (value?: number) =>
+  value && value > 0 ? `${value}` : '不限';
 const gbText = (value?: number) => {
   if (!value || value <= 0) return '0';
   if (value < 0.01) return '< 0.01';
@@ -110,7 +114,8 @@ const LongText: React.FC<{ value: string; maxWidth?: number }> = ({
 
 const EmbyProxyLogPage: React.FC = () => {
   const [data, setData] = useState<API.EmbyProxy302LogList | null>(null);
-  const [balanceStatus, setBalanceStatus] = useState<API.EmbyProxyBalanceStatus | null>(null);
+  const [balanceStatus, setBalanceStatus] =
+    useState<API.EmbyProxyBalanceStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,7 +229,9 @@ const EmbyProxyLogPage: React.FC = () => {
       title: '客户端',
       dataIndex: 'remote_ip',
       width: 130,
-      render: (ip: string) => <Text style={{ fontFamily: 'monospace' }}>{ip || '-'}</Text>,
+      render: (ip: string) => (
+        <Text style={{ fontFamily: 'monospace' }}>{ip || '-'}</Text>
+      ),
     },
     {
       title: '最近请求',
@@ -273,7 +280,8 @@ const EmbyProxyLogPage: React.FC = () => {
       width: 130,
       render: (_, record) => (
         <Tag>
-          {gbText(record.cache_used_gb)} / {maxActiveText(record.cache_max_gb)} GB
+          {gbText(record.cache_used_gb)} / {maxActiveText(record.cache_max_gb)}{' '}
+          GB
         </Tag>
       ),
     },
@@ -292,7 +300,9 @@ const EmbyProxyLogPage: React.FC = () => {
     },
     {
       title: '最近错误',
-      render: (_, record) => <LongText value={record.last_error || ''} maxWidth={260} />,
+      render: (_, record) => (
+        <LongText value={record.last_error || ''} maxWidth={260} />
+      ),
     },
   ];
 
@@ -313,8 +323,12 @@ const EmbyProxyLogPage: React.FC = () => {
       width: 240,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <Text>{record.source_storage_name || `ID: ${record.source_storage_id}`}</Text>
-          <Text type="secondary">{record.target_storage_name || `ID: ${record.target_storage_id}`}</Text>
+          <Text>
+            {record.source_storage_name || `ID: ${record.source_storage_id}`}
+          </Text>
+          <Text type="secondary">
+            {record.target_storage_name || `ID: ${record.target_storage_id}`}
+          </Text>
         </Space>
       ),
     },
@@ -441,7 +455,9 @@ const EmbyProxyLogPage: React.FC = () => {
             </span>
             <span>
               <ThunderboltOutlined /> 用于排查 Emby 播放是否走到 302 直链：
-              <Tag color="green" style={{ marginLeft: 4 }}>实时计算</Tag>
+              <Tag color="green" style={{ marginLeft: 4 }}>
+                实时计算
+              </Tag>
               <Tag color="blue">缓存命中</Tag>
               表示走了 302；
               <Tag color="red">未走302</Tag>
@@ -455,23 +471,36 @@ const EmbyProxyLogPage: React.FC = () => {
           <Card variant="borderless">
             <Statistic
               title="当前 active"
-              value={balanceStatus?.active_playbacks?.filter((item) => item.state === 'active').length || 0}
+              value={
+                balanceStatus?.active_playbacks?.filter(
+                  (item) => item.state === 'active',
+                ).length || 0
+              }
             />
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card variant="borderless">
-            <Statistic title="秒传中" value={balanceStatus?.transfer_summary?.transferring || 0} />
+            <Statistic
+              title="秒传中"
+              value={balanceStatus?.transfer_summary?.transferring || 0}
+            />
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card variant="borderless">
-            <Statistic title="缓存资源" value={balanceStatus?.cleanup_summary?.cache_count || 0} />
+            <Statistic
+              title="缓存资源"
+              value={balanceStatus?.cleanup_summary?.cache_count || 0}
+            />
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card variant="borderless">
-            <Statistic title="回退事件" value={balanceStatus?.recent_fallbacks?.length || 0} />
+            <Statistic
+              title="回退事件"
+              value={balanceStatus?.recent_fallbacks?.length || 0}
+            />
           </Card>
         </Col>
       </Row>

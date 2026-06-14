@@ -46,5 +46,8 @@ export * from './embyStats';
 // Emby 代理 302 重定向日志
 export * from './embyProxyLog';
 
+// Emby 账号 -> 115 存储 绑定
+export * from './embyBinding';
+
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';

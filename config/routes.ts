@@ -78,6 +78,12 @@ export default [
     component: './emby-proxy-log',
   },
   {
+    name: 'Emby账号绑定',
+    icon: 'userSwitch',
+    path: '/emby-bindings',
+    component: './emby-bindings',
+  },
+  {
     name: '整理日志',
     icon: 'fileText',
     path: '/organize-logs',

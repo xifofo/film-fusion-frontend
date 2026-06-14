@@ -949,4 +949,36 @@ declare namespace API {
     before_days?: number;
     confirm_all?: boolean;
   };
+
+  /** Emby 用户(用于绑定下拉选择) */
+  type EmbyUser = {
+    Id: string;
+    Name: string;
+  };
+
+  /** Emby 账号 -> 115 存储 绑定 */
+  type EmbyAccountBinding = {
+    id: number;
+    emby_user_id: string;
+    emby_user_name?: string;
+    cloud_storage_id: number;
+    enabled: boolean;
+    remark?: string;
+    created_at: string;
+    updated_at: string;
+    cloud_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
+  /** 创建/更新 Emby 账号绑定参数 */
+  type EmbyAccountBindingParams = {
+    emby_user_id: string;
+    emby_user_name?: string;
+    cloud_storage_id: number;
+    enabled?: boolean;
+    remark?: string;
+  };
 }
