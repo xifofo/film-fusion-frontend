@@ -43,7 +43,6 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
     setQrLoading(true);
     try {
       const result = await getAuth115QRCode(params);
-      console.log('[Storage115Config] 获取二维码成功:', result);
 
       setQrCodeData(result.qr_code_data);
       setSessionId(result.session_id);

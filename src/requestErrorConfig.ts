@@ -1,6 +1,21 @@
 ﻿import type { RequestOptions } from '@@/plugin-request/request';
+import { history } from '@umijs/max';
 import type { RequestConfig } from '@umijs/max';
 import { message, notification } from 'antd';
+
+const loginPath = '/user/login';
+
+/** 清除登录态并跳转到登录页（保留来源地址用于回跳） */
+const redirectToLogin = () => {
+  localStorage.removeItem('token');
+  const { pathname, search } = window.location;
+  if (pathname !== loginPath) {
+    history.replace({
+      pathname: loginPath,
+      search: new URLSearchParams({ redirect: pathname + search }).toString(),
+    });
+  }
+};
 
 // 错误处理方案： 错误类型
 enum ErrorShowType {
@@ -74,6 +89,13 @@ export const errorConfig: RequestConfig = {
         // 请求成功发出且服务器也响应了状态码，但状态代码超出了 2xx 的范围
         const { status } = error.response;
 
+        // 登录态失效：清除本地 token 并跳回登录页
+        if (status === 401) {
+          message.error('登录已过期，请重新登录');
+          redirectToLogin();
+          return;
+        }
+
         message.error(`Response status:${status}`);
       } else if (error.request) {
         // 请求已经成功发起，但没有收到响应
@@ -112,7 +134,6 @@ export const errorConfig: RequestConfig = {
       // 检查是否是Film Fusion API的响应格式（包含code字段）
       if (data && typeof data === 'object' && 'code' in data) {
         // 这是Film Fusion API的响应，不做处理，直接返回
-        console.log('[ResponseInterceptor] Film Fusion API响应:', data);
         return response;
       }
 

@@ -6,6 +6,6 @@ export default function access(
 ) {
   const { currentUser } = initialState ?? {};
   return {
-    canAdmin: currentUser && currentUser.id, // 简化权限逻辑，有用户即可访问
+    canAdmin: Boolean(currentUser?.id), // 简化权限逻辑，有用户即可访问
   };
 }

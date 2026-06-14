@@ -3,6 +3,7 @@ import { LoginForm, ProFormText } from "@ant-design/pro-components";
 import {
   FormattedMessage,
   Helmet,
+  history,
   SelectLang,
   useIntl,
   useModel,
@@ -105,10 +106,16 @@ const Login: React.FC = () => {
       message.success(defaultLoginSuccessMessage);
       await fetchUserInfo();
       const urlParams = new URL(window.location.href).searchParams;
-      window.location.href = urlParams.get("redirect") || "/";
+      const redirect = urlParams.get("redirect");
+      // 仅允许同源相对路径，避免开放重定向（Open Redirect）
+      const isSafeRedirect =
+        !!redirect &&
+        redirect.startsWith("/") &&
+        !redirect.startsWith("//") &&
+        !redirect.startsWith("/\\");
+      history.push(isSafeRedirect ? redirect : "/");
       return;
     }
-    console.log(response);
     // 如果失败去设置用户错误信息
     setUserLoginState({ error: true });
   };
