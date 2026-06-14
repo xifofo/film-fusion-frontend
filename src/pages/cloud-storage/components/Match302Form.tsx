@@ -1,6 +1,6 @@
 import { ProForm, ProFormDigit } from '@ant-design/pro-components';
 import React from 'react';
-import type { StorageSectionFormProps } from './storageFormTypes';
+import { HALF_COL, type StorageSectionFormProps } from './storageFormTypes';
 
 /** Match302 分区：最大同时播放 / 子账号缓存上限 */
 const Match302Form: React.FC<StorageSectionFormProps> = ({
@@ -8,13 +8,15 @@ const Match302Form: React.FC<StorageSectionFormProps> = ({
   onSave,
 }) => (
   <ProForm
+    grid
+    rowProps={{ gutter: [16, 0] }}
     layout="vertical"
     initialValues={values}
     submitter={{ searchConfig: { submitText: '保存 Match302', resetText: '重置' } }}
     onFinish={async (value) => onSave(value)}
   >
     <ProFormDigit
-      width="md"
+      colProps={HALF_COL}
       name="match302_max_active"
       label="Match302 最大同时播放"
       placeholder="0 表示不限制"
@@ -23,7 +25,7 @@ const Match302Form: React.FC<StorageSectionFormProps> = ({
       fieldProps={{ precision: 0 }}
     />
     <ProFormDigit
-      width="md"
+      colProps={HALF_COL}
       name="match302_cache_max_gb"
       label="Match302 子账号缓存空间上限(GB)"
       placeholder="0 表示不限制"

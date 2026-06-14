@@ -25,7 +25,6 @@ const CookieField: React.FC<CookieFieldProps> = ({ record }) => {
 
   return (
     <ProFormTextArea
-      width="md"
       name="cookie"
       label={
         is115 ? (

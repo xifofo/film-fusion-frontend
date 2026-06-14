@@ -5,7 +5,7 @@ import {
   ProFormText,
 } from '@ant-design/pro-components';
 import React from 'react';
-import type { StorageSectionFormProps } from './storageFormTypes';
+import { HALF_COL, type StorageSectionFormProps } from './storageFormTypes';
 
 /** 基本信息分区：名称 / 类型 / 状态 / 排序 */
 const BasicInfoForm: React.FC<StorageSectionFormProps> = ({
@@ -13,20 +13,22 @@ const BasicInfoForm: React.FC<StorageSectionFormProps> = ({
   onSave,
 }) => (
   <ProForm
+    grid
+    rowProps={{ gutter: [16, 0] }}
     layout="vertical"
     initialValues={values}
     submitter={{ searchConfig: { submitText: '保存基本信息', resetText: '重置' } }}
     onFinish={async (value) => onSave(value)}
   >
     <ProFormText
+      colProps={HALF_COL}
       rules={[{ required: true, message: '存储名称为必填项' }]}
-      width="md"
       name="storage_name"
       label="存储名称"
       placeholder="请输入存储名称"
     />
     <ProFormSelect
-      width="md"
+      colProps={HALF_COL}
       name="storage_type"
       label="存储类型"
       placeholder="请选择存储类型"
@@ -41,7 +43,7 @@ const BasicInfoForm: React.FC<StorageSectionFormProps> = ({
       ]}
     />
     <ProFormSelect
-      width="md"
+      colProps={HALF_COL}
       name="status"
       label="状态"
       options={[
@@ -51,7 +53,7 @@ const BasicInfoForm: React.FC<StorageSectionFormProps> = ({
       ]}
     />
     <ProFormDigit
-      width="md"
+      colProps={HALF_COL}
       name="sort_order"
       label="排序"
       placeholder="排序值，数字越大排序越靠前"
