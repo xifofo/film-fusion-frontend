@@ -52,6 +52,9 @@ export * from './embyBinding';
 // Emby 缺集扫描
 export * from './embyMissing';
 
+// Emby 观看记录（多用户隔离统计）
+export * from './embyWatch';
+
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';
 

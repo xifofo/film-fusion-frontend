@@ -101,6 +101,12 @@ export default [
     ],
   },
   {
+    name: '观看记录',
+    icon: 'calendar',
+    path: '/emby-watch',
+    component: './emby-watch',
+  },
+  {
     name: '整理日志',
     icon: 'fileText',
     path: '/organize-logs',

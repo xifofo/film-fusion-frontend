@@ -1101,6 +1101,161 @@ declare namespace API {
     strm_content?: string;
   };
 
+  /** 观看记录 - Emby 用户视图(含被统计/回填状态) */
+  type EmbyWatchUserView = {
+    emby_user_id: string;
+    emby_user_name: string;
+    tracked: boolean;
+    backfilling: boolean;
+    last_backfill_at?: string | null;
+    record_count: number;
+  };
+
+  /** 观看记录 - 单条记录 */
+  type EmbyWatchRecord = {
+    id: number;
+    emby_user_id: string;
+    emby_user_name: string;
+    item_id: string;
+    item_type: 'Movie' | 'Episode' | string;
+    title: string;
+    series_id?: string;
+    series_name?: string;
+    season_number?: number | null;
+    episode_number?: number | null;
+    production_year?: number;
+    runtime_minutes?: number;
+    watched_at: string;
+    watched_date: string;
+    source?: string;
+    created_at: string;
+  };
+
+  /** 观看记录 - 记录列表查询参数 */
+  type EmbyWatchRecordParams = {
+    emby_user_id: string;
+    item_type?: string;
+    series_id?: string;
+    start_date?: string;
+    end_date?: string;
+    page?: number;
+    page_size?: number;
+  };
+
+  /** 观看记录 - 采集规则设置 */
+  type EmbyWatchSetting = {
+    id?: number;
+    completion_threshold: number;
+    count_playback_stop: boolean;
+    count_mark_played: boolean;
+    updated_at?: string;
+  };
+
+  /** 观看记录 - 回填进度 */
+  type EmbyWatchBackfillStatus = {
+    running: boolean;
+    scanned: number;
+    inserted: number;
+    total: number;
+    started_at?: string | null;
+    finished_at?: string | null;
+    error?: string;
+  };
+
+  /** 观看记录 - 记录列表结果 */
+  type EmbyWatchRecordList = {
+    list: EmbyWatchRecord[];
+    total: number;
+  };
+
+  /** 观看记录 - 画廊卡片（电影按片 / 剧集按剧 聚合） */
+  type EmbyWatchGalleryCard = {
+    id: string;
+    poster_id: string;
+    title: string;
+    year: number;
+    count: number;
+    last_watched: string;
+    item_type: 'Movie' | 'Episode' | string;
+    emby_url: string;
+  };
+
+  /** 观看记录 - 画廊查询参数 */
+  type EmbyWatchGalleryParams = {
+    emby_user_id: string;
+    item_type?: 'Movie' | 'Episode' | string;
+    year?: number;
+    page?: number;
+    page_size?: number;
+  };
+
+  /** 观看记录 - 画廊结果 */
+  type EmbyWatchGalleryResult = {
+    list: EmbyWatchGalleryCard[];
+    total: number;
+    years: number[];
+  };
+
+  /** 观看记录 - 日历某天聚合 */
+  type EmbyWatchCalendarDay = {
+    date: string;
+    total: number;
+    movie_count: number;
+    episode_count: number;
+  };
+
+  /** 观看记录 - Top 剧集 */
+  type EmbyWatchTopSeries = {
+    series_id: string;
+    series_name: string;
+    episode_count: number;
+  };
+
+  /** 观看记录 - 月度计数 */
+  type EmbyWatchMonthCount = {
+    month: string;
+    total: number;
+  };
+
+  /** 观看记录 - 总览统计 */
+  type EmbyWatchSummary = {
+    year: number;
+    movie_count: number;
+    episode_count: number;
+    series_count: number;
+    total_minutes: number;
+    active_days: number;
+    top_series: EmbyWatchTopSeries[];
+    monthly: EmbyWatchMonthCount[];
+    years: number[];
+  };
+
+  /** 观看记录 - 时段计数 */
+  type EmbyWatchHourCount = {
+    hour: number;
+    total: number;
+  };
+
+  /** 观看记录 - 年度报告 */
+  type EmbyWatchAnnualReport = {
+    year: number;
+    movie_count: number;
+    episode_count: number;
+    series_count: number;
+    total_minutes: number;
+    active_days: number;
+    avg_minutes_per_day: number;
+    longest_streak: number;
+    first_watch: string;
+    last_watch: string;
+    busiest_day: { date: string; total: number };
+    top_series: EmbyWatchTopSeries[];
+    monthly: EmbyWatchMonthCount[];
+    weekday: { weekday: number; total: number }[];
+    hourly: EmbyWatchHourCount[];
+    years: number[];
+  };
+
   /** 运行日志文件信息 */
   type ServerLogFile = {
     name: string;
