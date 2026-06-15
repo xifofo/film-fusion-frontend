@@ -107,6 +107,12 @@ export default [
     component: './organize-logs',
   },
   {
+    name: '运行日志',
+    icon: 'profile',
+    path: '/server-logs',
+    component: './server-logs',
+  },
+  {
     path: '/',
     redirect: '/cloud-storage',
   },

@@ -54,3 +54,6 @@ export * from './embyMissing';
 
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';
+
+// 运行日志（server 进程日志文件查看）
+export * from './serverLog';

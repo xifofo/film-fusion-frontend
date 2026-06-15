@@ -1082,4 +1082,36 @@ declare namespace API {
     cloud_dir?: string;
     options: EmbyMissingCloudPathOption[];
   };
+
+  /** 运行日志文件信息 */
+  type ServerLogFile = {
+    name: string;
+    size: number;
+    modified: string;
+  };
+
+  /** 单条运行日志 */
+  type ServerLogEntry = {
+    timestamp?: string;
+    level?: string;
+    caller?: string;
+    msg?: string;
+    stacktrace?: string;
+    raw: string;
+  };
+
+  /** 运行日志查询结果 */
+  type ServerLogResult = {
+    file: string;
+    total: number;
+    entries: ServerLogEntry[];
+  };
+
+  /** 运行日志查询参数 */
+  type ServerLogQueryParams = {
+    file?: string;
+    lines?: number;
+    level?: string;
+    keyword?: string;
+  };
 }
