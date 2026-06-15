@@ -1,67 +1,11 @@
 import { ProFormDependency } from '@ant-design/pro-components';
 import { Input, Tag, Typography } from 'antd';
 import React, { useState } from 'react';
+import { encodePathSegments, extOf, safeFilePathJoin } from '@/utils/strmPath';
 
 const { Text, Paragraph } = Typography;
 
-// ===== 以下逻辑复刻后端 app/utils/pathhelper 与 strm_service，保证预览与真实生成一致 =====
-
-const driveLetterPattern = /^[a-zA-Z]:[\\/]+/;
-
-function removeDriveLetter(p: string): string {
-  return p ? p.replace(driveLetterPattern, '') : '';
-}
-
-function toLinux(p: string): string {
-  return removeDriveLetter(p).replace(/\\/g, '/');
-}
-
-// 复刻 Go filepath.Clean（Unix 语义）
-function cleanUnix(path: string): string {
-  const isAbs = path.startsWith('/');
-  const out: string[] = [];
-  for (const seg of path.split('/')) {
-    if (seg === '' || seg === '.') continue;
-    if (seg === '..') {
-      if (out.length > 0 && out[out.length - 1] !== '..') {
-        out.pop();
-      } else if (!isAbs) {
-        out.push('..');
-      }
-      continue;
-    }
-    out.push(seg);
-  }
-  let res = out.join('/');
-  if (isAbs) res = '/' + res;
-  if (res === '') res = isAbs ? '/' : '.';
-  return res;
-}
-
-// 复刻 Go filepath.Join（Unix 语义）：忽略空元素，再 Clean
-function unixJoin(base: string, relative: string): string {
-  const elems = [toLinux(base), toLinux(relative)].filter((e) => e !== '');
-  if (elems.length === 0) return '';
-  return cleanUnix(elems.join('/'));
-}
-
-// 复刻 pathhelper.SafeFilePathJoin
-function safeFilePathJoin(basePath: string, relativePath: string): string {
-  if (basePath.startsWith('http://') || basePath.startsWith('https://')) {
-    let base = basePath;
-    if (!base.endsWith('/')) base += '/';
-    const rel = relativePath.replace(/^\/+/, '');
-    return base + rel;
-  }
-  return unixJoin(basePath, relativePath);
-}
-
-// 复刻 Go filepath.Ext：取最后一段中最后一个 "." 起的后缀
-function extOf(p: string): string {
-  const base = p.split('/').pop() ?? '';
-  const idx = base.lastIndexOf('.');
-  return idx >= 0 ? base.slice(idx) : '';
-}
+// ===== 过滤规则解析为 cloud-paths 专用（include/download）；路径拼接复用 @/utils/strmPath =====
 
 type ParsedRules = { include: string[]; download: string[] } | null;
 
@@ -83,14 +27,6 @@ function parseRules(filterRules?: string): ParsedRules {
   } catch {
     return null;
   }
-}
-
-// 逐段 URI 编码（近似后端 url.PathEscape）
-function encodePathSegments(p: string): string {
-  return p
-    .split('/')
-    .map((seg) => (seg === '' ? seg : encodeURIComponent(seg)))
-    .join('/');
 }
 
 type SimResult =
