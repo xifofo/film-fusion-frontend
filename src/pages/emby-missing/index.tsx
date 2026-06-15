@@ -41,6 +41,7 @@ import {
   scanEmbyMissing,
   updateEmbyMissingSetting,
 } from '@/services/film-fusion';
+import ExternalLinksButton from './components/ExternalLinksButton';
 import RegenerateStrmModal from './components/RegenerateStrmModal';
 
 const { Text } = Typography;
@@ -269,7 +270,7 @@ const EmbyMissingPage: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 320,
+      width: 400,
       render: (_, record) => (
         <Space size={0} wrap>
           <Button
@@ -280,6 +281,7 @@ const EmbyMissingPage: React.FC = () => {
           >
             查看位置
           </Button>
+          <ExternalLinksButton seriesId={record.series_id} />
           <RegenerateStrmModal record={record} />
           <Popconfirm
             title="加入黑名单后将跳过该剧的缺集检查"

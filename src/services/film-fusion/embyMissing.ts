@@ -35,6 +35,21 @@ export async function resolveEmbyMissingCloudPath(
   );
 }
 
+/** 按需查询剧集的 TMDB/TVDB/IMDB 外部站点链接 */
+export async function getEmbyMissingExternalLinks(
+  seriesId: string,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.EmbyMissingExternalLinks>>(
+    '/api/emby-missing/external-links',
+    {
+      method: 'GET',
+      params: { series_id: seriesId },
+      ...(options || {}),
+    },
+  );
+}
+
 /** 获取定时扫描设置 */
 export async function getEmbyMissingSetting(options?: { [key: string]: any }) {
   return request<API.Response<API.EmbyMissingSetting>>('/api/emby-missing/setting', {

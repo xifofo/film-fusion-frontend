@@ -1077,6 +1077,14 @@ declare namespace API {
     emby_path_prefix?: string;
   };
 
+  /** 剧集外部站点链接（仅含 Emby 中存在的项） */
+  type EmbyMissingExternalLinks = {
+    series_id: string;
+    tmdb?: string;
+    tvdb?: string;
+    imdb?: string;
+  };
+
   /** 由 Emby 剧集反推云端目录的结果 */
   type EmbyMissingResolveResult = {
     series_id: string;
