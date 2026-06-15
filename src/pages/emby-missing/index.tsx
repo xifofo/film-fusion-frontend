@@ -1,4 +1,5 @@
 import {
+  EnvironmentOutlined,
   ReloadOutlined,
   ScanOutlined,
   SettingOutlined,
@@ -21,6 +22,7 @@ import {
   Popconfirm,
   Row,
   Space,
+  Spin,
   Statistic,
   Table,
   Tag,
@@ -35,9 +37,11 @@ import {
   getEmbyMissingBlacklist,
   getEmbyMissingLibraries,
   removeEmbyMissingBlacklist,
+  resolveEmbyMissingCloudPath,
   scanEmbyMissing,
   updateEmbyMissingSetting,
 } from '@/services/film-fusion';
+import ExternalLinksButton from './components/ExternalLinksButton';
 import RegenerateStrmModal from './components/RegenerateStrmModal';
 
 const { Text } = Typography;
@@ -64,6 +68,29 @@ const EmbyMissingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [blacklistOpen, setBlacklistOpen] = useState(false);
   const [blacklist, setBlacklist] = useState<API.EmbyMissingBlacklist[]>([]);
+  const [pathModal, setPathModal] = useState<{
+    open: boolean;
+    loading: boolean;
+    seriesName: string;
+    embyPath: string;
+    matched: boolean;
+    cloudDir: string;
+    storageName: string;
+    localDir: string;
+    strmFile: string;
+    strmContent: string;
+  }>({
+    open: false,
+    loading: false,
+    seriesName: '',
+    embyPath: '',
+    matched: false,
+    cloudDir: '',
+    storageName: '',
+    localDir: '',
+    strmFile: '',
+    strmContent: '',
+  });
   const [messageApi, contextHolder] = message.useMessage();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -123,6 +150,51 @@ const EmbyMissingPage: React.FC = () => {
       }
     } catch (error: any) {
       messageApi.error(error?.message || '加入黑名单失败');
+    }
+  };
+
+  const handleViewPath = async (record: API.EmbyMissingSeriesGroup) => {
+    setPathModal({
+      open: true,
+      loading: true,
+      seriesName: record.series_name,
+      embyPath: '',
+      matched: false,
+      cloudDir: '',
+      storageName: '',
+      localDir: '',
+      strmFile: '',
+      strmContent: '',
+    });
+    try {
+      const res = await resolveEmbyMissingCloudPath({
+        series_id: record.series_id,
+      });
+      if (res.code === 0 && res.data) {
+        const data = res.data;
+        const matchedOpt = (data.options || []).find(
+          (o) => o.id === data.cloud_path_id,
+        );
+        setPathModal((s) => ({
+          ...s,
+          loading: false,
+          embyPath: data.emby_path || '',
+          matched: !!data.matched,
+          cloudDir: data.cloud_dir || '',
+          storageName:
+            matchedOpt?.storage_name ||
+            (matchedOpt ? `存储#${matchedOpt.cloud_storage_id}` : ''),
+          localDir: data.local_dir || '',
+          strmFile: data.strm_file || '',
+          strmContent: data.strm_content || '',
+        }));
+      } else {
+        messageApi.error(res.message || '获取位置失败');
+        setPathModal((s) => ({ ...s, loading: false }));
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '获取位置失败');
+      setPathModal((s) => ({ ...s, loading: false }));
     }
   };
 
@@ -198,9 +270,18 @@ const EmbyMissingPage: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 230,
+      width: 400,
       render: (_, record) => (
         <Space size={0} wrap>
+          <Button
+            type="link"
+            size="small"
+            icon={<EnvironmentOutlined />}
+            onClick={() => handleViewPath(record)}
+          >
+            查看位置
+          </Button>
+          <ExternalLinksButton seriesId={record.series_id} />
           <RegenerateStrmModal record={record} />
           <Popconfirm
             title="加入黑名单后将跳过该剧的缺集检查"
@@ -324,6 +405,106 @@ const EmbyMissingPage: React.FC = () => {
           ),
         }}
       />
+
+      <Modal
+        title={`剧集位置 - ${pathModal.seriesName || ''}`}
+        open={pathModal.open}
+        onCancel={() => setPathModal((s) => ({ ...s, open: false }))}
+        footer={null}
+        width={640}
+      >
+        <Spin spinning={pathModal.loading}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Emby 本地路径（媒体服务器视角）：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : (
+                <Text
+                  code
+                  copyable={
+                    pathModal.embyPath ? { text: pathModal.embyPath } : false
+                  }
+                >
+                  {pathModal.embyPath || '未获取到路径（可能为虚拟/合集条目）'}
+                </Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              反推云端目录
+              {pathModal.storageName ? `（${pathModal.storageName}）` : ''}：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.matched && pathModal.cloudDir ? (
+                <Text code copyable={{ text: pathModal.cloudDir }}>
+                  {pathModal.cloudDir}
+                </Text>
+              ) : (
+                <Text type="warning">
+                  未匹配到云路径映射（无法反推云端目录）
+                </Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              本地剧集目录（定位结果）：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.localDir ? (
+                <Text code copyable={{ text: pathModal.localDir }}>
+                  {pathModal.localDir}
+                </Text>
+              ) : (
+                <Text type="warning">
+                  未定位到本地目录（Emby 路径后缀未能在任一映射 LocalPath
+                  下匹配）
+                </Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              STRM 文件：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.strmFile ? (
+                <Text code copyable={{ text: pathModal.strmFile }}>
+                  {pathModal.strmFile}
+                </Text>
+              ) : (
+                <Text type="secondary">未找到 .strm 文件</Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              STRM 内容（云端路径来源）：
+            </Text>
+            <div style={{ marginTop: 4 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.strmContent ? (
+                <Text
+                  code
+                  copyable={{ text: pathModal.strmContent }}
+                  style={{ wordBreak: 'break-all' }}
+                >
+                  {pathModal.strmContent}
+                </Text>
+              ) : (
+                <Text type="secondary">无内容</Text>
+              )}
+            </div>
+          </div>
+        </Spin>
+      </Modal>
 
       <Modal
         title="缺集检查黑名单"
