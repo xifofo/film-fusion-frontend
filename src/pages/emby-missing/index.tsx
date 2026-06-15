@@ -38,6 +38,7 @@ import {
   scanEmbyMissing,
   updateEmbyMissingSetting,
 } from '@/services/film-fusion';
+import RegenerateStrmModal from './components/RegenerateStrmModal';
 
 const { Text } = Typography;
 
@@ -197,16 +198,19 @@ const EmbyMissingPage: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 130,
+      width: 230,
       render: (_, record) => (
-        <Popconfirm
-          title="加入黑名单后将跳过该剧的缺集检查"
-          onConfirm={() => handleAddBlacklist(record)}
-        >
-          <Button type="link" size="small" danger icon={<StopOutlined />}>
-            加入黑名单
-          </Button>
-        </Popconfirm>
+        <Space size={0} wrap>
+          <RegenerateStrmModal record={record} />
+          <Popconfirm
+            title="加入黑名单后将跳过该剧的缺集检查"
+            onConfirm={() => handleAddBlacklist(record)}
+          >
+            <Button type="link" size="small" danger icon={<StopOutlined />}>
+              加入黑名单
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];

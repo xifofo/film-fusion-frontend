@@ -20,6 +20,21 @@ export async function scanEmbyMissing(
   });
 }
 
+/** 由剧集ID取 Emby 本地路径并反推云端源目录 */
+export async function resolveEmbyMissingCloudPath(
+  data: { series_id: string },
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.EmbyMissingResolveResult>>(
+    '/api/emby-missing/resolve-cloud-path',
+    {
+      method: 'POST',
+      data,
+      ...(options || {}),
+    },
+  );
+}
+
 /** 获取定时扫描设置 */
 export async function getEmbyMissingSetting(options?: { [key: string]: any }) {
   return request<API.Response<API.EmbyMissingSetting>>('/api/emby-missing/setting', {

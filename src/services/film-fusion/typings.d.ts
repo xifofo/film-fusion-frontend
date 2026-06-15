@@ -1062,4 +1062,24 @@ declare namespace API {
     series_name?: string;
     remark?: string;
   };
+
+  /** 可用于重生成 STRM 的云路径映射选项 */
+  type EmbyMissingCloudPathOption = {
+    id: number;
+    cloud_storage_id: number;
+    storage_name?: string;
+    storage_type?: string;
+    source_path?: string;
+    local_path?: string;
+  };
+
+  /** 由 Emby 剧集反推云端目录的结果 */
+  type EmbyMissingResolveResult = {
+    series_id: string;
+    emby_path: string;
+    matched: boolean;
+    cloud_path_id?: number;
+    cloud_dir?: string;
+    options: EmbyMissingCloudPathOption[];
+  };
 }
