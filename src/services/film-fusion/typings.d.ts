@@ -1081,6 +1081,12 @@ declare namespace API {
     cloud_path_id?: number;
     cloud_dir?: string;
     options: EmbyMissingCloudPathOption[];
+    /** 诊断字段：定位到的本地剧集目录 */
+    local_dir?: string;
+    /** 诊断字段：目录内取到的首个 .strm 文件路径 */
+    strm_file?: string;
+    /** 诊断字段：该 .strm 文件原始内容 */
+    strm_content?: string;
   };
 
   /** 运行日志文件信息 */

@@ -75,6 +75,9 @@ const EmbyMissingPage: React.FC = () => {
     matched: boolean;
     cloudDir: string;
     storageName: string;
+    localDir: string;
+    strmFile: string;
+    strmContent: string;
   }>({
     open: false,
     loading: false,
@@ -83,6 +86,9 @@ const EmbyMissingPage: React.FC = () => {
     matched: false,
     cloudDir: '',
     storageName: '',
+    localDir: '',
+    strmFile: '',
+    strmContent: '',
   });
   const [messageApi, contextHolder] = message.useMessage();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -155,6 +161,9 @@ const EmbyMissingPage: React.FC = () => {
       matched: false,
       cloudDir: '',
       storageName: '',
+      localDir: '',
+      strmFile: '',
+      strmContent: '',
     });
     try {
       const res = await resolveEmbyMissingCloudPath({
@@ -174,6 +183,9 @@ const EmbyMissingPage: React.FC = () => {
           storageName:
             matchedOpt?.storage_name ||
             (matchedOpt ? `存储#${matchedOpt.cloud_storage_id}` : ''),
+          localDir: data.local_dir || '',
+          strmFile: data.strm_file || '',
+          strmContent: data.strm_content || '',
         }));
       } else {
         messageApi.error(res.message || '获取位置失败');
@@ -423,7 +435,7 @@ const EmbyMissingPage: React.FC = () => {
               反推云端目录
               {pathModal.storageName ? `（${pathModal.storageName}）` : ''}：
             </Text>
-            <div style={{ marginTop: 4 }}>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
               {pathModal.loading ? (
                 <Text type="secondary">加载中…</Text>
               ) : pathModal.matched && pathModal.cloudDir ? (
@@ -434,6 +446,58 @@ const EmbyMissingPage: React.FC = () => {
                 <Text type="warning">
                   未匹配到云路径映射（无法反推云端目录）
                 </Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              本地剧集目录（定位结果）：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.localDir ? (
+                <Text code copyable={{ text: pathModal.localDir }}>
+                  {pathModal.localDir}
+                </Text>
+              ) : (
+                <Text type="warning">
+                  未定位到本地目录（Emby 路径后缀未能在任一映射 LocalPath
+                  下匹配）
+                </Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              STRM 文件：
+            </Text>
+            <div style={{ marginTop: 4, marginBottom: 16 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.strmFile ? (
+                <Text code copyable={{ text: pathModal.strmFile }}>
+                  {pathModal.strmFile}
+                </Text>
+              ) : (
+                <Text type="secondary">未找到 .strm 文件</Text>
+              )}
+            </div>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              STRM 内容（云端路径来源）：
+            </Text>
+            <div style={{ marginTop: 4 }}>
+              {pathModal.loading ? (
+                <Text type="secondary">加载中…</Text>
+              ) : pathModal.strmContent ? (
+                <Text
+                  code
+                  copyable={{ text: pathModal.strmContent }}
+                  style={{ wordBreak: 'break-all' }}
+                >
+                  {pathModal.strmContent}
+                </Text>
+              ) : (
+                <Text type="secondary">无内容</Text>
               )}
             </div>
           </div>
