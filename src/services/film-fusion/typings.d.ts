@@ -1142,6 +1142,63 @@ declare namespace API {
     page_size?: number;
   };
 
+  /** 应用配置 - config.yaml 结构 */
+  type AppConfig = {
+    server: {
+      port: string;
+      username: string;
+      password: string;
+      download_115_concurrency: number;
+      process_new_media: boolean;
+    };
+    log: {
+      level: string;
+      format: string;
+      output: string;
+      max_size: number;
+      max_backups: number;
+      max_age: number;
+      compress: boolean;
+    };
+    jwt: {
+      secret: string;
+      expire_time: number;
+      issuer: string;
+    };
+    emby: {
+      enabled: boolean;
+      url: string;
+      api_key: string;
+      admin_user_id: string;
+      cache_time: number;
+      add_current_media_info: boolean;
+      add_next_media_info: boolean;
+      run_proxy_port: number;
+      cover: {
+        enabled: boolean;
+        cron: string;
+        width: number;
+        height: number;
+        jpeg_quality: number;
+        font_cn: string;
+        font_en: string;
+        poster_count: number;
+      };
+    };
+    moviepilot: {
+      api: string;
+      username: string;
+      password: string;
+    };
+    file_watcher?: any;
+  };
+
+  /** 应用配置 - 读取结果（含密钥是否已设置） */
+  type AppConfigResult = {
+    config: AppConfig;
+    secrets: Record<string, boolean>;
+  };
+
   /** 观看记录 - 采集规则设置 */
   type EmbyWatchSetting = {
     id?: number;

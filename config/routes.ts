@@ -119,6 +119,12 @@ export default [
     component: './server-logs',
   },
   {
+    name: '系统设置',
+    icon: 'setting',
+    path: '/system-settings',
+    component: './system-settings',
+  },
+  {
     path: '/',
     redirect: '/cloud-storage',
   },

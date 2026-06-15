@@ -55,6 +55,9 @@ export * from './embyMissing';
 // Emby 观看记录（多用户隔离统计）
 export * from './embyWatch';
 
+// 应用配置（config.yaml 在线编辑 + 热重载）
+export * from './appConfig';
+
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';
 
