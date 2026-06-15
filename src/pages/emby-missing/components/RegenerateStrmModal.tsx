@@ -105,7 +105,9 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
   const optionList = options.map((o) => ({
     label: `${o.storage_name || `存储#${o.cloud_storage_id}`}${
       o.storage_type ? ` (${o.storage_type})` : ''
-    } | 本地: ${o.local_path || '-'}`,
+    } | 本地: ${o.local_path || '-'}${
+      o.emby_path_prefix ? ` | Emby前缀: ${o.emby_path_prefix}` : ''
+    }`,
     value: o.id,
   }));
 

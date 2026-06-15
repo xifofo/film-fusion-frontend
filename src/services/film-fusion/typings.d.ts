@@ -53,6 +53,7 @@ declare namespace API {
     source_path: string;        // 云盘源路径
     content_prefix?: string;    // STRM内容前缀
     local_path?: string;        // 本地路径
+    emby_path_prefix?: string;  // Emby 上报路径前缀（替换为 local_path 以定位真实本地路径）
     link_type: "strm";  // 链接类型
     filter_rules?: string;      // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
     strm_content_type?: "openlist" | "path";  // STRM文件内容类型
@@ -397,6 +398,7 @@ declare namespace API {
     source_path: string;
     content_prefix?: string;
     local_path?: string;
+    emby_path_prefix?: string;
     link_type: "strm";
     filter_rules?: string;
     strm_content_type?: "openlist" | "path";
@@ -425,6 +427,7 @@ declare namespace API {
     source_path?: string;
     content_prefix?: string;
     local_path?: string;
+    emby_path_prefix?: string;
     link_type?: "strm";
     filter_rules?: string;
     strm_content_type?: "openlist" | "path";
@@ -1071,6 +1074,7 @@ declare namespace API {
     storage_type?: string;
     source_path?: string;
     local_path?: string;
+    emby_path_prefix?: string;
   };
 
   /** 由 Emby 剧集反推云端目录的结果 */

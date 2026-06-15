@@ -30,6 +30,7 @@ const FIELD_TAB_MAP: Record<
   cloud_storage_id: { key: 'basic', tab: '基本信息', label: '云存储' },
   source_path: { key: 'basic', tab: '基本信息', label: '云盘源路径' },
   local_path: { key: 'basic', tab: '基本信息', label: '本地路径' },
+  emby_path_prefix: { key: 'basic', tab: '基本信息', label: 'Emby 路径前缀' },
   source_type: { key: 'basic', tab: '基本信息', label: '源类型' },
   link_type: { key: 'strm', tab: 'STRM 配置', label: '链接类型' },
   strm_content_type: { key: 'strm', tab: 'STRM 配置', label: 'STRM内容类型' },
@@ -248,6 +249,13 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
                     label="本地路径"
                     placeholder="请输入本地映射路径，如：/media/movies/action"
                     tooltip="本地文件系统中用于访问云盘文件的路径（可选）"
+                  />
+                  <ProFormText
+                    width="md"
+                    name="emby_path_prefix"
+                    label="Emby 路径前缀"
+                    placeholder="如：/media/tvshows（Emby 容器内看到的前缀）"
+                    tooltip="Emby 上报路径的前缀（媒体服务器/容器视角，常与本地路径不一致）。配置后，缺集「查看位置 / 重生成STRM」会把 Emby 路径里的该前缀替换成上面的「本地路径」，从而确定性地定位真实本地目录，不再依赖路径后缀试探。例：Emby 路径 /media/tvshows/某剧，本地路径 /mnt/strm/tvshows，则此处填 /media/tvshows。留空则回退到原有的后缀试探逻辑。"
                   />
                   <ProFormSelect
                     width="md"
