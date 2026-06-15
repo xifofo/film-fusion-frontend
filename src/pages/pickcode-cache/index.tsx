@@ -1,3 +1,12 @@
+import {
+  CalendarOutlined,
+  ClearOutlined,
+  DatabaseOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  FileTextOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import type {
   ActionType,
   ProColumns,
@@ -11,35 +20,26 @@ import {
 import { useRequest } from '@umijs/max';
 import {
   Button,
+  Card,
+  Col,
   Drawer,
+  Modal,
   message,
   Popconfirm,
-  Space,
-  Tooltip,
-  Modal,
-  Statistic,
-  Card,
   Row,
-  Col,
-  Tag
+  Space,
+  Statistic,
+  Tag,
+  Tooltip,
 } from 'antd';
-import {
-  DeleteOutlined,
-  EyeOutlined,
-  ClearOutlined,
-  InfoCircleOutlined,
-  FileTextOutlined,
-  DatabaseOutlined,
-  CalendarOutlined
-} from '@ant-design/icons';
-import React, { useRef, useState } from 'react';
 import dayjs from 'dayjs';
+import React, { useRef, useState } from 'react';
 import {
-  getPickcodeCacheList,
-  deletePickcodeCache,
   batchDeletePickcodeCache,
   clearAllPickcodeCache,
-  getPickcodeCacheStats
+  deletePickcodeCache,
+  getPickcodeCacheList,
+  getPickcodeCacheStats,
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
@@ -57,50 +57,66 @@ const PickcodeCacheList: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
 
   // 获取统计信息
-  const { data: statsData, refresh: refreshStats } = useRequest(getPickcodeCacheStats, {
-    formatResult: (res: any) => res?.data || {}
-  });
+  const { data: statsData, refresh: refreshStats } = useRequest(
+    getPickcodeCacheStats,
+    {
+      formatResult: (res: any) => res?.data || {},
+    },
+  );
 
   // 删除单个缓存记录
-  const { run: deleteRun, loading: deleteLoading } = useRequest(deletePickcodeCache, {
-    manual: true,
-    onSuccess: () => {
-      actionRef.current?.reloadAndRest?.();
-      refreshStats();
-      messageApi.success('删除成功');
+  const { run: deleteRun, loading: deleteLoading } = useRequest(
+    deletePickcodeCache,
+    {
+      manual: true,
+      onSuccess: () => {
+        actionRef.current?.reloadAndRest?.();
+        refreshStats();
+        messageApi.success('删除成功');
+      },
+      onError: (error) => {
+        messageApi.error(`删除失败：${error.message}`);
+      },
     },
-    onError: (error) => {
-      messageApi.error(`删除失败：${error.message}`);
-    },
-  });
+  );
 
   // 批量删除缓存记录
-  const { run: batchDeleteRun, loading: batchDeleteLoading } = useRequest(batchDeletePickcodeCache, {
-    manual: true,
-    onSuccess: (result) => {
-      actionRef.current?.reloadAndRest?.();
-      setSelectedRows([]);
-      refreshStats();
-      messageApi.success(`批量删除成功，共删除 ${result?.deleted_count || 0} 条记录`);
+  const { run: batchDeleteRun, loading: batchDeleteLoading } = useRequest(
+    batchDeletePickcodeCache,
+    {
+      manual: true,
+      onSuccess: (result) => {
+        actionRef.current?.reloadAndRest?.();
+        setSelectedRows([]);
+        refreshStats();
+        messageApi.success(
+          `批量删除成功，共删除 ${result?.deleted_count || 0} 条记录`,
+        );
+      },
+      onError: (error) => {
+        messageApi.error(`批量删除失败：${error.message}`);
+      },
     },
-    onError: (error) => {
-      messageApi.error(`批量删除失败：${error.message}`);
-    },
-  });
+  );
 
   // 清空所有缓存
-  const { run: clearAllRun, loading: clearAllLoading } = useRequest(clearAllPickcodeCache, {
-    manual: true,
-    onSuccess: (result) => {
-      actionRef.current?.reloadAndRest?.();
-      setSelectedRows([]);
-      refreshStats();
-      messageApi.success(`清空成功，共删除 ${result?.deleted_count || 0} 条记录`);
+  const { run: clearAllRun, loading: clearAllLoading } = useRequest(
+    clearAllPickcodeCache,
+    {
+      manual: true,
+      onSuccess: (result) => {
+        actionRef.current?.reloadAndRest?.();
+        setSelectedRows([]);
+        refreshStats();
+        messageApi.success(
+          `清空成功，共删除 ${result?.deleted_count || 0} 条记录`,
+        );
+      },
+      onError: (error) => {
+        messageApi.error(`清空失败：${error.message}`);
+      },
     },
-    onError: (error) => {
-      messageApi.error(`清空失败：${error.message}`);
-    },
-  });
+  );
 
   // 处理批量删除
   const handleBatchDelete = () => {
@@ -115,7 +131,7 @@ const PickcodeCacheList: React.FC = () => {
       okText: '确认',
       cancelText: '取消',
       onOk: () => {
-        batchDeleteRun({ ids: selectedRows.map(row => row.id) });
+        batchDeleteRun({ ids: selectedRows.map((row) => row.id) });
       },
     });
   };
@@ -139,7 +155,7 @@ const PickcodeCacheList: React.FC = () => {
     if (!bytes) return '-';
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+    return `${(bytes / 1024 ** i).toFixed(2)} ${sizes[i]}`;
   };
 
   const columns: ProColumns<API.PickcodeCache>[] = [
@@ -165,9 +181,7 @@ const PickcodeCacheList: React.FC = () => {
       title: 'Pickcode',
       dataIndex: 'pickcode',
       copyable: true,
-      render: (text) => (
-        <Tag color="blue">{text}</Tag>
-      ),
+      render: (text) => <Tag color="blue">{text}</Tag>,
       hideInSearch: true,
     },
     {
@@ -177,7 +191,8 @@ const PickcodeCacheList: React.FC = () => {
       valueType: 'dateTime',
       sorter: true,
       hideInSearch: true,
-      render: (_, record) => dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) =>
+        dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '更新时间',
@@ -186,7 +201,8 @@ const PickcodeCacheList: React.FC = () => {
       valueType: 'dateTime',
       sorter: true,
       hideInSearch: true,
-      render: (_, record) => dayjs(record.updated_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) =>
+        dayjs(record.updated_at).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',
@@ -290,19 +306,22 @@ const PickcodeCacheList: React.FC = () => {
             cancelText="取消"
             okType="danger"
           >
-            <Button
-              danger
-              loading={clearAllLoading}
-              icon={<ClearOutlined />}
-            >
+            <Button danger loading={clearAllLoading} icon={<ClearOutlined />}>
               清空所有缓存
             </Button>
           </Popconfirm>,
         ]}
         request={async (params) => {
-          const { current, pageSize, ...searchParams } = params;
+          const { current, pageSize, file_path, search } =
+            params as API.PickcodeCacheQueryParams & {
+              current?: number;
+              pageSize?: number;
+              file_path?: string;
+            };
+          // 搜索列 dataIndex 为 file_path，后端按 search 做左右模糊匹配(%kw%)
+          const keyword = (file_path ?? search ?? '').trim();
           const response = await getPickcodeCacheList({
-            ...searchParams,
+            search: keyword || undefined,
             page: current,
             size: pageSize,
           });
