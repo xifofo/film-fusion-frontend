@@ -1027,14 +1027,12 @@ declare namespace API {
     episodes: EmbyMissingEpisode[];
   };
 
-  /** 缺集扫描实时进度 */
+  /** 缺集扫描实时进度（聚合计数：多库/分页并发拉取，统计为全局累加值） */
   type EmbyMissingScanProgress = {
     phase: string;
-    library_index: number;
     library_total: number;
-    library_name: string;
-    library_items: number;
-    library_total_items: number;
+    processed_count: number;
+    total_count: number;
     collected_count: number;
     percent: number;
   };

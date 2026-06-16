@@ -71,15 +71,14 @@ const describeProgress = (p?: API.EmbyMissingScanProgress): string => {
       return '准备中…';
     case 'scanning': {
       const libPart =
-        p.library_total > 0
-          ? `扫描媒体库 ${p.library_index}/${p.library_total}`
-          : '扫描中';
-      const name = p.library_name ? `（${p.library_name}）` : '';
+        p.library_total > 0 ? `共 ${p.library_total} 个库` : '扫描中';
       const itemPart =
-        p.library_total_items > 0
-          ? ` · 本库 ${Math.min(p.library_items, p.library_total_items)}/${p.library_total_items}`
-          : '';
-      return `${libPart}${name}${itemPart} · 已收集 ${p.collected_count} 条`;
+        p.total_count > 0
+          ? ` · 已处理 ${Math.min(p.processed_count, p.total_count)}/${p.total_count}`
+          : p.processed_count > 0
+            ? ` · 已处理 ${p.processed_count}`
+            : '';
+      return `${libPart}${itemPart} · 已收集 ${p.collected_count} 条`;
     }
     case 'saving':
       return '写入数据库…';
