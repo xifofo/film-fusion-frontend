@@ -4,10 +4,12 @@ import {
   ScanOutlined,
   SettingOutlined,
   StopOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import {
   ModalForm,
   PageContainer,
+  ProFormDigit,
   ProFormSelect,
   ProFormSwitch,
   ProFormText,
@@ -68,17 +70,10 @@ const describeProgress = (p?: API.EmbyMissingScanProgress): string => {
   if (!p) return '准备中…';
   switch (p.phase) {
     case 'preparing':
-      return '准备中…';
+      return '准备中（枚举剧集）…';
     case 'scanning': {
-      const libPart =
-        p.library_total > 0 ? `共 ${p.library_total} 个库` : '扫描中';
-      const itemPart =
-        p.total_count > 0
-          ? ` · 已处理 ${Math.min(p.processed_count, p.total_count)}/${p.total_count}`
-          : p.processed_count > 0
-            ? ` · 已处理 ${p.processed_count}`
-            : '';
-      return `${libPart}${itemPart} · 已收集 ${p.collected_count} 条`;
+      const totalPart = p.series_total > 0 ? `/${p.series_total}` : '';
+      return `已处理 ${p.series_done}${totalPart} 部剧（查询 ${p.series_scanned}，跳过 ${p.series_skipped}）· 已收集 ${p.collected_count} 条`;
     }
     case 'saving':
       return '写入数据库…';
@@ -150,11 +145,11 @@ const EmbyMissingPage: React.FC = () => {
     };
   }, [data?.setting?.scanning, load]);
 
-  const handleScan = async () => {
+  const handleScan = async (forceFull = false) => {
     try {
-      const res = await scanEmbyMissing();
+      const res = await scanEmbyMissing(forceFull ? { force_full: true } : {});
       if (res.code === 0) {
-        messageApi.success('扫描已开始');
+        messageApi.success(forceFull ? '强制全量扫描已开始' : '扫描已开始');
         load();
       } else {
         messageApi.error(res.message || '触发扫描失败');
@@ -352,7 +347,7 @@ const EmbyMissingPage: React.FC = () => {
         style={{ marginBottom: 16 }}
         type="info"
         showIcon
-        message="基于 Emby /Shows/Missing 扫描电视剧缺失的剧集。可手动或定时扫描，结果会持久化；把某部剧加入黑名单后将跳过它的缺集检查。"
+        message="基于 Emby /Shows/Missing 按剧扫描缺失剧集。「增量扫描」只重查距上次检查超过设定天数的剧（其余沿用已有结果），首次/「强制全扫」会逐剧全量重查；结果持久化，加入黑名单的剧会被跳过。"
       />
 
       <Card style={{ marginBottom: 16 }}>
@@ -407,10 +402,21 @@ const EmbyMissingPage: React.FC = () => {
             type="primary"
             icon={<ScanOutlined />}
             loading={scanning}
-            onClick={handleScan}
+            onClick={() => handleScan(false)}
           >
-            {scanning ? '扫描中…' : '立即扫描'}
+            {scanning ? '扫描中…' : '增量扫描'}
           </Button>
+          <Popconfirm
+            title="强制全量扫描会逐剧重新检查全部剧集，忽略「近期已扫」窗口，耗时较长，确定继续？"
+            okText="开始全扫"
+            cancelText="取消"
+            disabled={scanning}
+            onConfirm={() => handleScan(true)}
+          >
+            <Button icon={<ThunderboltOutlined />} disabled={scanning}>
+              强制全扫
+            </Button>
+          </Popconfirm>
           <Button icon={<ReloadOutlined />} onClick={load}>
             刷新
           </Button>
@@ -613,6 +619,7 @@ const ScheduleSettingForm: React.FC<ScheduleSettingFormProps> = ({
           library_id: setting?.library_id || '',
           include_specials: setting?.include_specials ?? false,
           include_unaired: setting?.include_unaired ?? false,
+          rescan_interval_days: setting?.rescan_interval_days ?? 7,
         }}
         onFinish={async (values) => {
           try {
@@ -622,6 +629,7 @@ const ScheduleSettingForm: React.FC<ScheduleSettingFormProps> = ({
               library_id: values.library_id || '',
               include_specials: values.include_specials,
               include_unaired: values.include_unaired,
+              rescan_interval_days: values.rescan_interval_days,
             });
             if (res.code === 0) {
               messageApi.success('已保存');
@@ -660,6 +668,14 @@ const ScheduleSettingForm: React.FC<ScheduleSettingFormProps> = ({
         />
         <ProFormSwitch name="include_specials" label="统计特别篇(Specials)" />
         <ProFormSwitch name="include_unaired" label="统计未播出集" />
+        <ProFormDigit
+          name="rescan_interval_days"
+          label="重复扫描间隔(天)"
+          tooltip="增量扫描时，同一部剧在该天数内不再重复查询 Emby（0=每次都查）。首次扫描与「强制全扫」会忽略此项。统计口径(特别篇/未播出)变化时也会强制重查。"
+          min={0}
+          fieldProps={{ precision: 0 }}
+          placeholder="默认 7 天"
+        />
       </ModalForm>
     </>
   );

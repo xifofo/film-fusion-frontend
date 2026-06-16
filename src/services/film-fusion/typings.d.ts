@@ -999,6 +999,7 @@ declare namespace API {
     library_id: string;
     include_specials: boolean;
     include_unaired: boolean;
+    rescan_interval_days: number;
     scanning: boolean;
     last_scan_at?: string | null;
     last_status?: string;
@@ -1027,12 +1028,13 @@ declare namespace API {
     episodes: EmbyMissingEpisode[];
   };
 
-  /** 缺集扫描实时进度（聚合计数：多库/分页并发拉取，统计为全局累加值） */
+  /** 缺集扫描实时进度（按剧增量：已处理剧 / 剧总数） */
   type EmbyMissingScanProgress = {
     phase: string;
-    library_total: number;
-    processed_count: number;
-    total_count: number;
+    series_total: number;
+    series_done: number;
+    series_scanned: number;
+    series_skipped: number;
     collected_count: number;
     percent: number;
   };
@@ -1049,6 +1051,8 @@ declare namespace API {
     library_id?: string;
     include_specials?: boolean;
     include_unaired?: boolean;
+    /** true=忽略「近期已扫」窗口，逐剧强制全量重查 */
+    force_full?: boolean;
   };
 
   /** 更新缺集定时设置参数 */
@@ -1058,6 +1062,7 @@ declare namespace API {
     library_id?: string;
     include_specials?: boolean;
     include_unaired?: boolean;
+    rescan_interval_days?: number;
   };
 
   /** 缺集检查黑名单 */
