@@ -1027,10 +1027,23 @@ declare namespace API {
     episodes: EmbyMissingEpisode[];
   };
 
+  /** 缺集扫描实时进度 */
+  type EmbyMissingScanProgress = {
+    phase: string;
+    library_index: number;
+    library_total: number;
+    library_name: string;
+    library_items: number;
+    library_total_items: number;
+    collected_count: number;
+    percent: number;
+  };
+
   /** 缺集列表结果 */
   type EmbyMissingListResult = {
     setting: EmbyMissingSetting;
     groups: EmbyMissingSeriesGroup[];
+    progress?: EmbyMissingScanProgress;
   };
 
   /** 手动扫描参数 */

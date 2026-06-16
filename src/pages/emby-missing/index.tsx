@@ -20,6 +20,7 @@ import {
   Modal,
   message,
   Popconfirm,
+  Progress,
   Row,
   Space,
   Spin,
@@ -61,6 +62,34 @@ const fmtDateTime = (v?: string | null) => {
   if (!v) return '-';
   const d = dayjs(v);
   return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : v;
+};
+
+const describeProgress = (p?: API.EmbyMissingScanProgress): string => {
+  if (!p) return '准备中…';
+  switch (p.phase) {
+    case 'preparing':
+      return '准备中…';
+    case 'scanning': {
+      const libPart =
+        p.library_total > 0
+          ? `扫描媒体库 ${p.library_index}/${p.library_total}`
+          : '扫描中';
+      const name = p.library_name ? `（${p.library_name}）` : '';
+      const itemPart =
+        p.library_total_items > 0
+          ? ` · 本库 ${Math.min(p.library_items, p.library_total_items)}/${p.library_total_items}`
+          : '';
+      return `${libPart}${name}${itemPart} · 已收集 ${p.collected_count} 条`;
+    }
+    case 'saving':
+      return '写入数据库…';
+    case 'done':
+      return '扫描完成';
+    case 'failed':
+      return '扫描失败';
+    default:
+      return '扫描中';
+  }
 };
 
 const EmbyMissingPage: React.FC = () => {
@@ -366,6 +395,14 @@ const EmbyMissingPage: React.FC = () => {
             </Space>
           </Col>
         </Row>
+        {scanning && (
+          <div style={{ marginTop: 16 }}>
+            <Progress percent={data?.progress?.percent ?? 0} status="active" />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {describeProgress(data?.progress)}
+            </Text>
+          </div>
+        )}
         <Space style={{ marginTop: 16 }} wrap>
           <Button
             type="primary"
