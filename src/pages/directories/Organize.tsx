@@ -1,11 +1,16 @@
 import {
   ArrowLeftOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
   ExportOutlined,
+  EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
+  SyncOutlined,
   ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -24,6 +29,7 @@ import {
   Col,
   Empty,
   Input,
+  InputNumber,
   Modal,
   message,
   Result,
@@ -40,9 +46,14 @@ import {
 import type { DataNode } from 'antd/es/tree';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createOrganizePreviewTasks,
+  deleteOrganizePreviewTask,
   get115CookieDirs,
   getCloudDirectoryDetail,
+  getOrganizePreviewTask,
+  getOrganizePreviewTasks,
   organize115Cookie,
+  requeueOrganizePreviewTask,
 } from '@/services/film-fusion';
 
 const ROOT_KEY = '0';
@@ -224,6 +235,49 @@ const renderFileSize = (value?: number) => {
   );
 };
 
+const previewStatusMeta: Record<
+  API.OrganizePreviewTaskStatus,
+  { text: string; color: string; icon: React.ReactNode }
+> = {
+  pending: {
+    text: '排队中',
+    color: 'default',
+    icon: <ClockCircleOutlined />,
+  },
+  processing: {
+    text: '预整理中',
+    color: 'processing',
+    icon: <SyncOutlined spin />,
+  },
+  completed: {
+    text: '已预整理',
+    color: 'success',
+    icon: <CheckCircleOutlined />,
+  },
+  failed: {
+    text: '失败',
+    color: 'error',
+    icon: <WarningOutlined />,
+  },
+};
+
+const renderPreviewStatus = (status?: API.OrganizePreviewTaskStatus) => {
+  const meta = status ? previewStatusMeta[status] : undefined;
+  if (!meta) return <Tag>-</Tag>;
+  return (
+    <Tag color={meta.color} icon={meta.icon}>
+      {meta.text}
+    </Tag>
+  );
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+};
+
 const OrganizePage: React.FC = () => {
   const params = useParams<{ id: string }>();
   const directoryId = Number(params.id);
@@ -242,6 +296,8 @@ const OrganizePage: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [filenameRegexConfig, setFilenameRegexConfig] =
     useState<FilenameRegexConfig>(() => loadFilenameRegexConfig());
+  const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
+  const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
 
   const [dryRun, setDryRun] = useState(true);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
@@ -269,6 +325,23 @@ const OrganizePage: React.FC = () => {
   );
 
   const cloudStorageId = directoryDetail?.cloud_storage_id;
+
+  const {
+    data: previewTasks = [],
+    loading: previewTasksLoading,
+    refresh: refreshPreviewTasks,
+  } = useRequest(
+    () =>
+      getOrganizePreviewTasks({
+        cloud_directory_id: directoryId,
+      }),
+    {
+      ready: Number.isFinite(directoryId) && directoryId > 0,
+      refreshDeps: [directoryId],
+      pollingInterval: 8000,
+      formatResult: (res) => res.data?.list || [],
+    },
+  );
 
   const registerMeta = useCallback(
     (entries: Array<{ key: string; name: string; parentKey: string }>) => {
@@ -456,6 +529,83 @@ const OrganizePage: React.FC = () => {
     },
   );
 
+  const { run: runCreatePreviewTasks, loading: createPreviewLoading } =
+    useRequest(createOrganizePreviewTasks, {
+      manual: true,
+      onSuccess: (result) => {
+        const response = result as any;
+        const payload: API.OrganizePreviewTaskListResult =
+          response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          'code' in response
+            ? response.data
+            : response;
+        messageApi.success(
+          `已加入预整理队列${payload?.total ? ` ${payload.total} 个目录` : ''}`,
+        );
+        refreshPreviewTasks();
+      },
+      onError: (error: any) => {
+        messageApi.error(error?.message || '加入预整理队列失败');
+      },
+    });
+
+  const { run: runLoadPreviewTask, loading: loadPreviewTaskLoading } =
+    useRequest(getOrganizePreviewTask, {
+      manual: true,
+      onSuccess: (result) => {
+        const response = result as any;
+        const payload: API.OrganizePreviewTaskDetailResult =
+          response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          'code' in response
+            ? response.data
+            : response;
+        const previewResult = payload?.result;
+        if (!previewResult) {
+          messageApi.warning('这个预整理任务还没有可查看的结果');
+          return;
+        }
+        setDryRun(true);
+        setResultData(previewResult);
+        setRawResponse(response);
+        setSelectedItemRowKeys(
+          flattenOrganizeItems(previewResult).map(getOrganizeItemRowKey),
+        );
+        setCheckedKeys(previewResult.folder_ids || [previewResult.folder_id]);
+        messageApi.success('已加载预整理结果');
+      },
+      onError: (error: any) => {
+        messageApi.error(error?.message || '加载预整理结果失败');
+      },
+    });
+
+  const { run: runRequeuePreviewTask, loading: requeuePreviewLoading } =
+    useRequest(requeueOrganizePreviewTask, {
+      manual: true,
+      onSuccess: () => {
+        messageApi.success('已重新加入预整理队列');
+        refreshPreviewTasks();
+      },
+      onError: (error: any) => {
+        messageApi.error(error?.message || '重新加入队列失败');
+      },
+    });
+
+  const { run: runDeletePreviewTask, loading: deletePreviewLoading } =
+    useRequest(deleteOrganizePreviewTask, {
+      manual: true,
+      onSuccess: () => {
+        messageApi.success('已删除预整理任务');
+        refreshPreviewTasks();
+      },
+      onError: (error: any) => {
+        messageApi.error(error?.message || '删除预整理任务失败');
+      },
+    });
+
   const flatItemsForTable = useMemo<OrganizeItemRow[]>(
     () => flattenOrganizeItems(resultData),
     [resultData],
@@ -495,6 +645,53 @@ const OrganizePage: React.FC = () => {
     },
     [directoryId, filenameRegexConfig, messageApi],
   );
+
+  const buildPreviewFolders = useCallback(() => {
+    return checkedKeys.map((key) => {
+      const path = buildPathByKey(key);
+      const folderPath =
+        path.length > 0 ? path.map((p) => p.name).join(' / ') : key;
+      return {
+        folder_id: key,
+        folder_name: path[path.length - 1]?.name || key,
+        folder_path: folderPath,
+      };
+    });
+  }, [buildPathByKey, checkedKeys]);
+
+  const triggerPreviewQueue = useCallback(() => {
+    if (checkedKeys.length === 0) {
+      messageApi.warning('请先在左侧勾选至少一个 115 目录');
+      return;
+    }
+    const pattern = filenameRegexConfig.pattern.trim();
+    if (filenameRegexConfig.enabled && !pattern) {
+      messageApi.warning('启用文件名处理时，正则不能为空');
+      return;
+    }
+    runCreatePreviewTasks({
+      cloud_directory_id: directoryId,
+      folders: buildPreviewFolders(),
+      interval_seconds: previewIntervalSeconds,
+      recursive_depth: previewRecursiveDepth,
+      filename_regex_enabled: filenameRegexConfig.enabled,
+      ...(filenameRegexConfig.enabled
+        ? {
+            filename_regex_pattern: pattern,
+            filename_regex_replacement: filenameRegexConfig.replacement,
+          }
+        : {}),
+    });
+  }, [
+    buildPreviewFolders,
+    checkedKeys.length,
+    directoryId,
+    filenameRegexConfig,
+    messageApi,
+    previewIntervalSeconds,
+    previewRecursiveDepth,
+    runCreatePreviewTasks,
+  ]);
 
   const triggerOrganize = useCallback(
     (mode: 'dry' | 'apply') => {
@@ -851,6 +1048,140 @@ const OrganizePage: React.FC = () => {
     [buildPathByKey],
   );
 
+  const previewTaskColumns = useMemo<ProColumns<API.OrganizePreviewTask>[]>(
+    () => [
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 120,
+        fixed: 'left',
+        render: (_, row) => renderPreviewStatus(row.status),
+      },
+      {
+        title: '文件夹',
+        dataIndex: 'folder_path',
+        width: 260,
+        ellipsis: true,
+        render: (_, row) => {
+          const label = row.folder_path || row.folder_name || row.folder_id;
+          return (
+            <Tooltip title={`folder_id: ${row.folder_id}`}>
+              <span>{label}</span>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        title: '结果数',
+        dataIndex: 'total',
+        width: 90,
+      },
+      {
+        title: '层级',
+        dataIndex: 'depth',
+        width: 90,
+        render: (_, row) => `${row.depth ?? 0}/${row.max_depth ?? 0}`,
+      },
+      {
+        title: '间隔',
+        dataIndex: 'interval_seconds',
+        width: 90,
+        render: (_, row) => `${row.interval_seconds || 45}s`,
+      },
+      {
+        title: '更新时间',
+        dataIndex: 'updated_at',
+        width: 180,
+        render: (_, row) => formatDateTime(row.updated_at),
+      },
+      {
+        title: '完成时间',
+        dataIndex: 'completed_at',
+        width: 180,
+        render: (_, row) => formatDateTime(row.completed_at),
+      },
+      {
+        title: '错误',
+        dataIndex: 'error',
+        width: 240,
+        ellipsis: true,
+        render: (_, row) =>
+          row.error ? (
+            <Tooltip title={row.error}>
+              <Typography.Text type="danger">{row.error}</Typography.Text>
+            </Tooltip>
+          ) : (
+            '-'
+          ),
+      },
+      {
+        title: '操作',
+        valueType: 'option',
+        width: 210,
+        fixed: 'right',
+        render: (_, row) => {
+          const canView = row.status === 'completed' || row.status === 'failed';
+          const isProcessing = row.status === 'processing';
+          return (
+            <Space size={4}>
+              <Button
+                size="small"
+                type="link"
+                icon={<EyeOutlined />}
+                disabled={!canView}
+                loading={loadPreviewTaskLoading}
+                onClick={() => runLoadPreviewTask(row.id)}
+              >
+                查看结果
+              </Button>
+              <Button
+                size="small"
+                type="link"
+                icon={<ReloadOutlined />}
+                disabled={isProcessing}
+                loading={requeuePreviewLoading}
+                onClick={() => runRequeuePreviewTask(row.id)}
+              >
+                重跑
+              </Button>
+              <Tooltip title="删除">
+                <Button
+                  size="small"
+                  type="link"
+                  danger
+                  aria-label="删除预整理任务"
+                  icon={<DeleteOutlined />}
+                  disabled={isProcessing}
+                  loading={deletePreviewLoading}
+                  onClick={() =>
+                    modalApi.confirm({
+                      title: '删除预整理任务？',
+                      content:
+                        row.folder_path || row.folder_name || row.folder_id,
+                      okText: '删除',
+                      okButtonProps: { danger: true },
+                      cancelText: '取消',
+                      onOk: () => runDeletePreviewTask(row.id),
+                    })
+                  }
+                />
+              </Tooltip>
+            </Space>
+          );
+        },
+      },
+    ],
+    [
+      deletePreviewLoading,
+      loadPreviewTaskLoading,
+      modalApi,
+      requeuePreviewLoading,
+      runDeletePreviewTask,
+      runLoadPreviewTask,
+      runRequeuePreviewTask,
+    ],
+  );
+
   const flatDirDebugForTable = useMemo<OrganizeDirDebugRow[]>(() => {
     const groups = resultData?.groups;
     if (groups && groups.length > 0) {
@@ -1064,6 +1395,47 @@ const OrganizePage: React.FC = () => {
                 >
                   预览整理 ({checkedKeys.length})
                 </Button>
+                <Space size={4}>
+                  <Typography.Text type="secondary">后台间隔</Typography.Text>
+                  <InputNumber
+                    size="small"
+                    min={10}
+                    max={300}
+                    step={5}
+                    addonAfter="秒"
+                    value={previewIntervalSeconds}
+                    onChange={(value) =>
+                      setPreviewIntervalSeconds(
+                        typeof value === 'number' ? value : 45,
+                      )
+                    }
+                    style={{ width: 118 }}
+                  />
+                </Space>
+                <Space size={4}>
+                  <Typography.Text type="secondary">递归层数</Typography.Text>
+                  <InputNumber
+                    size="small"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={previewRecursiveDepth}
+                    onChange={(value) =>
+                      setPreviewRecursiveDepth(
+                        typeof value === 'number' ? value : 1,
+                      )
+                    }
+                    style={{ width: 78 }}
+                  />
+                </Space>
+                <Button
+                  icon={<ClockCircleOutlined />}
+                  onClick={triggerPreviewQueue}
+                  loading={createPreviewLoading}
+                  disabled={checkedKeys.length === 0}
+                >
+                  加入预整理 ({checkedKeys.length})
+                </Button>
                 <Button
                   type="primary"
                   danger
@@ -1175,6 +1547,34 @@ const OrganizePage: React.FC = () => {
                 }
               />
             ) : null}
+
+            <ProTable<API.OrganizePreviewTask>
+              rowKey="id"
+              headerTitle="后台预整理队列"
+              size="small"
+              search={false}
+              options={false}
+              loading={previewTasksLoading}
+              dataSource={previewTasks}
+              columns={previewTaskColumns}
+              pagination={{ pageSize: 5, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+              style={{ marginBottom: 12 }}
+              locale={{
+                emptyText:
+                  '还没有预整理任务。勾选左侧目录后点“加入预整理”，后台会先展开子目录，再按间隔逐个生成预览结果。',
+              }}
+              toolBarRender={() => [
+                <Button
+                  key="refresh"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  onClick={() => refreshPreviewTasks()}
+                >
+                  刷新
+                </Button>,
+              ]}
+            />
 
             {!resultData ? (
               <Alert

@@ -521,6 +521,67 @@ declare namespace API {
     groups?: Organize115CookieGroup[];
   };
 
+  type OrganizePreviewTaskStatus =
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed";
+
+  type OrganizePreviewTask = {
+    id: number;
+    user_id: number;
+    cloud_directory_id: number;
+    cloud_storage_id: number;
+    folder_id: string;
+    parent_folder_id?: string;
+    folder_name?: string;
+    folder_path?: string;
+    depth: number;
+    max_depth: number;
+    status: OrganizePreviewTaskStatus;
+    total: number;
+    error?: string;
+    interval_seconds: number;
+    filename_regex_enabled?: boolean;
+    filename_regex_pattern?: string;
+    filename_regex_replacement?: string;
+    started_at?: string;
+    completed_at?: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type CreateOrganizePreviewTasksParams = {
+    cloud_directory_id: number;
+    folders: Array<{
+      folder_id: string;
+      folder_name?: string;
+      folder_path?: string;
+    }>;
+    interval_seconds?: number;
+    recursive_depth?: number;
+    filename_regex_enabled?: boolean;
+    filename_regex_pattern?: string;
+    filename_regex_replacement?: string;
+  };
+
+  type OrganizePreviewTaskQueryParams = {
+    cloud_directory_id?: number;
+    status?: OrganizePreviewTaskStatus;
+  };
+
+  type OrganizePreviewTaskListResult = {
+    list: OrganizePreviewTask[];
+    total: number;
+    interval?: number;
+    max_depth?: number;
+  };
+
+  type OrganizePreviewTaskDetailResult = {
+    task: OrganizePreviewTask;
+    result?: Organize115CookieResult;
+  };
+
   /** 115 Cookie 保活状态 */
   type Web115CookieStatus = {
     storage_id: number;
