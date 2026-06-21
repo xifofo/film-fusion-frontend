@@ -44,7 +44,13 @@ import {
   Typography,
 } from 'antd';
 import type { DataNode } from 'antd/es/tree';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   createOrganizePreviewTasks,
   deleteOrganizePreviewTask,
@@ -298,9 +304,12 @@ const OrganizePage: React.FC = () => {
     useState<FilenameRegexConfig>(() => loadFilenameRegexConfig());
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
+  const previewResultRef = useRef<HTMLDivElement>(null);
 
   const [dryRun, setDryRun] = useState(true);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
+  const [activePreviewTask, setActivePreviewTask] =
+    useState<API.OrganizePreviewTask>();
   const [rawResponse, setRawResponse] = useState<unknown>();
   const [selectedItemRowKeys, setSelectedItemRowKeys] = useState<React.Key[]>(
     [],
@@ -408,6 +417,7 @@ const OrganizePage: React.FC = () => {
     setCheckedKeys([]);
     setExpandedKeys([]);
     setResultData(undefined);
+    setActivePreviewTask(undefined);
     setRawResponse(undefined);
     setSelectedItemRowKeys([]);
     setRootLoading(true);
@@ -420,6 +430,7 @@ const OrganizePage: React.FC = () => {
 
   useEffect(() => {
     setResultData(undefined);
+    setActivePreviewTask(undefined);
     setRawResponse(undefined);
     setSelectedItemRowKeys([]);
   }, [checkedKeys]);
@@ -512,12 +523,14 @@ const OrganizePage: React.FC = () => {
         );
         if (payload?.dry_run) {
           setResultData(payload);
+          setActivePreviewTask(undefined);
           setRawResponse(response);
           setSelectedItemRowKeys(
             flattenOrganizeItems(payload).map(getOrganizeItemRowKey),
           );
         } else {
           setResultData(undefined);
+          setActivePreviewTask(undefined);
           setRawResponse(undefined);
           setSelectedItemRowKeys([]);
           setCheckedKeys([]);
@@ -569,12 +582,18 @@ const OrganizePage: React.FC = () => {
           return;
         }
         setDryRun(true);
+        setActivePreviewTask(payload.task);
         setResultData(previewResult);
         setRawResponse(response);
         setSelectedItemRowKeys(
           flattenOrganizeItems(previewResult).map(getOrganizeItemRowKey),
         );
-        setCheckedKeys(previewResult.folder_ids || [previewResult.folder_id]);
+        window.setTimeout(() => {
+          previewResultRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }, 0);
         messageApi.success('已加载预整理结果');
       },
       onError: (error: any) => {
@@ -736,11 +755,30 @@ const OrganizePage: React.FC = () => {
         if (!organizeParams) {
           return;
         }
+        const activePreviewTaskLabel =
+          activePreviewTask?.folder_path ||
+          activePreviewTask?.folder_name ||
+          activePreviewTask?.folder_id;
         modalApi.confirm({
-          title: `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
-          content:
-            '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。' +
-            '单个目录失败不会阻断其它，错误会标注在对应分组上。',
+          title: activePreviewTask
+            ? `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
+            : `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
+          content: (
+            <Space direction="vertical" size={8}>
+              {activePreviewTaskLabel ? (
+                <Typography.Text>
+                  目录：
+                  <Typography.Text strong>
+                    {activePreviewTaskLabel}
+                  </Typography.Text>
+                </Typography.Text>
+              ) : null}
+              <Typography.Text>
+                将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
+                单个目录失败不会阻断其它，错误会标注在对应分组上。
+              </Typography.Text>
+            </Space>
+          ),
           okText: '执行整理',
           okButtonProps: { danger: true },
           cancelText: '取消',
@@ -770,6 +808,7 @@ const OrganizePage: React.FC = () => {
       });
     },
     [
+      activePreviewTask,
       buildOrganizeParams,
       checkedKeys,
       messageApi,
@@ -1240,6 +1279,11 @@ const OrganizePage: React.FC = () => {
   const applyButtonText = hasPreviewResult
     ? `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
+  const activePreviewTaskLabel = activePreviewTask
+    ? activePreviewTask.folder_path ||
+      activePreviewTask.folder_name ||
+      activePreviewTask.folder_id
+    : undefined;
 
   return (
     <PageContainer
@@ -1576,164 +1620,195 @@ const OrganizePage: React.FC = () => {
               ]}
             />
 
-            {!resultData ? (
-              <Alert
-                type="info"
-                showIcon
-                message="尚未整理"
-                description="在左侧勾选一个或多个 115 目录后，点击“预览整理”查看结果；确认无误后点击“确认整理”执行。多个目录会按勾选顺序逐个独立整理，单个失败不影响其它。"
-              />
-            ) : (
-              <>
-                <ProDescriptions<API.Organize115CookieResult>
-                  column={4}
-                  dataSource={resultData}
-                  style={{ marginBottom: 12 }}
-                  columns={[
-                    { title: '目录配置 ID', dataIndex: 'cloud_directory_id' },
-                    { title: '云存储 ID', dataIndex: 'cloud_storage_id' },
-                    {
-                      title: '整理目录数',
-                      render: () =>
-                        resultData.groups?.length ??
-                        (resultData.folder_id ? 1 : 0),
-                    },
-                    { title: '文件总数', dataIndex: 'total' },
-                    {
-                      title: '演练模式',
-                      render: () => renderBoolTag(resultData.dry_run),
-                    },
-                  ]}
+            <div ref={previewResultRef}>
+              {!resultData ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="尚未整理"
+                  description="在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。"
                 />
-
-                {(() => {
-                  const errored = (resultData.groups || []).filter(
-                    (g) => !!g?.error,
-                  );
-                  if (errored.length === 0) return null;
-                  return (
+              ) : (
+                <>
+                  {activePreviewTask ? (
                     <Alert
-                      type="warning"
+                      type="success"
                       showIcon
-                      icon={<WarningOutlined />}
                       style={{ marginBottom: 12 }}
-                      message={`有 ${errored.length} 个目录整理失败`}
+                      message="当前预整理结果"
                       description={
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          {errored.map((g) => {
-                            const path = buildPathByKey(g.folder_id);
-                            const label =
-                              path.length > 0
-                                ? path.map((p) => p.name).join(' / ')
-                                : g.folder_id;
-                            return (
-                              <li key={g.folder_id}>
-                                <Typography.Text strong>
-                                  {label}
-                                </Typography.Text>
-                                <Typography.Text type="secondary">
-                                  {' '}
-                                  ({g.folder_id}):{' '}
-                                </Typography.Text>
-                                <Typography.Text type="danger">
-                                  {g.error}
-                                </Typography.Text>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                        <Space size={8} wrap>
+                          <Typography.Text strong>
+                            {activePreviewTaskLabel}
+                          </Typography.Text>
+                          <Tag color="blue">
+                            层级 {activePreviewTask.depth}/
+                            {activePreviewTask.max_depth}
+                          </Tag>
+                          <Tag color="green">
+                            可确认 {selectedItemRowsForApply.length} 条
+                          </Tag>
+                        </Space>
                       }
                     />
-                  );
-                })()}
+                  ) : null}
 
-                <Tabs
-                  items={[
-                    {
-                      key: 'items',
-                      label: `处理明细 (${flatItemsForTable.length})`,
-                      children: (
-                        <ProTable<OrganizeItemRow>
-                          rowKey={getOrganizeItemRowKey}
-                          rowSelection={{
-                            selectedRowKeys: selectedItemRowKeys,
-                            onChange: (keys) => setSelectedItemRowKeys(keys),
-                            preserveSelectedRowKeys: true,
-                          }}
-                          search={false}
-                          options={false}
-                          pagination={{ pageSize: 10, showSizeChanger: true }}
-                          scroll={{ x: 'max-content', y: 420 }}
-                          dataSource={flatItemsForTable}
-                          columns={itemColumns}
-                          expandable={{
-                            expandedRowRender: (row) => (
-                              <Typography.Paragraph style={{ margin: 0 }}>
-                                <pre
-                                  style={{ margin: 0, whiteSpace: 'pre-wrap' }}
-                                >
-                                  {JSON.stringify(row, null, 2)}
-                                </pre>
-                              </Typography.Paragraph>
-                            ),
-                          }}
-                        />
-                      ),
-                    },
-                    {
-                      key: 'dir-debug',
-                      label: `目录调试 (${flatDirDebugForTable.length})`,
-                      children: (
-                        <ProTable<OrganizeDirDebugRow>
-                          rowKey={(row) =>
-                            `${row.__folder_id || ''}::${row.target_dir}`
-                          }
-                          search={false}
-                          options={false}
-                          pagination={{ pageSize: 10, showSizeChanger: true }}
-                          scroll={{ x: 'max-content', y: 420 }}
-                          dataSource={flatDirDebugForTable}
-                          columns={dirDebugColumns}
-                          expandable={{
-                            expandedRowRender: (row) => (
-                              <Typography.Paragraph style={{ margin: 0 }}>
-                                <pre
-                                  style={{ margin: 0, whiteSpace: 'pre-wrap' }}
-                                >
-                                  {JSON.stringify(row, null, 2)}
-                                </pre>
-                              </Typography.Paragraph>
-                            ),
-                          }}
-                        />
-                      ),
-                    },
-                    {
-                      key: 'raw',
-                      label: '原始响应',
-                      children: (
-                        <Typography.Paragraph style={{ margin: 0 }}>
-                          <pre
-                            style={{
-                              margin: 0,
-                              whiteSpace: 'pre-wrap',
-                              maxHeight: 480,
-                              overflow: 'auto',
+                  <ProDescriptions<API.Organize115CookieResult>
+                    column={4}
+                    dataSource={resultData}
+                    style={{ marginBottom: 12 }}
+                    columns={[
+                      { title: '目录配置 ID', dataIndex: 'cloud_directory_id' },
+                      { title: '云存储 ID', dataIndex: 'cloud_storage_id' },
+                      {
+                        title: '整理目录数',
+                        render: () =>
+                          resultData.groups?.length ??
+                          (resultData.folder_id ? 1 : 0),
+                      },
+                      { title: '文件总数', dataIndex: 'total' },
+                      {
+                        title: '演练模式',
+                        render: () => renderBoolTag(resultData.dry_run),
+                      },
+                    ]}
+                  />
+
+                  {(() => {
+                    const errored = (resultData.groups || []).filter(
+                      (g) => !!g?.error,
+                    );
+                    if (errored.length === 0) return null;
+                    return (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        icon={<WarningOutlined />}
+                        style={{ marginBottom: 12 }}
+                        message={`有 ${errored.length} 个目录整理失败`}
+                        description={
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {errored.map((g) => {
+                              const path = buildPathByKey(g.folder_id);
+                              const label =
+                                path.length > 0
+                                  ? path.map((p) => p.name).join(' / ')
+                                  : g.folder_id;
+                              return (
+                                <li key={g.folder_id}>
+                                  <Typography.Text strong>
+                                    {label}
+                                  </Typography.Text>
+                                  <Typography.Text type="secondary">
+                                    {' '}
+                                    ({g.folder_id}):{' '}
+                                  </Typography.Text>
+                                  <Typography.Text type="danger">
+                                    {g.error}
+                                  </Typography.Text>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        }
+                      />
+                    );
+                  })()}
+
+                  <Tabs
+                    items={[
+                      {
+                        key: 'items',
+                        label: `处理明细 (${flatItemsForTable.length})`,
+                        children: (
+                          <ProTable<OrganizeItemRow>
+                            rowKey={getOrganizeItemRowKey}
+                            rowSelection={{
+                              selectedRowKeys: selectedItemRowKeys,
+                              onChange: (keys) => setSelectedItemRowKeys(keys),
+                              preserveSelectedRowKeys: true,
                             }}
-                          >
-                            {JSON.stringify(
-                              rawResponse ?? resultData ?? {},
-                              null,
-                              2,
-                            )}
-                          </pre>
-                        </Typography.Paragraph>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            )}
+                            search={false}
+                            options={false}
+                            pagination={{ pageSize: 10, showSizeChanger: true }}
+                            scroll={{ x: 'max-content', y: 420 }}
+                            dataSource={flatItemsForTable}
+                            columns={itemColumns}
+                            expandable={{
+                              expandedRowRender: (row) => (
+                                <Typography.Paragraph style={{ margin: 0 }}>
+                                  <pre
+                                    style={{
+                                      margin: 0,
+                                      whiteSpace: 'pre-wrap',
+                                    }}
+                                  >
+                                    {JSON.stringify(row, null, 2)}
+                                  </pre>
+                                </Typography.Paragraph>
+                              ),
+                            }}
+                          />
+                        ),
+                      },
+                      {
+                        key: 'dir-debug',
+                        label: `目录调试 (${flatDirDebugForTable.length})`,
+                        children: (
+                          <ProTable<OrganizeDirDebugRow>
+                            rowKey={(row) =>
+                              `${row.__folder_id || ''}::${row.target_dir}`
+                            }
+                            search={false}
+                            options={false}
+                            pagination={{ pageSize: 10, showSizeChanger: true }}
+                            scroll={{ x: 'max-content', y: 420 }}
+                            dataSource={flatDirDebugForTable}
+                            columns={dirDebugColumns}
+                            expandable={{
+                              expandedRowRender: (row) => (
+                                <Typography.Paragraph style={{ margin: 0 }}>
+                                  <pre
+                                    style={{
+                                      margin: 0,
+                                      whiteSpace: 'pre-wrap',
+                                    }}
+                                  >
+                                    {JSON.stringify(row, null, 2)}
+                                  </pre>
+                                </Typography.Paragraph>
+                              ),
+                            }}
+                          />
+                        ),
+                      },
+                      {
+                        key: 'raw',
+                        label: '原始响应',
+                        children: (
+                          <Typography.Paragraph style={{ margin: 0 }}>
+                            <pre
+                              style={{
+                                margin: 0,
+                                whiteSpace: 'pre-wrap',
+                                maxHeight: 480,
+                                overflow: 'auto',
+                              }}
+                            >
+                              {JSON.stringify(
+                                rawResponse ?? resultData ?? {},
+                                null,
+                                2,
+                              )}
+                            </pre>
+                          </Typography.Paragraph>
+                        ),
+                      },
+                    ]}
+                  />
+                </>
+              )}
+            </div>
           </Card>
         </Col>
       </Row>
