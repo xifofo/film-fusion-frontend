@@ -570,6 +570,24 @@ declare namespace API {
     status?: OrganizePreviewTaskStatus;
   };
 
+  type DeleteOrganizePreviewTaskParams = {
+    delete_source_folder?: boolean;
+  };
+
+  type DeleteOrganizePreviewTaskResult = {
+    id: number;
+    source_folder_deleted?: boolean;
+  };
+
+  type ClearOrganizePreviewTasksParams = {
+    cloud_directory_id?: number;
+    status?: OrganizePreviewTaskStatus;
+  };
+
+  type ClearOrganizePreviewTasksResult = {
+    deleted_count: number;
+  };
+
   type OrganizePreviewTaskListResult = {
     list: OrganizePreviewTask[];
     total: number;

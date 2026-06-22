@@ -73,12 +73,29 @@ export async function requeueOrganizePreviewTask(
 /** 删除后台预整理任务 */
 export async function deleteOrganizePreviewTask(
   id: number,
+  params?: API.DeleteOrganizePreviewTaskParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<{ id: number }>>(
+  return request<API.Response<API.DeleteOrganizePreviewTaskResult>>(
     `/api/organize/preview-tasks/${id}`,
     {
       method: 'DELETE',
+      params,
+      ...(options || {}),
+    },
+  );
+}
+
+/** 批量清理后台预整理任务 */
+export async function clearOrganizePreviewTasks(
+  params: API.ClearOrganizePreviewTasksParams,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.ClearOrganizePreviewTasksResult>>(
+    '/api/organize/preview-tasks',
+    {
+      method: 'DELETE',
+      params,
       ...(options || {}),
     },
   );

@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import {
+  FooterToolbar,
   PageContainer,
   ProDescriptions,
   ProTable,
@@ -26,6 +27,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  Checkbox,
   Col,
   Empty,
   Input,
@@ -52,6 +54,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  clearOrganizePreviewTasks,
   createOrganizePreviewTasks,
   deleteOrganizePreviewTask,
   get115CookieDirs,
@@ -67,6 +70,17 @@ const PAGE_LIMIT = 1150;
 const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
+const footerNumberControlStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  whiteSpace: 'nowrap',
+};
+const footerNumberLabelStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  lineHeight: '24px',
+};
 
 type FilenameRegexConfig = {
   enabled: boolean;
@@ -305,6 +319,13 @@ const OrganizePage: React.FC = () => {
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
   const previewResultRef = useRef<HTMLDivElement>(null);
+  const applyingPreviewTaskRef = useRef<API.OrganizePreviewTask | undefined>(
+    undefined,
+  );
+  const deleteSourceFolderAfterApplyRef = useRef(false);
+  const clearingPreviewTaskStatusRef = useRef<
+    API.OrganizePreviewTaskStatus | undefined
+  >(undefined);
 
   const [dryRun, setDryRun] = useState(true);
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
@@ -529,6 +550,41 @@ const OrganizePage: React.FC = () => {
             flattenOrganizeItems(payload).map(getOrganizeItemRowKey),
           );
         } else {
+          const appliedPreviewTask = applyingPreviewTaskRef.current;
+          const shouldDeleteSourceFolder =
+            deleteSourceFolderAfterApplyRef.current;
+          applyingPreviewTaskRef.current = undefined;
+          deleteSourceFolderAfterApplyRef.current = false;
+          if (appliedPreviewTask) {
+            deleteOrganizePreviewTask(
+              appliedPreviewTask.id,
+              shouldDeleteSourceFolder
+                ? { delete_source_folder: true }
+                : undefined,
+            )
+              .then((deleteResult) => {
+                const deleteResponse = deleteResult as any;
+                const deletePayload: API.DeleteOrganizePreviewTaskResult =
+                  deleteResponse &&
+                  typeof deleteResponse === 'object' &&
+                  'data' in deleteResponse &&
+                  'code' in deleteResponse
+                    ? deleteResponse.data
+                    : deleteResponse;
+                messageApi.success(
+                  deletePayload?.source_folder_deleted
+                    ? '已从预整理队列移除，源文件夹已移入回收站'
+                    : '已从预整理队列移除',
+                );
+                refreshPreviewTasks();
+              })
+              .catch((error: any) => {
+                messageApi.warning(
+                  error?.message || '整理已完成，但移除预整理队列失败',
+                );
+                refreshPreviewTasks();
+              });
+          }
           setResultData(undefined);
           setActivePreviewTask(undefined);
           setRawResponse(undefined);
@@ -537,6 +593,8 @@ const OrganizePage: React.FC = () => {
         }
       },
       onError: (error: any) => {
+        applyingPreviewTaskRef.current = undefined;
+        deleteSourceFolderAfterApplyRef.current = false;
         messageApi.error(error?.message || '整理失败，请重试');
       },
     },
@@ -616,14 +674,110 @@ const OrganizePage: React.FC = () => {
   const { run: runDeletePreviewTask, loading: deletePreviewLoading } =
     useRequest(deleteOrganizePreviewTask, {
       manual: true,
-      onSuccess: () => {
-        messageApi.success('已删除预整理任务');
+      onSuccess: (result) => {
+        const response = result as any;
+        const payload: API.DeleteOrganizePreviewTaskResult =
+          response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          'code' in response
+            ? response.data
+            : response;
+        messageApi.success(
+          payload?.source_folder_deleted
+            ? '已删除预整理任务，源文件夹已移入回收站'
+            : '已删除预整理任务',
+        );
         refreshPreviewTasks();
       },
       onError: (error: any) => {
         messageApi.error(error?.message || '删除预整理任务失败');
       },
     });
+
+  const failedPreviewTaskCount = useMemo(
+    () => previewTasks.filter((task) => task.status === 'failed').length,
+    [previewTasks],
+  );
+  const clearablePreviewTaskCount = useMemo(
+    () => previewTasks.filter((task) => task.status !== 'processing').length,
+    [previewTasks],
+  );
+
+  const { run: runClearPreviewTasks, loading: clearPreviewTasksLoading } =
+    useRequest(clearOrganizePreviewTasks, {
+      manual: true,
+      onSuccess: (result) => {
+        const response = result as any;
+        const payload: API.ClearOrganizePreviewTasksResult =
+          response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          'code' in response
+            ? response.data
+            : response;
+        const clearedStatus = clearingPreviewTaskStatusRef.current;
+        clearingPreviewTaskStatusRef.current = undefined;
+        const deletedCount = payload?.deleted_count || 0;
+        messageApi.success(
+          clearedStatus === 'failed'
+            ? `已清理失败预整理任务 ${deletedCount} 个`
+            : `已清理预整理任务 ${deletedCount} 个`,
+        );
+        refreshPreviewTasks();
+        if (
+          activePreviewTask &&
+          (!clearedStatus || activePreviewTask.status === clearedStatus)
+        ) {
+          setActivePreviewTask(undefined);
+          setResultData(undefined);
+          setRawResponse(undefined);
+          setSelectedItemRowKeys([]);
+        }
+      },
+      onError: (error: any) => {
+        clearingPreviewTaskStatusRef.current = undefined;
+        messageApi.error(error?.message || '清理预整理队列失败');
+      },
+    });
+
+  const confirmClearPreviewTasks = useCallback(
+    (status?: API.OrganizePreviewTaskStatus) => {
+      const isFailedOnly = status === 'failed';
+      const count = isFailedOnly
+        ? failedPreviewTaskCount
+        : clearablePreviewTaskCount;
+      if (count <= 0) {
+        messageApi.info(isFailedOnly ? '没有失败任务可清理' : '没有任务可清理');
+        return;
+      }
+
+      modalApi.confirm({
+        title: isFailedOnly ? '清理失败预整理任务？' : '清理全部预整理任务？',
+        content: isFailedOnly
+          ? `将删除当前目录配置下 ${count} 个失败任务。`
+          : `将删除当前目录配置下 ${count} 个非处理中任务，正在处理的任务会保留。`,
+        okText: '清理',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => {
+          clearingPreviewTaskStatusRef.current = status;
+          runClearPreviewTasks({
+            cloud_directory_id: directoryId,
+            status,
+          });
+        },
+      });
+    },
+    [
+      clearablePreviewTaskCount,
+      directoryId,
+      failedPreviewTaskCount,
+      messageApi,
+      modalApi,
+      runClearPreviewTasks,
+    ],
+  );
 
   const flatItemsForTable = useMemo<OrganizeItemRow[]>(
     () => flattenOrganizeItems(resultData),
@@ -636,6 +790,40 @@ const OrganizePage: React.FC = () => {
       selectedSet.has(getOrganizeItemRowKey(row)),
     );
   }, [flatItemsForTable, selectedItemRowKeys]);
+
+  const confirmDeletePreviewTask = useCallback(
+    (row: API.OrganizePreviewTask) => {
+      const folderLabel = row.folder_path || row.folder_name || row.folder_id;
+      let deleteSourceFolder = false;
+      modalApi.confirm({
+        title: '删除预整理任务？',
+        content: (
+          <Space direction="vertical" size={8}>
+            <Typography.Text>{folderLabel}</Typography.Text>
+            <Checkbox
+              onChange={(event) => {
+                deleteSourceFolder = event.target.checked;
+              }}
+            >
+              同时删除源文件夹
+            </Checkbox>
+            <Typography.Text type="secondary">
+              勾选后会将源文件夹移入 115 回收站，请确认整理后源目录已为空。
+            </Typography.Text>
+          </Space>
+        ),
+        okText: '删除',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () =>
+          runDeletePreviewTask(
+            row.id,
+            deleteSourceFolder ? { delete_source_folder: true } : undefined,
+          ),
+      });
+    },
+    [modalApi, runDeletePreviewTask],
+  );
 
   const buildOrganizeParams = useCallback(
     (
@@ -724,6 +912,8 @@ const OrganizePage: React.FC = () => {
         if (!organizeParams) {
           return;
         }
+        applyingPreviewTaskRef.current = undefined;
+        deleteSourceFolderAfterApplyRef.current = false;
         runOrganize(organizeParams);
         return;
       }
@@ -759,6 +949,7 @@ const OrganizePage: React.FC = () => {
           activePreviewTask?.folder_path ||
           activePreviewTask?.folder_name ||
           activePreviewTask?.folder_id;
+        let deleteSourceFolder = false;
         modalApi.confirm({
           title: activePreviewTask
             ? `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
@@ -777,12 +968,31 @@ const OrganizePage: React.FC = () => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
+              {activePreviewTask ? (
+                <Space direction="vertical" size={4}>
+                  <Checkbox
+                    onChange={(event) => {
+                      deleteSourceFolder = event.target.checked;
+                    }}
+                  >
+                    整理完成后删除源文件夹
+                  </Checkbox>
+                  <Typography.Text type="secondary">
+                    仅在整理成功后执行，会将源文件夹移入 115 回收站。
+                  </Typography.Text>
+                </Space>
+              ) : null}
             </Space>
           ),
           okText: '执行整理',
           okButtonProps: { danger: true },
           cancelText: '取消',
-          onOk: () => runOrganize(organizeParams),
+          onOk: () => {
+            applyingPreviewTaskRef.current = activePreviewTask;
+            deleteSourceFolderAfterApplyRef.current =
+              !!activePreviewTask && deleteSourceFolder;
+            runOrganize(organizeParams);
+          },
         });
         return;
       }
@@ -804,7 +1014,11 @@ const OrganizePage: React.FC = () => {
         okText: '执行整理',
         okButtonProps: { danger: true },
         cancelText: '取消',
-        onOk: () => runOrganize(organizeParams),
+        onOk: () => {
+          applyingPreviewTaskRef.current = undefined;
+          deleteSourceFolderAfterApplyRef.current = false;
+          runOrganize(organizeParams);
+        },
       });
     },
     [
@@ -1192,17 +1406,7 @@ const OrganizePage: React.FC = () => {
                   icon={<DeleteOutlined />}
                   disabled={isProcessing}
                   loading={deletePreviewLoading}
-                  onClick={() =>
-                    modalApi.confirm({
-                      title: '删除预整理任务？',
-                      content:
-                        row.folder_path || row.folder_name || row.folder_id,
-                      okText: '删除',
-                      okButtonProps: { danger: true },
-                      cancelText: '取消',
-                      onOk: () => runDeletePreviewTask(row.id),
-                    })
-                  }
+                  onClick={() => confirmDeletePreviewTask(row)}
                 />
               </Tooltip>
             </Space>
@@ -1211,11 +1415,10 @@ const OrganizePage: React.FC = () => {
       },
     ],
     [
+      confirmDeletePreviewTask,
       deletePreviewLoading,
       loadPreviewTaskLoading,
-      modalApi,
       requeuePreviewLoading,
-      runDeletePreviewTask,
       runLoadPreviewTask,
       runRequeuePreviewTask,
     ],
@@ -1419,79 +1622,6 @@ const OrganizePage: React.FC = () => {
                 )}
               </Space>
             }
-            extra={
-              <Space size={8} wrap>
-                <span>
-                  演练模式：
-                  <Switch
-                    checked={dryRun}
-                    checkedChildren="是"
-                    unCheckedChildren="否"
-                    onChange={(checked) => setDryRun(checked)}
-                    style={{ marginLeft: 4 }}
-                  />
-                </span>
-                <Button
-                  icon={<PlayCircleOutlined />}
-                  onClick={() => triggerOrganize('dry')}
-                  loading={organizeLoading && dryRun}
-                  disabled={checkedKeys.length === 0}
-                >
-                  预览整理 ({checkedKeys.length})
-                </Button>
-                <Space size={4}>
-                  <Typography.Text type="secondary">后台间隔</Typography.Text>
-                  <InputNumber
-                    size="small"
-                    min={10}
-                    max={300}
-                    step={5}
-                    addonAfter="秒"
-                    value={previewIntervalSeconds}
-                    onChange={(value) =>
-                      setPreviewIntervalSeconds(
-                        typeof value === 'number' ? value : 45,
-                      )
-                    }
-                    style={{ width: 118 }}
-                  />
-                </Space>
-                <Space size={4}>
-                  <Typography.Text type="secondary">递归层数</Typography.Text>
-                  <InputNumber
-                    size="small"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={previewRecursiveDepth}
-                    onChange={(value) =>
-                      setPreviewRecursiveDepth(
-                        typeof value === 'number' ? value : 1,
-                      )
-                    }
-                    style={{ width: 78 }}
-                  />
-                </Space>
-                <Button
-                  icon={<ClockCircleOutlined />}
-                  onClick={triggerPreviewQueue}
-                  loading={createPreviewLoading}
-                  disabled={checkedKeys.length === 0}
-                >
-                  加入预整理 ({checkedKeys.length})
-                </Button>
-                <Button
-                  type="primary"
-                  danger
-                  icon={<ThunderboltOutlined />}
-                  onClick={() => triggerOrganize('apply')}
-                  loading={organizeLoading && !dryRun}
-                  disabled={applyDisabled}
-                >
-                  {applyButtonText}
-                </Button>
-              </Space>
-            }
           >
             <Alert
               type={filenameRegexConfig.enabled ? 'warning' : 'info'}
@@ -1609,6 +1739,28 @@ const OrganizePage: React.FC = () => {
                   '还没有预整理任务。勾选左侧目录后点“加入预整理”，后台会先展开子目录，再按间隔逐个生成预览结果。',
               }}
               toolBarRender={() => [
+                <Button
+                  key="clearFailed"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={failedPreviewTaskCount === 0}
+                  loading={clearPreviewTasksLoading}
+                  onClick={() => confirmClearPreviewTasks('failed')}
+                >
+                  清理失败 ({failedPreviewTaskCount})
+                </Button>,
+                <Button
+                  key="clearAll"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={clearablePreviewTaskCount === 0}
+                  loading={clearPreviewTasksLoading}
+                  onClick={() => confirmClearPreviewTasks()}
+                >
+                  清理全部 ({clearablePreviewTaskCount})
+                </Button>,
                 <Button
                   key="refresh"
                   size="small"
@@ -1812,6 +1964,99 @@ const OrganizePage: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      <div style={{ height: 72 }} />
+      <FooterToolbar
+        extra={
+          <Space size={8} wrap>
+            <Tag color={checkedKeys.length > 0 ? 'blue' : 'default'}>
+              已选目录 {checkedKeys.length}
+            </Tag>
+            {activePreviewTaskLabel ? (
+              <Typography.Text
+                type="secondary"
+                ellipsis={{ tooltip: activePreviewTaskLabel }}
+                style={{ maxWidth: 420 }}
+              >
+                当前预整理：{activePreviewTaskLabel}
+              </Typography.Text>
+            ) : null}
+          </Space>
+        }
+      >
+        <Space size={8} wrap>
+          <Space size={4}>
+            <Typography.Text type="secondary">演练模式</Typography.Text>
+            <Switch
+              checked={dryRun}
+              checkedChildren="是"
+              unCheckedChildren="否"
+              onChange={(checked) => setDryRun(checked)}
+            />
+          </Space>
+          <Button
+            icon={<PlayCircleOutlined />}
+            onClick={() => triggerOrganize('dry')}
+            loading={organizeLoading && dryRun}
+            disabled={checkedKeys.length === 0}
+          >
+            预览整理 ({checkedKeys.length})
+          </Button>
+          <span style={footerNumberControlStyle}>
+            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
+              后台间隔
+            </Typography.Text>
+            <InputNumber
+              size="small"
+              min={10}
+              max={300}
+              step={5}
+              addonAfter="秒"
+              value={previewIntervalSeconds}
+              onChange={(value) =>
+                setPreviewIntervalSeconds(
+                  typeof value === 'number' ? value : 45,
+                )
+              }
+              style={{ width: 118 }}
+            />
+          </span>
+          <span style={footerNumberControlStyle}>
+            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
+              递归层数
+            </Typography.Text>
+            <InputNumber
+              size="small"
+              min={1}
+              max={5}
+              step={1}
+              value={previewRecursiveDepth}
+              onChange={(value) =>
+                setPreviewRecursiveDepth(typeof value === 'number' ? value : 1)
+              }
+              style={{ width: 78 }}
+            />
+          </span>
+          <Button
+            icon={<ClockCircleOutlined />}
+            onClick={triggerPreviewQueue}
+            loading={createPreviewLoading}
+            disabled={checkedKeys.length === 0}
+          >
+            加入预整理 ({checkedKeys.length})
+          </Button>
+          <Button
+            type="primary"
+            danger
+            icon={<ThunderboltOutlined />}
+            onClick={() => triggerOrganize('apply')}
+            loading={organizeLoading && !dryRun}
+            disabled={applyDisabled}
+          >
+            {applyButtonText}
+          </Button>
+        </Space>
+      </FooterToolbar>
     </PageContainer>
   );
 };
