@@ -455,6 +455,11 @@ declare namespace API {
     folder_id?: string;
     folder_ids?: string[];
     file_ids?: string[];
+    folder_contexts?: Array<{
+      folder_id: string;
+      folder_name?: string;
+      folder_path?: string;
+    }>;
     dry_run?: boolean;
     filename_regex_enabled?: boolean;
     filename_regex_pattern?: string;
@@ -479,6 +484,7 @@ declare namespace API {
     file_name: string;
     file_size?: number;
     recognize_name?: string;
+    recognize_input?: string;
     pickcode?: string;
     media_type?: string;
     category?: string;
@@ -499,6 +505,14 @@ declare namespace API {
     subtitle_error?: string;
     local_dir?: string;
     local_exists?: boolean;
+    source_season?: number;
+    source_episode?: number;
+    target_season?: number;
+    target_episode?: number;
+    episode_matched?: boolean;
+    risk_level?: 'low' | 'medium' | 'high';
+    risk_reasons?: string[];
+    error?: string;
   };
 
   type Organize115CookieGroup = {

@@ -48,6 +48,13 @@ export default [
     parentKeys: ['/directories'],
   },
   {
+    name: '剧集安全入库',
+    path: '/directories/episode-organize/:id',
+    component: './directories/EpisodeOrganize',
+    hideInMenu: true,
+    parentKeys: ['/directories'],
+  },
+  {
     name: 'Match302重定向',
     icon: 'swap',
     path: '/match302',

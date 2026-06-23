@@ -68,8 +68,11 @@ import {
 const ROOT_KEY = '0';
 const PAGE_LIMIT = 1150;
 const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
+const EPISODE_FILENAME_REGEX_STORAGE_KEY =
+  'film-fusion.episodeOrganize.filenameRegex';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
+const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
 const footerNumberControlStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -94,41 +97,48 @@ const defaultFilenameRegexConfig: FilenameRegexConfig = {
   replacement: DEFAULT_FILENAME_REGEX_REPLACEMENT,
 };
 
-function loadFilenameRegexConfig(): FilenameRegexConfig {
+const defaultEpisodeFilenameRegexConfig: FilenameRegexConfig = {
+  enabled: true,
+  pattern: EPISODE_FILENAME_REGEX_PATTERN,
+  replacement: DEFAULT_FILENAME_REGEX_REPLACEMENT,
+};
+
+function loadFilenameRegexConfig(
+  storageKey: string,
+  defaults: FilenameRegexConfig,
+): FilenameRegexConfig {
   if (typeof window === 'undefined') {
-    return defaultFilenameRegexConfig;
+    return defaults;
   }
   try {
-    const raw = window.localStorage.getItem(FILENAME_REGEX_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
-      return defaultFilenameRegexConfig;
+      return defaults;
     }
     const parsed = JSON.parse(raw) as Partial<FilenameRegexConfig>;
     return {
       enabled: !!parsed.enabled,
       pattern:
-        typeof parsed.pattern === 'string'
-          ? parsed.pattern
-          : DEFAULT_FILENAME_REGEX_PATTERN,
+        typeof parsed.pattern === 'string' ? parsed.pattern : defaults.pattern,
       replacement:
         typeof parsed.replacement === 'string'
           ? parsed.replacement
-          : DEFAULT_FILENAME_REGEX_REPLACEMENT,
+          : defaults.replacement,
     };
   } catch {
-    return defaultFilenameRegexConfig;
+    return defaults;
   }
 }
 
-function saveFilenameRegexConfig(config: FilenameRegexConfig) {
+function saveFilenameRegexConfig(
+  storageKey: string,
+  config: FilenameRegexConfig,
+) {
   if (typeof window === 'undefined') {
     return;
   }
   try {
-    window.localStorage.setItem(
-      FILENAME_REGEX_STORAGE_KEY,
-      JSON.stringify(config),
-    );
+    window.localStorage.setItem(storageKey, JSON.stringify(config));
   } catch {
     return;
   }
@@ -255,6 +265,55 @@ const renderFileSize = (value?: number) => {
   );
 };
 
+const riskMeta = {
+  low: { text: '低风险', color: 'success' },
+  medium: { text: '需复核', color: 'warning' },
+  high: { text: '高风险', color: 'error' },
+} as const;
+
+function isLowRiskItem(row: OrganizeItemRow) {
+  return row.risk_level === 'low';
+}
+
+function getDefaultSelectedItemKeys(
+  rows: OrganizeItemRow[],
+  episodeMode: boolean,
+) {
+  return rows
+    .filter((row) => !episodeMode || isLowRiskItem(row))
+    .map(getOrganizeItemRowKey);
+}
+
+function renderRiskTag(level?: OrganizeItemRow['risk_level']) {
+  if (!level) return <Tag>未评估</Tag>;
+  const meta = riskMeta[level];
+  if (!meta) return <Tag>{level}</Tag>;
+  return <Tag color={meta.color}>{meta.text}</Tag>;
+}
+
+function renderEpisodePair(row: OrganizeItemRow) {
+  const source =
+    row.source_episode && row.source_episode > 0
+      ? `S${String(row.source_season || 0).padStart(2, '0')}E${String(
+          row.source_episode,
+        ).padStart(2, '0')}`
+      : '-';
+  const target =
+    row.target_episode && row.target_episode > 0
+      ? `S${String(row.target_season || 0).padStart(2, '0')}E${String(
+          row.target_episode,
+        ).padStart(2, '0')}`
+      : '-';
+  const color = row.episode_matched ? 'success' : 'warning';
+  return (
+    <Space size={4} wrap>
+      <Tag color={color}>{source}</Tag>
+      <Typography.Text type="secondary">→</Typography.Text>
+      <Tag color={color}>{target}</Tag>
+    </Space>
+  );
+}
+
 const previewStatusMeta: Record<
   API.OrganizePreviewTaskStatus,
   { text: string; color: string; icon: React.ReactNode }
@@ -298,9 +357,19 @@ const formatDateTime = (value?: string) => {
   return date.toLocaleString();
 };
 
-const OrganizePage: React.FC = () => {
+type OrganizePageProps = {
+  episodeMode?: boolean;
+};
+
+const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const params = useParams<{ id: string }>();
   const directoryId = Number(params.id);
+  const filenameRegexStorageKey = episodeMode
+    ? EPISODE_FILENAME_REGEX_STORAGE_KEY
+    : FILENAME_REGEX_STORAGE_KEY;
+  const defaultRegexConfig = episodeMode
+    ? defaultEpisodeFilenameRegexConfig
+    : defaultFilenameRegexConfig;
 
   const [messageApi, contextHolder] = message.useMessage();
   const [modalApi, modalContextHolder] = Modal.useModal();
@@ -315,7 +384,9 @@ const OrganizePage: React.FC = () => {
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
   const [filenameRegexConfig, setFilenameRegexConfig] =
-    useState<FilenameRegexConfig>(() => loadFilenameRegexConfig());
+    useState<FilenameRegexConfig>(() =>
+      loadFilenameRegexConfig(filenameRegexStorageKey, defaultRegexConfig),
+    );
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
   const previewResultRef = useRef<HTMLDivElement>(null);
@@ -446,8 +517,8 @@ const OrganizePage: React.FC = () => {
   }, [cloudStorageId, loadChildren]);
 
   useEffect(() => {
-    saveFilenameRegexConfig(filenameRegexConfig);
-  }, [filenameRegexConfig]);
+    saveFilenameRegexConfig(filenameRegexStorageKey, filenameRegexConfig);
+  }, [filenameRegexConfig, filenameRegexStorageKey]);
 
   useEffect(() => {
     setResultData(undefined);
@@ -485,6 +556,31 @@ const OrganizePage: React.FC = () => {
       return path;
     },
     [nodeMeta],
+  );
+
+  const buildFolderContexts = useCallback(
+    (folderIds: string[]) =>
+      folderIds.map((folderId) => {
+        if (activePreviewTask?.folder_id === folderId) {
+          return {
+            folder_id: folderId,
+            folder_name: activePreviewTask.folder_name || folderId,
+            folder_path:
+              activePreviewTask.folder_path ||
+              activePreviewTask.folder_name ||
+              folderId,
+          };
+        }
+        const path = buildPathByKey(folderId);
+        const folderPath =
+          path.length > 0 ? path.map((p) => p.name).join(' / ') : folderId;
+        return {
+          folder_id: folderId,
+          folder_name: path[path.length - 1]?.name || folderId,
+          folder_path: folderPath,
+        };
+      }),
+    [activePreviewTask, buildPathByKey],
   );
 
   const selectedPath = useMemo(
@@ -547,7 +643,10 @@ const OrganizePage: React.FC = () => {
           setActivePreviewTask(undefined);
           setRawResponse(response);
           setSelectedItemRowKeys(
-            flattenOrganizeItems(payload).map(getOrganizeItemRowKey),
+            getDefaultSelectedItemKeys(
+              flattenOrganizeItems(payload),
+              episodeMode,
+            ),
           );
         } else {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
@@ -644,7 +743,10 @@ const OrganizePage: React.FC = () => {
         setResultData(previewResult);
         setRawResponse(response);
         setSelectedItemRowKeys(
-          flattenOrganizeItems(previewResult).map(getOrganizeItemRowKey),
+          getDefaultSelectedItemKeys(
+            flattenOrganizeItems(previewResult),
+            episodeMode,
+          ),
         );
         window.setTimeout(() => {
           previewResultRef.current?.scrollIntoView({
@@ -784,6 +886,20 @@ const OrganizePage: React.FC = () => {
     [resultData],
   );
 
+  const riskSummary = useMemo(() => {
+    return flatItemsForTable.reduce(
+      (acc, row) => {
+        if (row.risk_level === 'low') acc.low += 1;
+        else if (row.risk_level === 'medium') acc.medium += 1;
+        else if (row.risk_level === 'high') acc.high += 1;
+        else acc.unknown += 1;
+        if (row.episode_matched) acc.episodeMatched += 1;
+        return acc;
+      },
+      { low: 0, medium: 0, high: 0, unknown: 0, episodeMatched: 0 },
+    );
+  }, [flatItemsForTable]);
+
   const selectedItemRowsForApply = useMemo(() => {
     const selectedSet = new Set(selectedItemRowKeys.map((key) => String(key)));
     return flatItemsForTable.filter((row) =>
@@ -839,6 +955,7 @@ const OrganizePage: React.FC = () => {
       return {
         cloud_directory_id: directoryId,
         folder_ids: folderIds,
+        folder_contexts: buildFolderContexts(folderIds),
         ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
         dry_run: dryRunValue,
         filename_regex_enabled: filenameRegexConfig.enabled,
@@ -850,21 +967,12 @@ const OrganizePage: React.FC = () => {
           : {}),
       };
     },
-    [directoryId, filenameRegexConfig, messageApi],
+    [buildFolderContexts, directoryId, filenameRegexConfig, messageApi],
   );
 
   const buildPreviewFolders = useCallback(() => {
-    return checkedKeys.map((key) => {
-      const path = buildPathByKey(key);
-      const folderPath =
-        path.length > 0 ? path.map((p) => p.name).join(' / ') : key;
-      return {
-        folder_id: key,
-        folder_name: path[path.length - 1]?.name || key,
-        folder_path: folderPath,
-      };
-    });
-  }, [buildPathByKey, checkedKeys]);
+    return buildFolderContexts(checkedKeys);
+  }, [buildFolderContexts, checkedKeys]);
 
   const triggerPreviewQueue = useCallback(() => {
     if (checkedKeys.length === 0) {
@@ -923,6 +1031,13 @@ const OrganizePage: React.FC = () => {
           messageApi.warning('请先在处理明细表格中选择至少一条记录');
           return;
         }
+        if (
+          episodeMode &&
+          selectedItemRowsForApply.some((row) => !isLowRiskItem(row))
+        ) {
+          messageApi.warning('剧集安全入库只允许执行低风险且集数匹配的明细');
+          return;
+        }
         const folderIds = Array.from(
           new Set(
             selectedItemRowsForApply
@@ -968,6 +1083,11 @@ const OrganizePage: React.FC = () => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
+              {episodeMode ? (
+                <Typography.Text type="secondary">
+                  当前页面仅执行低风险项；需复核和高风险项会保留在表格中，不会被整理。
+                </Typography.Text>
+              ) : null}
               {activePreviewTask ? (
                 <Space direction="vertical" size={4}>
                   <Checkbox
@@ -1025,6 +1145,7 @@ const OrganizePage: React.FC = () => {
       activePreviewTask,
       buildOrganizeParams,
       checkedKeys,
+      episodeMode,
       messageApi,
       modalApi,
       resultData?.dry_run,
@@ -1035,6 +1156,25 @@ const OrganizePage: React.FC = () => {
 
   const itemColumns = useMemo<ProColumns<OrganizeItemRow>[]>(
     () => [
+      {
+        title: '风险',
+        dataIndex: 'risk_level',
+        width: 120,
+        fixed: 'left',
+        render: (_, row) => {
+          const reasons = row.risk_reasons || [];
+          const tag = renderRiskTag(row.risk_level);
+          if (reasons.length === 0) return tag;
+          return <Tooltip title={reasons.join('；')}>{tag}</Tooltip>;
+        },
+      },
+      {
+        title: '集数校验',
+        dataIndex: 'episode_matched',
+        width: 150,
+        hideInTable: !episodeMode,
+        render: (_, row) => renderEpisodePair(row),
+      },
       {
         title: '类型',
         dataIndex: 'media_type',
@@ -1098,6 +1238,21 @@ const OrganizePage: React.FC = () => {
           row.recognize_name ? (
             <Tooltip title={row.recognize_name}>
               <span>{row.recognize_name}</span>
+            </Tooltip>
+          ) : (
+            <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
+          ),
+      },
+      {
+        title: '识别输入',
+        dataIndex: 'recognize_input',
+        width: 260,
+        ellipsis: true,
+        hideInTable: !episodeMode,
+        render: (_, row) =>
+          row.recognize_input ? (
+            <Tooltip title={row.recognize_input}>
+              <span>{row.recognize_input}</span>
             </Tooltip>
           ) : (
             <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
@@ -1215,7 +1370,7 @@ const OrganizePage: React.FC = () => {
         ellipsis: true,
       },
     ],
-    [buildPathByKey],
+    [buildPathByKey, episodeMode],
   );
 
   const dirDebugColumns = useMemo<ProColumns<OrganizeDirDebugRow>[]>(
@@ -1438,7 +1593,7 @@ const OrganizePage: React.FC = () => {
     return (
       <PageContainer
         header={{
-          title: '整理目录',
+          title: episodeMode ? '剧集安全入库' : '整理目录',
           onBack: () => history.push('/directories'),
         }}
       >
@@ -1480,7 +1635,9 @@ const OrganizePage: React.FC = () => {
     ? selectedItemRowsForApply.length === 0
     : checkedKeys.length === 0;
   const applyButtonText = hasPreviewResult
-    ? `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+    ? episodeMode
+      ? `确认低风险 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+      : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
   const activePreviewTaskLabel = activePreviewTask
     ? activePreviewTask.folder_path ||
@@ -1492,14 +1649,16 @@ const OrganizePage: React.FC = () => {
     <PageContainer
       loading={directoryLoading && !directoryDetail}
       header={{
-        title: `整理目录：${directoryDetail?.directory_name || ''}`,
+        title: `${episodeMode ? '剧集安全入库' : '整理目录'}：${
+          directoryDetail?.directory_name || ''
+        }`,
         onBack: () => history.push('/directories'),
         backIcon: <ArrowLeftOutlined />,
         extra: headerExtra,
         breadcrumb: {
           routes: [
             { path: '/directories', breadcrumbName: '目录配置' },
-            { path: '', breadcrumbName: '整理' },
+            { path: '', breadcrumbName: episodeMode ? '剧集安全入库' : '整理' },
           ],
         },
       }}
@@ -1777,8 +1936,12 @@ const OrganizePage: React.FC = () => {
                 <Alert
                   type="info"
                   showIcon
-                  message="尚未整理"
-                  description="在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。"
+                  message={episodeMode ? '尚未生成剧集预览' : '尚未整理'}
+                  description={
+                    episodeMode
+                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并按单剧集批次和集数匹配标记风险。只有低风险项会默认勾选。'
+                      : '在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。'
+                  }
                 />
               ) : (
                 <>
@@ -1806,7 +1969,7 @@ const OrganizePage: React.FC = () => {
                   ) : null}
 
                   <ProDescriptions<API.Organize115CookieResult>
-                    column={4}
+                    column={episodeMode ? 5 : 4}
                     dataSource={resultData}
                     style={{ marginBottom: 12 }}
                     columns={[
@@ -1823,6 +1986,36 @@ const OrganizePage: React.FC = () => {
                         title: '演练模式',
                         render: () => renderBoolTag(resultData.dry_run),
                       },
+                      ...(episodeMode
+                        ? [
+                            {
+                              title: '低风险',
+                              render: () => (
+                                <Tag color="success">{riskSummary.low}</Tag>
+                              ),
+                            },
+                            {
+                              title: '需复核',
+                              render: () => (
+                                <Tag color="warning">{riskSummary.medium}</Tag>
+                              ),
+                            },
+                            {
+                              title: '高风险',
+                              render: () => (
+                                <Tag color="error">{riskSummary.high}</Tag>
+                              ),
+                            },
+                            {
+                              title: '集数匹配',
+                              render: () => (
+                                <Tag color="blue">
+                                  {riskSummary.episodeMatched}
+                                </Tag>
+                              ),
+                            },
+                          ]
+                        : []),
                     ]}
                   />
 
@@ -1879,6 +2072,9 @@ const OrganizePage: React.FC = () => {
                               selectedRowKeys: selectedItemRowKeys,
                               onChange: (keys) => setSelectedItemRowKeys(keys),
                               preserveSelectedRowKeys: true,
+                              getCheckboxProps: (row) => ({
+                                disabled: episodeMode && !isLowRiskItem(row),
+                              }),
                             }}
                             search={false}
                             options={false}

@@ -27,12 +27,10 @@ const DirectoryList: React.FC = () => {
 
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { data: cloudStorageData = [], loading: cloudStorageLoading } = useRequest(
-    () => getCloudStorageList({ current: 1, pageSize: 1000 }),
-    {
+  const { data: cloudStorageData = [], loading: cloudStorageLoading } =
+    useRequest(() => getCloudStorageList({ current: 1, pageSize: 1000 }), {
       formatResult: (res) => res.data?.list || [],
-    },
-  );
+    });
 
   const storageOptions = useMemo(
     () =>
@@ -43,16 +41,19 @@ const DirectoryList: React.FC = () => {
     [cloudStorageData],
   );
 
-  const { run: delRun, loading: delLoading } = useRequest(deleteCloudDirectory, {
-    manual: true,
-    onSuccess: () => {
-      actionRef.current?.reloadAndRest?.();
-      messageApi.success('删除成功');
+  const { run: delRun, loading: delLoading } = useRequest(
+    deleteCloudDirectory,
+    {
+      manual: true,
+      onSuccess: () => {
+        actionRef.current?.reloadAndRest?.();
+        messageApi.success('删除成功');
+      },
+      onError: () => {
+        messageApi.error('删除失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('删除失败，请重试');
-    },
-  });
+  );
 
   const formatExtensions = (value?: string) => {
     if (!value) return '-';
@@ -66,7 +67,7 @@ const DirectoryList: React.FC = () => {
           </Tooltip>
         );
       }
-    } catch (error) {
+    } catch (_error) {
       return '格式错误';
     }
     return value;
@@ -121,7 +122,8 @@ const DirectoryList: React.FC = () => {
       render: (_, record) => (
         <Space size={6}>
           <Tag color="blue">
-            {record.cloud_storage?.storage_name || `ID: ${record.cloud_storage_id}`}
+            {record.cloud_storage?.storage_name ||
+              `ID: ${record.cloud_storage_id}`}
           </Tag>
           {record.cloud_storage?.storage_type ? (
             <Tag color="geekblue">{record.cloud_storage.storage_type}</Tag>
@@ -207,7 +209,7 @@ const DirectoryList: React.FC = () => {
       title: '操作',
       dataIndex: 'option',
       valueType: 'option',
-      width: 200,
+      width: 260,
       fixed: 'right',
       render: (_, record) => (
         <Space size={8}>
@@ -225,6 +227,15 @@ const DirectoryList: React.FC = () => {
             onClick={() => history.push(`/directories/organize/${record.id}`)}
           >
             整理
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() =>
+              history.push(`/directories/episode-organize/${record.id}`)
+            }
+          >
+            剧集整理
           </Button>
           <Popconfirm
             title="确定要删除这条目录配置吗？"
