@@ -60,6 +60,7 @@ import {
   deleteOrganizePreviewTask,
   get115CookieDirs,
   getCloudDirectoryDetail,
+  getOrganizeCategoryConfig,
   getOrganizePreviewTask,
   getOrganizePreviewTasks,
   organize115Cookie,
@@ -75,35 +76,18 @@ const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
+type PreviewQueueOptions = {
+  mediaType: OrganizeMediaType;
+  category?: string;
+  bestVersionEnabled: boolean;
+  intervalSeconds: number;
+  recursiveDepth: number;
+};
 const mediaTypeOptions: Array<{ label: string; value: OrganizeMediaType }> = [
   { label: '自动', value: 'auto' },
   { label: '电影', value: 'movie' },
   { label: '剧集', value: 'tv' },
 ];
-const categoryOptions = [
-  '电影',
-  '电视剧',
-  '剧集',
-  '动漫',
-  '番剧',
-  '纪录片',
-  '综艺',
-  '华语电影',
-  '欧美电影',
-  '日韩电影',
-].map((value) => ({ label: value, value }));
-const footerNumberControlStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 4,
-  whiteSpace: 'nowrap',
-};
-const footerNumberLabelStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  lineHeight: '24px',
-};
-
 type FilenameRegexConfig = {
   enabled: boolean;
   pattern: string;
@@ -311,6 +295,18 @@ function renderRiskTag(level?: OrganizeItemRow['risk_level']) {
   return <Tag color={meta.color}>{meta.text}</Tag>;
 }
 
+function unwrapResponseData<T>(response: T | API.Response<T>): T {
+  if (
+    response &&
+    typeof response === 'object' &&
+    'data' in response &&
+    'code' in response
+  ) {
+    return (response as API.Response<T>).data as T;
+  }
+  return response as T;
+}
+
 function renderTaskRisk(row: API.OrganizePreviewTask) {
   if (row.status === 'pending') return <Tag>待评估</Tag>;
   if (row.status === 'processing') return <Tag color="processing">评估中</Tag>;
@@ -480,6 +476,16 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
   const [organizeCategory, setOrganizeCategory] = useState<string>();
   const [bestVersionEnabled, setBestVersionEnabled] = useState(false);
+  const [previewOptionsOpen, setPreviewOptionsOpen] = useState(false);
+  const [previewMediaTypeDraft, setPreviewMediaTypeDraft] =
+    useState<OrganizeMediaType>(episodeMode ? 'tv' : 'auto');
+  const [previewCategoryDraft, setPreviewCategoryDraft] = useState<string>();
+  const [previewBestVersionDraft, setPreviewBestVersionDraft] = useState(false);
+  const [previewIntervalDraft, setPreviewIntervalDraft] = useState(45);
+  const [previewRecursiveDepthDraft, setPreviewRecursiveDepthDraft] =
+    useState(1);
+  const [categoryConfig, setCategoryConfig] =
+    useState<API.OrganizeCategoryConfigResult>();
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
   const previewResultRef = useRef<HTMLDivElement>(null);
@@ -514,6 +520,16 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     }
   }, [episodeMode]);
 
+  const previewCategoryOptions = useMemo(() => {
+    const names =
+      previewMediaTypeDraft === 'movie'
+        ? categoryConfig?.movie
+        : previewMediaTypeDraft === 'tv'
+          ? categoryConfig?.tv
+          : categoryConfig?.all;
+    return (names || []).map((value) => ({ label: value, value }));
+  }, [categoryConfig, previewMediaTypeDraft]);
+
   const {
     data: directoryDetail,
     loading: directoryLoading,
@@ -533,6 +549,41 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
 
   const cloudStorageId = directoryDetail?.cloud_storage_id;
+
+  const { loading: categoryConfigLoading, refresh: refreshCategoryConfig } =
+    useRequest(getOrganizeCategoryConfig, {
+      onSuccess: (result) => {
+        setCategoryConfig(
+          unwrapResponseData<API.OrganizeCategoryConfigResult>(result),
+        );
+      },
+      onError: (error: any) => {
+        messageApi.warning(error?.message || '获取分类配置失败');
+      },
+    });
+
+  const openPreviewOptions = useCallback(() => {
+    if (checkedKeys.length === 0) {
+      messageApi.warning('请先在左侧勾选至少一个 115 目录');
+      return;
+    }
+    setPreviewMediaTypeDraft(effectiveMediaType);
+    setPreviewCategoryDraft(organizeCategory);
+    setPreviewBestVersionDraft(bestVersionEnabled);
+    setPreviewIntervalDraft(previewIntervalSeconds);
+    setPreviewRecursiveDepthDraft(previewRecursiveDepth);
+    setPreviewOptionsOpen(true);
+    refreshCategoryConfig();
+  }, [
+    bestVersionEnabled,
+    checkedKeys.length,
+    effectiveMediaType,
+    messageApi,
+    organizeCategory,
+    previewIntervalSeconds,
+    previewRecursiveDepth,
+    refreshCategoryConfig,
+  ]);
 
   const {
     data: previewTasks = [],
@@ -1118,49 +1169,73 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     return buildFolderContexts(checkedKeys);
   }, [buildFolderContexts, checkedKeys]);
 
-  const triggerPreviewQueue = useCallback(() => {
-    if (checkedKeys.length === 0) {
-      messageApi.warning('请先在左侧勾选至少一个 115 目录');
-      return;
+  const triggerPreviewQueue = useCallback(
+    (options: PreviewQueueOptions) => {
+      if (checkedKeys.length === 0) {
+        messageApi.warning('请先在左侧勾选至少一个 115 目录');
+        return false;
+      }
+      const pattern = filenameRegexConfig.pattern.trim();
+      if (filenameRegexConfig.enabled && !pattern) {
+        messageApi.warning('启用文件名处理时，正则不能为空');
+        return false;
+      }
+      const category = options.category?.trim();
+      runCreatePreviewTasks({
+        cloud_directory_id: directoryId,
+        folders: buildPreviewFolders(),
+        interval_seconds: options.intervalSeconds,
+        recursive_depth: options.recursiveDepth,
+        ...(options.mediaType !== 'auto'
+          ? { media_type: options.mediaType }
+          : {}),
+        ...(category ? { category } : {}),
+        ...(options.mediaType === 'movie'
+          ? { best_version_enabled: options.bestVersionEnabled }
+          : {}),
+        filename_regex_enabled: filenameRegexConfig.enabled,
+        ...(filenameRegexConfig.enabled
+          ? {
+              filename_regex_pattern: pattern,
+              filename_regex_replacement: filenameRegexConfig.replacement,
+            }
+          : {}),
+      });
+      return true;
+    },
+    [
+      buildPreviewFolders,
+      checkedKeys.length,
+      directoryId,
+      filenameRegexConfig,
+      messageApi,
+      runCreatePreviewTasks,
+    ],
+  );
+
+  const confirmPreviewOptions = useCallback(() => {
+    const options: PreviewQueueOptions = {
+      mediaType: previewMediaTypeDraft,
+      category: previewCategoryDraft,
+      bestVersionEnabled: previewBestVersionDraft,
+      intervalSeconds: previewIntervalDraft,
+      recursiveDepth: previewRecursiveDepthDraft,
+    };
+    if (triggerPreviewQueue(options)) {
+      setOrganizeMediaType(previewMediaTypeDraft);
+      setOrganizeCategory(previewCategoryDraft);
+      setBestVersionEnabled(previewBestVersionDraft);
+      setPreviewIntervalSeconds(previewIntervalDraft);
+      setPreviewRecursiveDepth(previewRecursiveDepthDraft);
+      setPreviewOptionsOpen(false);
     }
-    const pattern = filenameRegexConfig.pattern.trim();
-    if (filenameRegexConfig.enabled && !pattern) {
-      messageApi.warning('启用文件名处理时，正则不能为空');
-      return;
-    }
-    const category = organizeCategory?.trim();
-    runCreatePreviewTasks({
-      cloud_directory_id: directoryId,
-      folders: buildPreviewFolders(),
-      interval_seconds: previewIntervalSeconds,
-      recursive_depth: previewRecursiveDepth,
-      ...(effectiveMediaType !== 'auto'
-        ? { media_type: effectiveMediaType }
-        : {}),
-      ...(category ? { category } : {}),
-      ...(effectiveMediaType === 'movie'
-        ? { best_version_enabled: bestVersionEnabled }
-        : {}),
-      filename_regex_enabled: filenameRegexConfig.enabled,
-      ...(filenameRegexConfig.enabled
-        ? {
-            filename_regex_pattern: pattern,
-            filename_regex_replacement: filenameRegexConfig.replacement,
-          }
-        : {}),
-    });
   }, [
-    buildPreviewFolders,
-    bestVersionEnabled,
-    checkedKeys.length,
-    directoryId,
-    effectiveMediaType,
-    filenameRegexConfig,
-    messageApi,
-    organizeCategory,
-    previewIntervalSeconds,
-    previewRecursiveDepth,
-    runCreatePreviewTasks,
+    previewBestVersionDraft,
+    previewCategoryDraft,
+    previewIntervalDraft,
+    previewMediaTypeDraft,
+    previewRecursiveDepthDraft,
+    triggerPreviewQueue,
   ]);
 
   const triggerOrganize = useCallback(
@@ -2423,6 +2498,106 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         </Col>
       </Row>
 
+      <Modal
+        title="加入预整理"
+        open={previewOptionsOpen}
+        onCancel={() => setPreviewOptionsOpen(false)}
+        onOk={confirmPreviewOptions}
+        confirmLoading={createPreviewLoading}
+        okText="加入队列"
+        cancelText="取消"
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Typography.Text type="secondary">识别类型</Typography.Text>
+              <Select<OrganizeMediaType>
+                value={episodeMode ? 'tv' : previewMediaTypeDraft}
+                options={mediaTypeOptions}
+                disabled={episodeMode}
+                onChange={(value) => {
+                  setPreviewMediaTypeDraft(value);
+                  setPreviewBestVersionDraft(value === 'movie');
+                  const nextNames =
+                    value === 'movie'
+                      ? categoryConfig?.movie
+                      : value === 'tv'
+                        ? categoryConfig?.tv
+                        : categoryConfig?.all;
+                  if (
+                    previewCategoryDraft &&
+                    !(nextNames || []).includes(previewCategoryDraft)
+                  ) {
+                    setPreviewCategoryDraft(undefined);
+                  }
+                }}
+                style={{ width: '100%', marginTop: 6 }}
+              />
+            </Col>
+            <Col span={12}>
+              <Typography.Text type="secondary">目标分类</Typography.Text>
+              <Select
+                allowClear
+                showSearch
+                loading={categoryConfigLoading}
+                placeholder="自动匹配"
+                value={previewCategoryDraft}
+                options={previewCategoryOptions}
+                onChange={(value) => setPreviewCategoryDraft(value)}
+                notFoundContent={
+                  categoryConfigLoading ? '加载中' : '无分类配置'
+                }
+                optionFilterProp="label"
+                style={{ width: '100%', marginTop: 6 }}
+              />
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Typography.Text type="secondary">后台间隔</Typography.Text>
+              <InputNumber
+                min={10}
+                max={300}
+                step={5}
+                addonAfter="秒"
+                value={previewIntervalDraft}
+                onChange={(value) =>
+                  setPreviewIntervalDraft(
+                    typeof value === 'number' ? value : 45,
+                  )
+                }
+                style={{ width: '100%', marginTop: 6 }}
+              />
+            </Col>
+            <Col span={12}>
+              <Typography.Text type="secondary">递归层数</Typography.Text>
+              <InputNumber
+                min={1}
+                max={5}
+                step={1}
+                value={previewRecursiveDepthDraft}
+                onChange={(value) =>
+                  setPreviewRecursiveDepthDraft(
+                    typeof value === 'number' ? value : 1,
+                  )
+                }
+                style={{ width: '100%', marginTop: 6 }}
+              />
+            </Col>
+          </Row>
+          <Space size={8}>
+            <Typography.Text type="secondary">最佳版本</Typography.Text>
+            <Switch
+              checked={previewBestVersionDraft}
+              disabled={previewMediaTypeDraft !== 'movie'}
+              checkedChildren="是"
+              unCheckedChildren="否"
+              onChange={(checked) => setPreviewBestVersionDraft(checked)}
+            />
+          </Space>
+        </Space>
+      </Modal>
+
       <div style={{ height: 72 }} />
       <FooterToolbar
         extra={
@@ -2452,50 +2627,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               onChange={(checked) => setDryRun(checked)}
             />
           </Space>
-          <span style={footerNumberControlStyle}>
-            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
-              识别
-            </Typography.Text>
-            <Select<OrganizeMediaType>
-              size="small"
-              value={effectiveMediaType}
-              options={mediaTypeOptions}
-              disabled={episodeMode}
-              onChange={(value) => {
-                setOrganizeMediaType(value);
-                setBestVersionEnabled(value === 'movie');
-              }}
-              style={{ width: 92 }}
-            />
-          </span>
-          <span style={footerNumberControlStyle}>
-            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
-              分类
-            </Typography.Text>
-            <Select
-              size="small"
-              mode="tags"
-              allowClear
-              placeholder="自动"
-              value={organizeCategory ? [organizeCategory] : []}
-              options={categoryOptions}
-              onChange={(values) => {
-                const next = values[values.length - 1]?.trim();
-                setOrganizeCategory(next || undefined);
-              }}
-              style={{ width: 132 }}
-            />
-          </span>
-          <Space size={4}>
-            <Typography.Text type="secondary">最佳版本</Typography.Text>
-            <Switch
-              checked={bestVersionEnabled}
-              disabled={effectiveMediaType !== 'movie'}
-              checkedChildren="是"
-              unCheckedChildren="否"
-              onChange={(checked) => setBestVersionEnabled(checked)}
-            />
-          </Space>
           <Button
             icon={<PlayCircleOutlined />}
             onClick={() => triggerOrganize('dry')}
@@ -2504,44 +2635,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           >
             预览整理 ({checkedKeys.length})
           </Button>
-          <span style={footerNumberControlStyle}>
-            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
-              后台间隔
-            </Typography.Text>
-            <InputNumber
-              size="small"
-              min={10}
-              max={300}
-              step={5}
-              addonAfter="秒"
-              value={previewIntervalSeconds}
-              onChange={(value) =>
-                setPreviewIntervalSeconds(
-                  typeof value === 'number' ? value : 45,
-                )
-              }
-              style={{ width: 118 }}
-            />
-          </span>
-          <span style={footerNumberControlStyle}>
-            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
-              递归层数
-            </Typography.Text>
-            <InputNumber
-              size="small"
-              min={1}
-              max={5}
-              step={1}
-              value={previewRecursiveDepth}
-              onChange={(value) =>
-                setPreviewRecursiveDepth(typeof value === 'number' ? value : 1)
-              }
-              style={{ width: 78 }}
-            />
-          </span>
           <Button
             icon={<ClockCircleOutlined />}
-            onClick={triggerPreviewQueue}
+            onClick={openPreviewOptions}
             loading={createPreviewLoading}
             disabled={checkedKeys.length === 0}
           >

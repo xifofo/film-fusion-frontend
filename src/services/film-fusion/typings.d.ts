@@ -469,6 +469,12 @@ declare namespace API {
     filename_regex_replacement?: string;
   };
 
+  type OrganizeCategoryConfigResult = {
+    movie?: string[];
+    tv?: string[];
+    all?: string[];
+  };
+
   type Organize115DirDebug = {
     target_dir: string;
     existing_dir: string;

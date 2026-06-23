@@ -1,5 +1,16 @@
 import { request } from '@umijs/max';
 
+/** 获取 MoviePilot 分类配置 */
+export async function getOrganizeCategoryConfig(options?: { [key: string]: any }) {
+  return request<API.Response<API.OrganizeCategoryConfigResult>>(
+    '/api/organize/category-config',
+    {
+      method: 'GET',
+      ...(options || {}),
+    },
+  );
+}
+
 /** 整理并处理 115 Cookie 目录 */
 export async function organize115Cookie(
   data: API.Organize115CookieParams,
