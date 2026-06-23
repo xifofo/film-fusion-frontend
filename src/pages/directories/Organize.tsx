@@ -36,6 +36,7 @@ import {
   message,
   Result,
   Row,
+  Select,
   Space,
   Spin,
   Switch,
@@ -73,6 +74,24 @@ const EPISODE_FILENAME_REGEX_STORAGE_KEY =
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
+type OrganizeMediaType = 'auto' | 'movie' | 'tv';
+const mediaTypeOptions: Array<{ label: string; value: OrganizeMediaType }> = [
+  { label: '自动', value: 'auto' },
+  { label: '电影', value: 'movie' },
+  { label: '剧集', value: 'tv' },
+];
+const categoryOptions = [
+  '电影',
+  '电视剧',
+  '剧集',
+  '动漫',
+  '番剧',
+  '纪录片',
+  '综艺',
+  '华语电影',
+  '欧美电影',
+  '日韩电影',
+].map((value) => ({ label: value, value }));
 const footerNumberControlStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -292,6 +311,62 @@ function renderRiskTag(level?: OrganizeItemRow['risk_level']) {
   return <Tag color={meta.color}>{meta.text}</Tag>;
 }
 
+function renderTaskRisk(row: API.OrganizePreviewTask) {
+  if (row.status === 'pending') return <Tag>待评估</Tag>;
+  if (row.status === 'processing') return <Tag color="processing">评估中</Tag>;
+  if (!row.risk_level) {
+    return row.status === 'failed' ? (
+      <Tag color="error">失败</Tag>
+    ) : (
+      <Tag>未评估</Tag>
+    );
+  }
+  return renderRiskTag(row.risk_level);
+}
+
+function renderTaskRiskCounts(row: API.OrganizePreviewTask) {
+  const none = row.risk_none_count || 0;
+  const low = row.risk_low_count || 0;
+  const medium = row.risk_medium_count || 0;
+  const high = row.risk_high_count || 0;
+  if (none + low + medium + high === 0) return '-';
+  return (
+    <Space size={4} wrap>
+      <Tag color="success">无 {none}</Tag>
+      <Tag color="processing">低 {low}</Tag>
+      <Tag color="warning">复核 {medium}</Tag>
+      <Tag color="error">高 {high}</Tag>
+    </Space>
+  );
+}
+
+function renderVersionTag(row: OrganizeItemRow) {
+  const reasons = row.version_reasons || [];
+  const detail = reasons.length > 0 ? reasons.join('；') : undefined;
+  if (row.best_version) {
+    return (
+      <Tooltip title={detail}>
+        <Tag color="success">最佳 {row.version_score ?? 0}</Tag>
+      </Tooltip>
+    );
+  }
+  if (row.alternate_version) {
+    return (
+      <Tooltip title={detail}>
+        <Tag color="error">非最佳 {row.version_score ?? 0}</Tag>
+      </Tooltip>
+    );
+  }
+  if (typeof row.version_score === 'number' && row.version_score > 0) {
+    return (
+      <Tooltip title={detail}>
+        <Tag>{row.version_score}</Tag>
+      </Tooltip>
+    );
+  }
+  return <Tag>无</Tag>;
+}
+
 function renderEpisodePair(row: OrganizeItemRow) {
   const source =
     row.source_episode && row.source_episode > 0
@@ -400,6 +475,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     useState<FilenameRegexConfig>(() =>
       loadFilenameRegexConfig(filenameRegexStorageKey, defaultRegexConfig),
     );
+  const [organizeMediaType, setOrganizeMediaType] = useState<OrganizeMediaType>(
+    episodeMode ? 'tv' : 'auto',
+  );
+  const [organizeCategory, setOrganizeCategory] = useState<string>();
+  const [bestVersionEnabled, setBestVersionEnabled] = useState(false);
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
   const previewResultRef = useRef<HTMLDivElement>(null);
@@ -419,6 +499,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [selectedItemRowKeys, setSelectedItemRowKeys] = useState<React.Key[]>(
     [],
   );
+  const effectiveMediaType: OrganizeMediaType = episodeMode
+    ? 'tv'
+    : organizeMediaType;
+  const safeSelectionMode =
+    episodeMode ||
+    effectiveMediaType === 'movie' ||
+    resultData?.media_type === 'movie';
+
+  useEffect(() => {
+    if (episodeMode) {
+      setOrganizeMediaType('tv');
+      setBestVersionEnabled(false);
+    }
+  }, [episodeMode]);
 
   const {
     data: directoryDetail,
@@ -658,7 +752,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setSelectedItemRowKeys(
             getDefaultSelectedItemKeys(
               flattenOrganizeItems(payload),
-              episodeMode,
+              safeSelectionMode,
             ),
           );
         } else {
@@ -753,12 +847,17 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         }
         setDryRun(true);
         setActivePreviewTask(payload.task);
+        if (!episodeMode) {
+          setOrganizeMediaType(payload.task?.media_type || 'auto');
+        }
+        setOrganizeCategory(payload.task?.category || undefined);
+        setBestVersionEnabled(!!payload.task?.best_version_enabled);
         setResultData(previewResult);
         setRawResponse(response);
         setSelectedItemRowKeys(
           getDefaultSelectedItemKeys(
             flattenOrganizeItems(previewResult),
-            episodeMode,
+            episodeMode || payload.task?.media_type === 'movie',
           ),
         );
         window.setTimeout(() => {
@@ -911,6 +1010,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         if ((row.external_subtitle_files || []).length > 0) {
           acc.externalSubtitle += 1;
         }
+        if (row.best_version) acc.bestVersion += 1;
+        if (row.alternate_version) acc.alternateVersion += 1;
         return acc;
       },
       {
@@ -921,6 +1022,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         unknown: 0,
         episodeMatched: 0,
         externalSubtitle: 0,
+        bestVersion: 0,
+        alternateVersion: 0,
       },
     );
   }, [flatItemsForTable]);
@@ -977,12 +1080,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         messageApi.warning('启用文件名处理时，正则不能为空');
         return undefined;
       }
+      const category = organizeCategory?.trim();
       return {
         cloud_directory_id: directoryId,
         folder_ids: folderIds,
         folder_contexts: buildFolderContexts(folderIds),
         ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
         dry_run: dryRunValue,
+        ...(effectiveMediaType !== 'auto'
+          ? { media_type: effectiveMediaType }
+          : {}),
+        ...(category ? { category } : {}),
+        ...(effectiveMediaType === 'movie'
+          ? { best_version_enabled: bestVersionEnabled }
+          : {}),
         filename_regex_enabled: filenameRegexConfig.enabled,
         ...(filenameRegexConfig.enabled
           ? {
@@ -992,7 +1103,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           : {}),
       };
     },
-    [buildFolderContexts, directoryId, filenameRegexConfig, messageApi],
+    [
+      bestVersionEnabled,
+      buildFolderContexts,
+      directoryId,
+      effectiveMediaType,
+      filenameRegexConfig,
+      messageApi,
+      organizeCategory,
+    ],
   );
 
   const buildPreviewFolders = useCallback(() => {
@@ -1009,11 +1128,19 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       messageApi.warning('启用文件名处理时，正则不能为空');
       return;
     }
+    const category = organizeCategory?.trim();
     runCreatePreviewTasks({
       cloud_directory_id: directoryId,
       folders: buildPreviewFolders(),
       interval_seconds: previewIntervalSeconds,
       recursive_depth: previewRecursiveDepth,
+      ...(effectiveMediaType !== 'auto'
+        ? { media_type: effectiveMediaType }
+        : {}),
+      ...(category ? { category } : {}),
+      ...(effectiveMediaType === 'movie'
+        ? { best_version_enabled: bestVersionEnabled }
+        : {}),
       filename_regex_enabled: filenameRegexConfig.enabled,
       ...(filenameRegexConfig.enabled
         ? {
@@ -1024,10 +1151,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     });
   }, [
     buildPreviewFolders,
+    bestVersionEnabled,
     checkedKeys.length,
     directoryId,
+    effectiveMediaType,
     filenameRegexConfig,
     messageApi,
+    organizeCategory,
     previewIntervalSeconds,
     previewRecursiveDepth,
     runCreatePreviewTasks,
@@ -1057,10 +1187,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           return;
         }
         if (
-          episodeMode &&
+          safeSelectionMode &&
           selectedItemRowsForApply.some((row) => !isNoRiskItem(row))
         ) {
-          messageApi.warning('剧集安全入库只允许执行无风险且全部命中的明细');
+          messageApi.warning('当前模式只允许执行无风险且全部命中的明细');
           return;
         }
         const folderIds = Array.from(
@@ -1108,7 +1238,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
-              {episodeMode ? (
+              {safeSelectionMode ? (
                 <Typography.Text type="secondary">
                   当前页面仅执行无风险项；低风险、需复核和高风险项会保留在表格中，不会被整理。
                 </Typography.Text>
@@ -1175,6 +1305,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       modalApi,
       resultData?.dry_run,
       runOrganize,
+      safeSelectionMode,
       selectedItemRowsForApply,
     ],
   );
@@ -1204,8 +1335,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: '外挂字幕',
         dataIndex: 'external_subtitle_files',
         width: 130,
-        hideInTable: !episodeMode,
         render: (_, row) => renderExternalSubtitleTag(row),
+      },
+      {
+        title: '版本',
+        dataIndex: 'best_version',
+        width: 130,
+        hideInTable: episodeMode,
+        render: (_, row) => renderVersionTag(row),
       },
       {
         title: '类型',
@@ -1493,9 +1630,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 120,
+        width: 190,
         fixed: 'left',
-        render: (_, row) => renderPreviewStatus(row.status),
+        render: (_, row) => (
+          <Space size={4} wrap>
+            {renderPreviewStatus(row.status)}
+            {renderTaskRisk(row)}
+          </Space>
+        ),
       },
       {
         title: '文件夹',
@@ -1515,6 +1657,55 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: '结果数',
         dataIndex: 'total',
         width: 90,
+      },
+      {
+        title: '风险',
+        dataIndex: 'risk_level',
+        width: 260,
+        render: (_, row) => renderTaskRiskCounts(row),
+      },
+      {
+        title: '类型/分类',
+        dataIndex: 'media_type',
+        width: 130,
+        render: (_, row) => (
+          <Space size={4} wrap>
+            <Tag>
+              {row.media_type === 'movie'
+                ? '电影'
+                : row.media_type === 'tv'
+                  ? '剧集'
+                  : '自动'}
+            </Tag>
+            {row.category ? <Tag>{row.category}</Tag> : null}
+          </Space>
+        ),
+      },
+      {
+        title: '版本',
+        dataIndex: 'best_version_count',
+        width: 130,
+        render: (_, row) =>
+          row.best_version_enabled ? (
+            <Space size={4} wrap>
+              <Tag color="success">最佳 {row.best_version_count || 0}</Tag>
+              <Tag color="error">非最佳 {row.alternate_version_count || 0}</Tag>
+            </Space>
+          ) : (
+            '-'
+          ),
+      },
+      {
+        title: '外挂字幕',
+        dataIndex: 'external_subtitle_count',
+        width: 110,
+        render: (_, row) => (
+          <Tag
+            color={(row.external_subtitle_count || 0) > 0 ? 'error' : 'default'}
+          >
+            {row.external_subtitle_count || 0}
+          </Tag>
+        ),
       },
       {
         title: '层级',
@@ -1667,7 +1858,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     ? selectedItemRowsForApply.length === 0
     : checkedKeys.length === 0;
   const applyButtonText = hasPreviewResult
-    ? episodeMode
+    ? safeSelectionMode
       ? `确认无风险 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
       : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
@@ -2001,7 +2192,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   ) : null}
 
                   <ProDescriptions<API.Organize115CookieResult>
-                    column={episodeMode ? 5 : 4}
+                    column={safeSelectionMode ? 5 : 4}
                     dataSource={resultData}
                     style={{ marginBottom: 12 }}
                     columns={[
@@ -2018,7 +2209,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         title: '演练模式',
                         render: () => renderBoolTag(resultData.dry_run),
                       },
-                      ...(episodeMode
+                      ...(safeSelectionMode
                         ? [
                             {
                               title: '无风险',
@@ -2066,6 +2257,24 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                                 </Tag>
                               ),
                             },
+                            ...(resultData?.media_type === 'movie' ||
+                            effectiveMediaType === 'movie'
+                              ? [
+                                  {
+                                    title: '最佳版本',
+                                    render: () => (
+                                      <Space size={4} wrap>
+                                        <Tag color="success">
+                                          {riskSummary.bestVersion}
+                                        </Tag>
+                                        <Tag color="error">
+                                          {riskSummary.alternateVersion}
+                                        </Tag>
+                                      </Space>
+                                    ),
+                                  },
+                                ]
+                              : []),
                           ]
                         : []),
                     ]}
@@ -2125,7 +2334,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               onChange: (keys) => setSelectedItemRowKeys(keys),
                               preserveSelectedRowKeys: true,
                               getCheckboxProps: (row) => ({
-                                disabled: episodeMode && !isNoRiskItem(row),
+                                disabled:
+                                  safeSelectionMode && !isNoRiskItem(row),
                               }),
                             }}
                             search={false}
@@ -2240,6 +2450,50 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               checkedChildren="是"
               unCheckedChildren="否"
               onChange={(checked) => setDryRun(checked)}
+            />
+          </Space>
+          <span style={footerNumberControlStyle}>
+            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
+              识别
+            </Typography.Text>
+            <Select<OrganizeMediaType>
+              size="small"
+              value={effectiveMediaType}
+              options={mediaTypeOptions}
+              disabled={episodeMode}
+              onChange={(value) => {
+                setOrganizeMediaType(value);
+                setBestVersionEnabled(value === 'movie');
+              }}
+              style={{ width: 92 }}
+            />
+          </span>
+          <span style={footerNumberControlStyle}>
+            <Typography.Text type="secondary" style={footerNumberLabelStyle}>
+              分类
+            </Typography.Text>
+            <Select
+              size="small"
+              mode="tags"
+              allowClear
+              placeholder="自动"
+              value={organizeCategory ? [organizeCategory] : []}
+              options={categoryOptions}
+              onChange={(values) => {
+                const next = values[values.length - 1]?.trim();
+                setOrganizeCategory(next || undefined);
+              }}
+              style={{ width: 132 }}
+            />
+          </span>
+          <Space size={4}>
+            <Typography.Text type="secondary">最佳版本</Typography.Text>
+            <Switch
+              checked={bestVersionEnabled}
+              disabled={effectiveMediaType !== 'movie'}
+              checkedChildren="是"
+              unCheckedChildren="否"
+              onChange={(checked) => setBestVersionEnabled(checked)}
             />
           </Space>
           <Button
