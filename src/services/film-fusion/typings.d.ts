@@ -505,12 +505,13 @@ declare namespace API {
     subtitle_error?: string;
     local_dir?: string;
     local_exists?: boolean;
+    external_subtitle_files?: string[];
     source_season?: number;
     source_episode?: number;
     target_season?: number;
     target_episode?: number;
     episode_matched?: boolean;
-    risk_level?: 'low' | 'medium' | 'high';
+    risk_level?: 'none' | 'low' | 'medium' | 'high';
     risk_reasons?: string[];
     error?: string;
   };

@@ -266,13 +266,14 @@ const renderFileSize = (value?: number) => {
 };
 
 const riskMeta = {
-  low: { text: '低风险', color: 'success' },
+  none: { text: '无风险', color: 'success' },
+  low: { text: '低风险', color: 'processing' },
   medium: { text: '需复核', color: 'warning' },
   high: { text: '高风险', color: 'error' },
 } as const;
 
-function isLowRiskItem(row: OrganizeItemRow) {
-  return row.risk_level === 'low';
+function isNoRiskItem(row: OrganizeItemRow) {
+  return row.risk_level === 'none';
 }
 
 function getDefaultSelectedItemKeys(
@@ -280,7 +281,7 @@ function getDefaultSelectedItemKeys(
   episodeMode: boolean,
 ) {
   return rows
-    .filter((row) => !episodeMode || isLowRiskItem(row))
+    .filter((row) => !episodeMode || isNoRiskItem(row))
     .map(getOrganizeItemRowKey);
 }
 
@@ -311,6 +312,18 @@ function renderEpisodePair(row: OrganizeItemRow) {
       <Typography.Text type="secondary">→</Typography.Text>
       <Tag color={color}>{target}</Tag>
     </Space>
+  );
+}
+
+function renderExternalSubtitleTag(row: OrganizeItemRow) {
+  const files = row.external_subtitle_files || [];
+  if (files.length === 0) {
+    return <Tag>无</Tag>;
+  }
+  return (
+    <Tooltip title={files.join('；')}>
+      <Tag color="error">外挂字幕 {files.length}</Tag>
+    </Tooltip>
   );
 }
 
@@ -889,14 +902,26 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const riskSummary = useMemo(() => {
     return flatItemsForTable.reduce(
       (acc, row) => {
-        if (row.risk_level === 'low') acc.low += 1;
+        if (row.risk_level === 'none') acc.none += 1;
+        else if (row.risk_level === 'low') acc.low += 1;
         else if (row.risk_level === 'medium') acc.medium += 1;
         else if (row.risk_level === 'high') acc.high += 1;
         else acc.unknown += 1;
         if (row.episode_matched) acc.episodeMatched += 1;
+        if ((row.external_subtitle_files || []).length > 0) {
+          acc.externalSubtitle += 1;
+        }
         return acc;
       },
-      { low: 0, medium: 0, high: 0, unknown: 0, episodeMatched: 0 },
+      {
+        none: 0,
+        low: 0,
+        medium: 0,
+        high: 0,
+        unknown: 0,
+        episodeMatched: 0,
+        externalSubtitle: 0,
+      },
     );
   }, [flatItemsForTable]);
 
@@ -1033,9 +1058,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         }
         if (
           episodeMode &&
-          selectedItemRowsForApply.some((row) => !isLowRiskItem(row))
+          selectedItemRowsForApply.some((row) => !isNoRiskItem(row))
         ) {
-          messageApi.warning('剧集安全入库只允许执行低风险且集数匹配的明细');
+          messageApi.warning('剧集安全入库只允许执行无风险且全部命中的明细');
           return;
         }
         const folderIds = Array.from(
@@ -1085,7 +1110,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               </Typography.Text>
               {episodeMode ? (
                 <Typography.Text type="secondary">
-                  当前页面仅执行低风险项；需复核和高风险项会保留在表格中，不会被整理。
+                  当前页面仅执行无风险项；低风险、需复核和高风险项会保留在表格中，不会被整理。
                 </Typography.Text>
               ) : null}
               {activePreviewTask ? (
@@ -1174,6 +1199,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         width: 150,
         hideInTable: !episodeMode,
         render: (_, row) => renderEpisodePair(row),
+      },
+      {
+        title: '外挂字幕',
+        dataIndex: 'external_subtitle_files',
+        width: 130,
+        hideInTable: !episodeMode,
+        render: (_, row) => renderExternalSubtitleTag(row),
       },
       {
         title: '类型',
@@ -1636,7 +1668,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     : checkedKeys.length === 0;
   const applyButtonText = hasPreviewResult
     ? episodeMode
-      ? `确认低风险 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+      ? `确认无风险 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
       : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
   const activePreviewTaskLabel = activePreviewTask
@@ -1939,7 +1971,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   message={episodeMode ? '尚未生成剧集预览' : '尚未整理'}
                   description={
                     episodeMode
-                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并按单剧集批次和集数匹配标记风险。只有低风险项会默认勾选。'
+                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并按单剧集批次、集数匹配、本地入库和外挂字幕标记风险。只有无风险项会默认勾选。'
                       : '在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。'
                   }
                 />
@@ -1989,9 +2021,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                       ...(episodeMode
                         ? [
                             {
+                              title: '无风险',
+                              render: () => (
+                                <Tag color="success">{riskSummary.none}</Tag>
+                              ),
+                            },
+                            {
                               title: '低风险',
                               render: () => (
-                                <Tag color="success">{riskSummary.low}</Tag>
+                                <Tag color="processing">{riskSummary.low}</Tag>
                               ),
                             },
                             {
@@ -2011,6 +2049,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               render: () => (
                                 <Tag color="blue">
                                   {riskSummary.episodeMatched}
+                                </Tag>
+                              ),
+                            },
+                            {
+                              title: '外挂字幕',
+                              render: () => (
+                                <Tag
+                                  color={
+                                    riskSummary.externalSubtitle > 0
+                                      ? 'error'
+                                      : 'default'
+                                  }
+                                >
+                                  {riskSummary.externalSubtitle}
                                 </Tag>
                               ),
                             },
@@ -2073,7 +2125,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               onChange: (keys) => setSelectedItemRowKeys(keys),
                               preserveSelectedRowKeys: true,
                               getCheckboxProps: (row) => ({
-                                disabled: episodeMode && !isLowRiskItem(row),
+                                disabled: episodeMode && !isNoRiskItem(row),
                               }),
                             }}
                             search={false}
