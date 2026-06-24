@@ -268,31 +268,8 @@ const renderFileSize = (value?: number) => {
   );
 };
 
-const riskMeta = {
-  none: { text: '无风险', color: 'success' },
-  low: { text: '低风险', color: 'processing' },
-  medium: { text: '需复核', color: 'warning' },
-  high: { text: '高风险', color: 'error' },
-} as const;
-
-function isNoRiskItem(row: OrganizeItemRow) {
-  return row.risk_level === 'none';
-}
-
-function getDefaultSelectedItemKeys(
-  rows: OrganizeItemRow[],
-  episodeMode: boolean,
-) {
-  return rows
-    .filter((row) => !episodeMode || isNoRiskItem(row))
-    .map(getOrganizeItemRowKey);
-}
-
-function renderRiskTag(level?: OrganizeItemRow['risk_level']) {
-  if (!level) return <Tag>未评估</Tag>;
-  const meta = riskMeta[level];
-  if (!meta) return <Tag>{level}</Tag>;
-  return <Tag color={meta.color}>{meta.text}</Tag>;
+function getDefaultSelectedItemKeys(rows: OrganizeItemRow[]) {
+  return rows.map(getOrganizeItemRowKey);
 }
 
 function unwrapResponseData<T>(response: T | API.Response<T>): T {
@@ -305,35 +282,6 @@ function unwrapResponseData<T>(response: T | API.Response<T>): T {
     return (response as API.Response<T>).data as T;
   }
   return response as T;
-}
-
-function renderTaskRisk(row: API.OrganizePreviewTask) {
-  if (row.status === 'pending') return <Tag>待评估</Tag>;
-  if (row.status === 'processing') return <Tag color="processing">评估中</Tag>;
-  if (!row.risk_level) {
-    return row.status === 'failed' ? (
-      <Tag color="error">失败</Tag>
-    ) : (
-      <Tag>未评估</Tag>
-    );
-  }
-  return renderRiskTag(row.risk_level);
-}
-
-function renderTaskRiskCounts(row: API.OrganizePreviewTask) {
-  const none = row.risk_none_count || 0;
-  const low = row.risk_low_count || 0;
-  const medium = row.risk_medium_count || 0;
-  const high = row.risk_high_count || 0;
-  if (none + low + medium + high === 0) return '-';
-  return (
-    <Space size={4} wrap>
-      <Tag color="success">无 {none}</Tag>
-      <Tag color="processing">低 {low}</Tag>
-      <Tag color="warning">复核 {medium}</Tag>
-      <Tag color="error">高 {high}</Tag>
-    </Space>
-  );
 }
 
 function renderVersionTag(row: OrganizeItemRow) {
@@ -509,12 +457,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const effectiveMediaType: OrganizeMediaType = episodeMode
     ? 'tv'
     : organizeMediaType;
-  const safeSelectionMode =
-    episodeMode ||
-    effectiveMediaType === 'movie' ||
-    effectiveMediaType === 'tv' ||
-    resultData?.media_type === 'movie' ||
-    resultData?.media_type === 'tv';
 
   useEffect(() => {
     if (episodeMode) {
@@ -804,10 +746,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setActivePreviewTask(undefined);
           setRawResponse(response);
           setSelectedItemRowKeys(
-            getDefaultSelectedItemKeys(
-              flattenOrganizeItems(payload),
-              safeSelectionMode,
-            ),
+            getDefaultSelectedItemKeys(flattenOrganizeItems(payload)),
           );
         } else {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
@@ -909,10 +848,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         setResultData(previewResult);
         setRawResponse(response);
         setSelectedItemRowKeys(
-          getDefaultSelectedItemKeys(
-            flattenOrganizeItems(previewResult),
-            episodeMode || payload.task?.media_type === 'movie',
-          ),
+          getDefaultSelectedItemKeys(flattenOrganizeItems(previewResult)),
         );
         window.setTimeout(() => {
           previewResultRef.current?.scrollIntoView({
@@ -1052,14 +988,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     [resultData],
   );
 
-  const riskSummary = useMemo(() => {
+  const itemFactSummary = useMemo(() => {
     return flatItemsForTable.reduce(
       (acc, row) => {
-        if (row.risk_level === 'none') acc.none += 1;
-        else if (row.risk_level === 'low') acc.low += 1;
-        else if (row.risk_level === 'medium') acc.medium += 1;
-        else if (row.risk_level === 'high') acc.high += 1;
-        else acc.unknown += 1;
         if (row.episode_matched) acc.episodeMatched += 1;
         if ((row.external_subtitle_files || []).length > 0) {
           acc.externalSubtitle += 1;
@@ -1069,11 +1000,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         return acc;
       },
       {
-        none: 0,
-        low: 0,
-        medium: 0,
-        high: 0,
-        unknown: 0,
         episodeMatched: 0,
         externalSubtitle: 0,
         bestVersion: 0,
@@ -1264,13 +1190,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           messageApi.warning('请先在处理明细表格中选择至少一条记录');
           return;
         }
-        if (
-          safeSelectionMode &&
-          selectedItemRowsForApply.some((row) => !isNoRiskItem(row))
-        ) {
-          messageApi.warning('当前模式只允许执行无风险且全部命中的明细');
-          return;
-        }
         const folderIds = Array.from(
           new Set(
             selectedItemRowsForApply
@@ -1316,11 +1235,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
-              {safeSelectionMode ? (
-                <Typography.Text type="secondary">
-                  当前页面仅执行无风险项；低风险、需复核和高风险项会保留在表格中，不会被整理。
-                </Typography.Text>
-              ) : null}
               {activePreviewTask ? (
                 <Space direction="vertical" size={4}>
                   <Checkbox
@@ -1383,25 +1297,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       modalApi,
       resultData?.dry_run,
       runOrganize,
-      safeSelectionMode,
       selectedItemRowsForApply,
     ],
   );
 
   const itemColumns = useMemo<ProColumns<OrganizeItemRow>[]>(
     () => [
-      {
-        title: '风险',
-        dataIndex: 'risk_level',
-        width: 120,
-        fixed: 'left',
-        render: (_, row) => {
-          const reasons = row.risk_reasons || [];
-          const tag = renderRiskTag(row.risk_level);
-          if (reasons.length === 0) return tag;
-          return <Tooltip title={reasons.join('；')}>{tag}</Tooltip>;
-        },
-      },
       {
         title: '集数校验',
         dataIndex: 'episode_matched',
@@ -1419,7 +1320,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: '版本',
         dataIndex: 'best_version',
         width: 130,
-        hideInTable: episodeMode,
         render: (_, row) => renderVersionTag(row),
       },
       {
@@ -1708,14 +1608,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 190,
+        width: 120,
         fixed: 'left',
-        render: (_, row) => (
-          <Space size={4} wrap>
-            {renderPreviewStatus(row.status)}
-            {renderTaskRisk(row)}
-          </Space>
-        ),
+        render: (_, row) => renderPreviewStatus(row.status),
       },
       {
         title: '文件夹',
@@ -1735,12 +1630,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: '结果数',
         dataIndex: 'total',
         width: 90,
-      },
-      {
-        title: '风险',
-        dataIndex: 'risk_level',
-        width: 260,
-        render: (_, row) => renderTaskRiskCounts(row),
       },
       {
         title: '类型/分类',
@@ -1894,7 +1783,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     return (
       <PageContainer
         header={{
-          title: episodeMode ? '剧集安全入库' : '整理目录',
+          title: episodeMode ? '剧集预整理' : '整理目录',
           onBack: () => history.push('/directories'),
         }}
       >
@@ -1936,21 +1825,28 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     ? selectedItemRowsForApply.length === 0
     : checkedKeys.length === 0;
   const applyButtonText = hasPreviewResult
-    ? safeSelectionMode
-      ? `确认无风险 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
-      : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+    ? `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
   const activePreviewTaskLabel = activePreviewTask
     ? activePreviewTask.folder_path ||
       activePreviewTask.folder_name ||
       activePreviewTask.folder_id
     : undefined;
+  const showEpisodeFacts =
+    episodeMode ||
+    resultData?.media_type === 'tv' ||
+    effectiveMediaType === 'tv';
+  const showVersionFacts =
+    resultData?.media_type === 'movie' ||
+    resultData?.media_type === 'tv' ||
+    effectiveMediaType === 'movie' ||
+    effectiveMediaType === 'tv';
 
   return (
     <PageContainer
       loading={directoryLoading && !directoryDetail}
       header={{
-        title: `${episodeMode ? '剧集安全入库' : '整理目录'}：${
+        title: `${episodeMode ? '剧集预整理' : '整理目录'}：${
           directoryDetail?.directory_name || ''
         }`,
         onBack: () => history.push('/directories'),
@@ -1959,7 +1855,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         breadcrumb: {
           routes: [
             { path: '/directories', breadcrumbName: '目录配置' },
-            { path: '', breadcrumbName: episodeMode ? '剧集安全入库' : '整理' },
+            { path: '', breadcrumbName: episodeMode ? '剧集预整理' : '整理' },
           ],
         },
       }}
@@ -2240,7 +2136,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   message={episodeMode ? '尚未生成剧集预览' : '尚未整理'}
                   description={
                     episodeMode
-                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并按单剧集批次、集数匹配、本地入库和外挂字幕标记风险。只有无风险项会默认勾选。'
+                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并标记集数匹配、本地入库、外挂字幕和版本信息，方便手动检查。'
                       : '在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。'
                   }
                 />
@@ -2270,7 +2166,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   ) : null}
 
                   <ProDescriptions<API.Organize115CookieResult>
-                    column={safeSelectionMode ? 5 : 4}
+                    column={4}
                     dataSource={resultData}
                     style={{ marginBottom: 12 }}
                     columns={[
@@ -2287,74 +2183,47 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         title: '演练模式',
                         render: () => renderBoolTag(resultData.dry_run),
                       },
-                      ...(safeSelectionMode
+                      ...(showEpisodeFacts
                         ? [
-                            {
-                              title: '无风险',
-                              render: () => (
-                                <Tag color="success">{riskSummary.none}</Tag>
-                              ),
-                            },
-                            {
-                              title: '低风险',
-                              render: () => (
-                                <Tag color="processing">{riskSummary.low}</Tag>
-                              ),
-                            },
-                            {
-                              title: '需复核',
-                              render: () => (
-                                <Tag color="warning">{riskSummary.medium}</Tag>
-                              ),
-                            },
-                            {
-                              title: '高风险',
-                              render: () => (
-                                <Tag color="error">{riskSummary.high}</Tag>
-                              ),
-                            },
                             {
                               title: '集数匹配',
                               render: () => (
                                 <Tag color="blue">
-                                  {riskSummary.episodeMatched}
+                                  {itemFactSummary.episodeMatched}
                                 </Tag>
                               ),
                             },
+                          ]
+                        : []),
+                      {
+                        title: '外挂字幕',
+                        render: () => (
+                          <Tag
+                            color={
+                              itemFactSummary.externalSubtitle > 0
+                                ? 'error'
+                                : 'default'
+                            }
+                          >
+                            {itemFactSummary.externalSubtitle}
+                          </Tag>
+                        ),
+                      },
+                      ...(showVersionFacts
+                        ? [
                             {
-                              title: '外挂字幕',
+                              title: '最佳版本',
                               render: () => (
-                                <Tag
-                                  color={
-                                    riskSummary.externalSubtitle > 0
-                                      ? 'error'
-                                      : 'default'
-                                  }
-                                >
-                                  {riskSummary.externalSubtitle}
-                                </Tag>
+                                <Space size={4} wrap>
+                                  <Tag color="success">
+                                    {itemFactSummary.bestVersion}
+                                  </Tag>
+                                  <Tag color="error">
+                                    {itemFactSummary.alternateVersion}
+                                  </Tag>
+                                </Space>
                               ),
                             },
-                            ...(resultData?.media_type === 'movie' ||
-                            resultData?.media_type === 'tv' ||
-                            effectiveMediaType === 'movie' ||
-                            effectiveMediaType === 'tv'
-                              ? [
-                                  {
-                                    title: '最佳版本',
-                                    render: () => (
-                                      <Space size={4} wrap>
-                                        <Tag color="success">
-                                          {riskSummary.bestVersion}
-                                        </Tag>
-                                        <Tag color="error">
-                                          {riskSummary.alternateVersion}
-                                        </Tag>
-                                      </Space>
-                                    ),
-                                  },
-                                ]
-                              : []),
                           ]
                         : []),
                     ]}
@@ -2413,10 +2282,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               selectedRowKeys: selectedItemRowKeys,
                               onChange: (keys) => setSelectedItemRowKeys(keys),
                               preserveSelectedRowKeys: true,
-                              getCheckboxProps: (row) => ({
-                                disabled:
-                                  safeSelectionMode && !isNoRiskItem(row),
-                              }),
                             }}
                             search={false}
                             options={false}

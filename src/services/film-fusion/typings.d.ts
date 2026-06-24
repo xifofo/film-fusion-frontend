@@ -524,8 +524,6 @@ declare namespace API {
     target_season?: number;
     target_episode?: number;
     episode_matched?: boolean;
-    risk_level?: 'none' | 'low' | 'medium' | 'high';
-    risk_reasons?: string[];
     error?: string;
   };
 
@@ -547,17 +545,6 @@ declare namespace API {
     best_version_enabled?: boolean;
     dry_run: boolean;
     total: number;
-    risk_summary?: {
-      risk_level?: 'none' | 'low' | 'medium' | 'high';
-      none: number;
-      low: number;
-      medium: number;
-      high: number;
-      unknown: number;
-      external_subtitle_count: number;
-      best_version_count: number;
-      alternate_version_count: number;
-    };
     dir_debug?: Organize115DirDebug[];
     items?: Organize115ItemResult[];
     groups?: Organize115CookieGroup[];
@@ -585,12 +572,6 @@ declare namespace API {
     best_version_enabled?: boolean;
     status: OrganizePreviewTaskStatus;
     total: number;
-    risk_level?: 'none' | 'low' | 'medium' | 'high';
-    risk_none_count?: number;
-    risk_low_count?: number;
-    risk_medium_count?: number;
-    risk_high_count?: number;
-    risk_unknown_count?: number;
     external_subtitle_count?: number;
     best_version_count?: number;
     alternate_version_count?: number;
