@@ -475,12 +475,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     episodeMode ? 'tv' : 'auto',
   );
   const [organizeCategory, setOrganizeCategory] = useState<string>();
-  const [bestVersionEnabled, setBestVersionEnabled] = useState(false);
+  const [bestVersionEnabled, setBestVersionEnabled] = useState(episodeMode);
   const [previewOptionsOpen, setPreviewOptionsOpen] = useState(false);
   const [previewMediaTypeDraft, setPreviewMediaTypeDraft] =
     useState<OrganizeMediaType>(episodeMode ? 'tv' : 'auto');
   const [previewCategoryDraft, setPreviewCategoryDraft] = useState<string>();
-  const [previewBestVersionDraft, setPreviewBestVersionDraft] = useState(false);
+  const [previewBestVersionDraft, setPreviewBestVersionDraft] =
+    useState(episodeMode);
   const [previewIntervalDraft, setPreviewIntervalDraft] = useState(45);
   const [previewRecursiveDepthDraft, setPreviewRecursiveDepthDraft] =
     useState(1);
@@ -511,12 +512,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const safeSelectionMode =
     episodeMode ||
     effectiveMediaType === 'movie' ||
-    resultData?.media_type === 'movie';
+    effectiveMediaType === 'tv' ||
+    resultData?.media_type === 'movie' ||
+    resultData?.media_type === 'tv';
 
   useEffect(() => {
     if (episodeMode) {
       setOrganizeMediaType('tv');
-      setBestVersionEnabled(false);
+      setBestVersionEnabled(true);
     }
   }, [episodeMode]);
 
@@ -1142,7 +1145,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           ? { media_type: effectiveMediaType }
           : {}),
         ...(category ? { category } : {}),
-        ...(effectiveMediaType === 'movie'
+        ...(effectiveMediaType !== 'auto'
           ? { best_version_enabled: bestVersionEnabled }
           : {}),
         filename_regex_enabled: filenameRegexConfig.enabled,
@@ -1190,7 +1193,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           ? { media_type: options.mediaType }
           : {}),
         ...(category ? { category } : {}),
-        ...(options.mediaType === 'movie'
+        ...(options.mediaType !== 'auto'
           ? { best_version_enabled: options.bestVersionEnabled }
           : {}),
         filename_regex_enabled: filenameRegexConfig.enabled,
@@ -2333,7 +2336,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               ),
                             },
                             ...(resultData?.media_type === 'movie' ||
-                            effectiveMediaType === 'movie'
+                            resultData?.media_type === 'tv' ||
+                            effectiveMediaType === 'movie' ||
+                            effectiveMediaType === 'tv'
                               ? [
                                   {
                                     title: '最佳版本',
@@ -2517,7 +2522,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 disabled={episodeMode}
                 onChange={(value) => {
                   setPreviewMediaTypeDraft(value);
-                  setPreviewBestVersionDraft(value === 'movie');
+                  setPreviewBestVersionDraft(value !== 'auto');
                   const nextNames =
                     value === 'movie'
                       ? categoryConfig?.movie
@@ -2589,7 +2594,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             <Typography.Text type="secondary">最佳版本</Typography.Text>
             <Switch
               checked={previewBestVersionDraft}
-              disabled={previewMediaTypeDraft !== 'movie'}
+              disabled={previewMediaTypeDraft === 'auto'}
               checkedChildren="是"
               unCheckedChildren="否"
               onChange={(checked) => setPreviewBestVersionDraft(checked)}
