@@ -738,9 +738,31 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         const total = payload?.total;
         const suffix = typeof total === 'number' ? `，共 ${total} 项` : '';
         const text = response?.message || '整理完成';
+        const sourceFolderDeletedCount =
+          typeof payload?.source_folder_deleted_count === 'number'
+            ? payload.source_folder_deleted_count
+            : payload?.source_folder_deleted
+              ? 1
+              : 0;
+        const sourceFolderDeletedSuffix =
+          !payload?.dry_run && sourceFolderDeletedCount > 0
+            ? `，已删除原文件夹 ${sourceFolderDeletedCount} 个`
+            : '';
         messageApi.success(
-          `${text}${suffix}${payload?.dry_run ? '（演练）' : ''}`,
+          `${text}${suffix}${payload?.dry_run ? '（演练）' : ''}${sourceFolderDeletedSuffix}`,
         );
+        const sourceFolderDeleteErrors =
+          payload?.source_folder_delete_errors || [];
+        if (!payload?.dry_run && sourceFolderDeleteErrors.length > 0) {
+          const visibleErrors = sourceFolderDeleteErrors.slice(0, 2).join('；');
+          const more =
+            sourceFolderDeleteErrors.length > 2
+              ? `；另有 ${sourceFolderDeleteErrors.length - 2} 个错误`
+              : '';
+          messageApi.warning(
+            `整理已完成，但原文件夹删除存在异常：${visibleErrors}${more}`,
+          );
+        }
         if (payload?.dry_run) {
           setResultData(payload);
           setActivePreviewTask(undefined);
@@ -1235,20 +1257,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
-              {activePreviewTask ? (
-                <Space direction="vertical" size={4}>
-                  <Checkbox
-                    onChange={(event) => {
-                      deleteSourceFolder = event.target.checked;
-                    }}
-                  >
-                    整理完成后删除源文件夹
-                  </Checkbox>
-                  <Typography.Text type="secondary">
-                    仅在整理成功后执行，会将源文件夹移入 115 回收站。
-                  </Typography.Text>
-                </Space>
-              ) : null}
+              <Space direction="vertical" size={4}>
+                <Checkbox
+                  onChange={(event) => {
+                    deleteSourceFolder = event.target.checked;
+                  }}
+                >
+                  整理完成后删除原文件夹
+                </Checkbox>
+                <Typography.Text type="secondary">
+                  仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。
+                </Typography.Text>
+              </Space>
             </Space>
           ),
           okText: '执行整理',
@@ -1258,7 +1278,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             applyingPreviewTaskRef.current = activePreviewTask;
             deleteSourceFolderAfterApplyRef.current =
               !!activePreviewTask && deleteSourceFolder;
-            runOrganize(organizeParams);
+            runOrganize(
+              !activePreviewTask && deleteSourceFolder
+                ? { ...organizeParams, delete_source_folder: true }
+                : organizeParams,
+            );
           },
         });
         return;
@@ -1273,18 +1297,40 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       if (!organizeParams) {
         return;
       }
+      let deleteSourceFolder = false;
       modalApi.confirm({
         title: `确认整理 ${folderIds.length} 个 115 目录？`,
-        content:
-          '将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。' +
-          '单个目录失败不会阻断其它，错误会标注在对应分组上。',
+        content: (
+          <Space direction="vertical" size={8}>
+            <Typography.Text>
+              将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。
+              单个目录失败不会阻断其它，错误会标注在对应分组上。
+            </Typography.Text>
+            <Space direction="vertical" size={4}>
+              <Checkbox
+                onChange={(event) => {
+                  deleteSourceFolder = event.target.checked;
+                }}
+              >
+                整理完成后删除原文件夹
+              </Checkbox>
+              <Typography.Text type="secondary">
+                仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。
+              </Typography.Text>
+            </Space>
+          </Space>
+        ),
         okText: '执行整理',
         okButtonProps: { danger: true },
         cancelText: '取消',
         onOk: () => {
           applyingPreviewTaskRef.current = undefined;
           deleteSourceFolderAfterApplyRef.current = false;
-          runOrganize(organizeParams);
+          runOrganize(
+            deleteSourceFolder
+              ? { ...organizeParams, delete_source_folder: true }
+              : organizeParams,
+          );
         },
       });
     },

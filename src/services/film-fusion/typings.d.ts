@@ -464,6 +464,7 @@ declare namespace API {
     media_type?: 'movie' | 'tv';
     category?: string;
     best_version_enabled?: boolean;
+    delete_source_folder?: boolean;
     filename_regex_enabled?: boolean;
     filename_regex_pattern?: string;
     filename_regex_replacement?: string;
@@ -548,6 +549,9 @@ declare namespace API {
     dir_debug?: Organize115DirDebug[];
     items?: Organize115ItemResult[];
     groups?: Organize115CookieGroup[];
+    source_folder_deleted?: boolean;
+    source_folder_deleted_count?: number;
+    source_folder_delete_errors?: string[];
   };
 
   type OrganizePreviewTaskStatus =
