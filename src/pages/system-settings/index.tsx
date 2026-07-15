@@ -136,7 +136,7 @@ const SystemSettingsPage: React.FC = () => {
         style={{ marginBottom: 16 }}
         type="info"
         showIcon
-        message="在线编辑 config.yaml。多数配置保存后即时生效（Emby 连接、新媒体开关、封面参数与定时、MoviePilot、HDHive 等）；标有「需重启」的项（HTTP/代理端口、日志、115 并发）需重启后端生效。密钥类字段留空表示不修改。"
+        message="在线编辑 config.yaml。多数配置保存后即时生效（Emby 连接、新媒体开关、封面参数与定时、MoviePilot、TMDB、HDHive 等）；标有「需重启」的项（HTTP/代理端口、日志、115 并发）需重启后端生效。密钥类字段留空表示不修改。"
       />
       <Card>
         <Spin spinning={loading}>
@@ -329,6 +329,63 @@ const SystemSettingsPage: React.FC = () => {
                               'moviepilot.password',
                             ),
                           }}
+                        />
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'tmdb',
+                    label: 'TMDB',
+                    forceRender: true,
+                    children: (
+                      <>
+                        <ProFormSwitch
+                          name={['tmdb', 'enabled']}
+                          label="启用 TMDB API"
+                        />
+                        <Alert
+                          style={{ marginBottom: 16 }}
+                          type="info"
+                          showIcon
+                          message="用于后台预整理队列展示 TMDB 总集数"
+                          description="启用后，队列会通过 TMDB TV Series Details 接口读取 number_of_episodes，并按缓存时间复用结果。"
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['tmdb', 'base_url']}
+                          label="API 地址"
+                          placeholder="https://api.themoviedb.org"
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['tmdb', 'api_key']}
+                          label="v3 API Key"
+                          fieldProps={{
+                            placeholder: secretPlaceholder('tmdb.api_key'),
+                          }}
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['tmdb', 'access_token']}
+                          label="Read Access Token"
+                          tooltip="可选。填写后优先使用 Bearer Token；未填写时使用 v3 API Key 查询参数。"
+                          fieldProps={{
+                            placeholder: secretPlaceholder('tmdb.access_token'),
+                          }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['tmdb', 'timeout_seconds']}
+                          label="请求超时 (秒)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['tmdb', 'cache_minutes']}
+                          label="缓存时间 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
                         />
                       </>
                     ),

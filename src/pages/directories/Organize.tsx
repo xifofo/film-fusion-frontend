@@ -1720,10 +1720,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           );
           return (
             <Space direction="vertical" size={2}>
-              <Typography.Text>{row.total || 0}</Typography.Text>
+              <Tag style={{ marginInlineEnd: 0 }}>本地 {row.total || 0}</Tag>
               {tmdbEpisodeCount > 0 ? (
                 <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                  TMDB {tmdbEpisodeCount} 集
+                  TMDB 总 {tmdbEpisodeCount} 集
                 </Tag>
               ) : null}
             </Space>

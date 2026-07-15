@@ -1401,6 +1401,14 @@ declare namespace API {
       username: string;
       password: string;
     };
+    tmdb: {
+      enabled: boolean;
+      base_url: string;
+      api_key: string;
+      access_token: string;
+      timeout_seconds: number;
+      cache_minutes: number;
+    };
     hdhive: {
       enabled: boolean;
       base_url: string;
