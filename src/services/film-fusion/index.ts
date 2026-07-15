@@ -52,11 +52,17 @@ export * from './embyBinding';
 // Emby 缺集扫描
 export * from './embyMissing';
 
+// Emby 本地多版本检查
+export * from './embyVersionCheck';
+
 // Emby 观看记录（多用户隔离统计）
 export * from './embyWatch';
 
 // 应用配置（config.yaml 在线编辑 + 热重载）
 export * from './appConfig';
+
+// HDHive OpenAPI 代理
+export * from './hdhive';
 
 // 整理日志（STRM 生成 / 文件下载等业务事件）
 export * from './organizeLog';

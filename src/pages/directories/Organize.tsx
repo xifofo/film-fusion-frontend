@@ -54,6 +54,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import {
   clearOrganizePreviewTasks,
   createOrganizePreviewTasks,
@@ -1040,13 +1041,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const confirmDeletePreviewTask = useCallback(
     (row: API.OrganizePreviewTask) => {
       const folderLabel = row.folder_path || row.folder_name || row.folder_id;
-      let deleteSourceFolder = false;
+      let deleteSourceFolder = true;
       modalApi.confirm({
         title: '删除预整理任务？',
         content: (
           <Space direction="vertical" size={8}>
             <Typography.Text>{folderLabel}</Typography.Text>
             <Checkbox
+              defaultChecked
               onChange={(event) => {
                 deleteSourceFolder = event.target.checked;
               }}
@@ -1238,7 +1240,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           activePreviewTask?.folder_path ||
           activePreviewTask?.folder_name ||
           activePreviewTask?.folder_id;
-        let deleteSourceFolder = false;
+        let deleteSourceFolder = true;
         modalApi.confirm({
           title: activePreviewTask
             ? `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
@@ -1259,6 +1261,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               </Typography.Text>
               <Space direction="vertical" size={4}>
                 <Checkbox
+                  defaultChecked
                   onChange={(event) => {
                     deleteSourceFolder = event.target.checked;
                   }}
@@ -1297,7 +1300,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       if (!organizeParams) {
         return;
       }
-      let deleteSourceFolder = false;
+      let deleteSourceFolder = true;
       modalApi.confirm({
         title: `确认整理 ${folderIds.length} 个 115 目录？`,
         content: (
@@ -1308,6 +1311,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             </Typography.Text>
             <Space direction="vertical" size={4}>
               <Checkbox
+                defaultChecked
                 onChange={(event) => {
                   deleteSourceFolder = event.target.checked;
                 }}
@@ -1387,17 +1391,30 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           const url = buildTmdbUrl(row.tmdb_id, row.media_type);
           if (!url) return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
           return (
-            <Tooltip title={`在 TMDB 打开：${url}`}>
-              <Typography.Link
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {row.tmdb_id} <ExportOutlined />
-              </Typography.Link>
-            </Tooltip>
+            <Space size={0} wrap>
+              <Tooltip title={`在 TMDB 打开：${url}`}>
+                <Typography.Link
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {row.tmdb_id} <ExportOutlined />
+                </Typography.Link>
+              </Tooltip>
+              <HDHiveResourcesButton
+                tmdbId={row.tmdb_id}
+                mediaType={row.media_type}
+                title={row.title || row.rename_to || row.file_name}
+              />
+            </Space>
           );
         },
+      },
+      {
+        title: '重命名为',
+        dataIndex: 'rename_to',
+        width: 180,
+        ellipsis: true,
       },
       {
         title: '标题年份',
@@ -1514,12 +1531,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             <span>{row.target_path}</span>
           </Tooltip>
         ),
-      },
-      {
-        title: '重命名为',
-        dataIndex: 'rename_to',
-        width: 180,
-        ellipsis: true,
       },
       {
         title: '目标目录 ID',
@@ -1671,6 +1682,47 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             </Tooltip>
           );
         },
+      },
+      {
+        title: 'TMDB',
+        dataIndex: 'tmdb_refs',
+        width: 150,
+        render: (_, row) =>
+          row.tmdb_refs?.length ? (
+            <Space size={[4, 4]} wrap>
+              {row.tmdb_refs.map((ref) => {
+                const url = buildTmdbUrl(ref.tmdb_id, ref.media_type);
+                if (!url) return null;
+                const title = ref.title
+                  ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
+                  : `TMDB ${ref.tmdb_id}`;
+                return (
+                  <Space
+                    key={`${ref.media_type || 'media'}:${ref.tmdb_id}`}
+                    size={0}
+                    wrap
+                  >
+                    <Tooltip title={`在 TMDB 打开：${title}`}>
+                      <Typography.Link
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {ref.tmdb_id} <ExportOutlined />
+                      </Typography.Link>
+                    </Tooltip>
+                    <HDHiveResourcesButton
+                      tmdbId={ref.tmdb_id}
+                      mediaType={ref.media_type}
+                      title={title}
+                    />
+                  </Space>
+                );
+              })}
+            </Space>
+          ) : (
+            <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>
+          ),
       },
       {
         title: '结果数',

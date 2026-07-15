@@ -34,6 +34,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import {
   addEmbyMissingBlacklist,
   getEmbyMissing,
@@ -293,7 +294,7 @@ const EmbyMissingPage: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 400,
+      width: 460,
       render: (_, record) => (
         <Space size={0} wrap>
           <Button
@@ -305,6 +306,7 @@ const EmbyMissingPage: React.FC = () => {
             查看位置
           </Button>
           <ExternalLinksButton seriesId={record.series_id} />
+          <HDHiveResourcesButton seriesId={record.series_id} />
           <RegenerateStrmModal record={record} />
           <Popconfirm
             title="加入黑名单后将跳过该剧的缺集检查"

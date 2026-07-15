@@ -80,7 +80,7 @@ const SystemSettingsPage: React.FC = () => {
         style={{ marginBottom: 16 }}
         type="info"
         showIcon
-        message="在线编辑 config.yaml。多数配置保存后即时生效（Emby 连接、新媒体开关、封面参数与定时、MoviePilot 等）；标有「需重启」的项（HTTP/代理端口、日志、115 并发）需重启后端生效。密钥类字段留空表示不修改。"
+        message="在线编辑 config.yaml。多数配置保存后即时生效（Emby 连接、新媒体开关、封面参数与定时、MoviePilot、HDHive 等）；标有「需重启」的项（HTTP/代理端口、日志、115 并发）需重启后端生效。密钥类字段留空表示不修改。"
       />
       <Card>
         <Spin spinning={loading}>
@@ -273,6 +273,79 @@ const SystemSettingsPage: React.FC = () => {
                               'moviepilot.password',
                             ),
                           }}
+                        />
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'hdhive',
+                    label: 'HDHive',
+                    forceRender: true,
+                    children: (
+                      <>
+                        <ProFormSwitch
+                          name={['hdhive', 'enabled']}
+                          label="启用 HDHive OpenAPI"
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['hdhive', 'base_url']}
+                          label="服务地址"
+                          placeholder="https://hdhive.com"
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['hdhive', 'client_id']}
+                          label="Client ID"
+                          placeholder="app_xxx"
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['hdhive', 'redirect_uri']}
+                          label="Redirect URI"
+                          placeholder="https://your.domain/openapi/callback"
+                        />
+                        <ProFormText
+                          width="md"
+                          name={['hdhive', 'scope']}
+                          label="授权 Scope"
+                          placeholder="query unlock"
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['hdhive', 'api_key']}
+                          label="应用 Secret (X-API-Key)"
+                          fieldProps={{
+                            placeholder: secretPlaceholder('hdhive.api_key'),
+                          }}
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['hdhive', 'access_token']}
+                          label="用户 Access Token"
+                          fieldProps={{
+                            placeholder: secretPlaceholder(
+                              'hdhive.access_token',
+                            ),
+                          }}
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['hdhive', 'refresh_token']}
+                          label="用户 Refresh Token"
+                          tooltip="当前作为配置预留；Access Token 过期时可在这里更新或后续接 OAuth 刷新流程。"
+                          fieldProps={{
+                            placeholder: secretPlaceholder(
+                              'hdhive.refresh_token',
+                            ),
+                          }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['hdhive', 'timeout_seconds']}
+                          label="请求超时 (秒)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
                         />
                       </>
                     ),

@@ -100,6 +100,12 @@ export default [
         component: './emby-missing',
       },
       {
+        name: '多版本检查',
+        icon: 'branches',
+        path: '/emby/version-check',
+        component: './emby-version-check',
+      },
+      {
         name: '账号绑定',
         icon: 'userSwitch',
         path: '/emby/bindings',

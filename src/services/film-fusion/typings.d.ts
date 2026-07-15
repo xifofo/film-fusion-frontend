@@ -202,6 +202,69 @@ declare namespace API {
     partial_errors?: string[];
   };
 
+  type EmbyVersionCheckMediaType = 'all' | 'movie' | 'tv';
+
+  type EmbyVersionCheckParams = {
+    cloud_path_ids?: number[];
+    media_type?: EmbyVersionCheckMediaType;
+  };
+
+  type EmbyVersionScannedPath = {
+    cloud_path_id: number;
+    storage_name?: string;
+    source_path: string;
+    local_path: string;
+    emby_path_prefix?: string;
+    file_count: number;
+    error?: string;
+  };
+
+  type EmbyVersionFile = {
+    cloud_path_id: number;
+    storage_name?: string;
+    source_path?: string;
+    local_root: string;
+    path: string;
+    relative_path: string;
+    file_name: string;
+    file_size: number;
+    modified_at: string;
+    extension: string;
+    version_score?: number;
+    version_reasons?: string[];
+    version_signature?: string;
+  };
+
+  type EmbyVersionDuplicateItem = {
+    key: string;
+    media_type: 'movie' | 'episode';
+    title: string;
+    tmdb_id?: string;
+    season?: number;
+    episode?: number;
+    version_count: number;
+    version_labels?: string[];
+    cloud_path_ids?: number[];
+    files: EmbyVersionFile[];
+  };
+
+  type EmbyVersionCheckResult = {
+    scanned_at: string;
+    scanned_paths: EmbyVersionScannedPath[];
+    total_files: number;
+    movie_group_count: number;
+    episode_group_count: number;
+    duplicate_movie_count: number;
+    duplicate_episode_count: number;
+    duplicate_item_count: number;
+    items: EmbyVersionDuplicateItem[];
+    errors?: string[];
+    skipped_cloud_path_ids?: number[];
+    selected_cloud_path_ids?: number[];
+    available_cloud_path_ids?: number[];
+    unmatched_media_file_count: number;
+  };
+
   /** 上行：更新媒体库封面配置参数 */
   type UpsertEmbyCoverLibraryParams = {
     emby_name?: string;
@@ -371,6 +434,8 @@ declare namespace API {
 
   /** 云盘路径查询参数 */
   type CloudPathQueryParams = PageParams & {
+    page?: number;
+    page_size?: number;
     cloud_storage_id?: number;
     source_path?: string;
     local_path?: string;
@@ -560,6 +625,13 @@ declare namespace API {
     | "completed"
     | "failed";
 
+  type OrganizePreviewTmdbRef = {
+    tmdb_id: string;
+    media_type?: 'movie' | 'tv';
+    title?: string;
+    year?: string;
+  };
+
   type OrganizePreviewTask = {
     id: number;
     user_id: number;
@@ -573,6 +645,7 @@ declare namespace API {
     max_depth: number;
     media_type?: 'movie' | 'tv';
     category?: string;
+    tmdb_refs?: OrganizePreviewTmdbRef[];
     best_version_enabled?: boolean;
     status: OrganizePreviewTaskStatus;
     total: number;
@@ -1327,6 +1400,17 @@ declare namespace API {
       username: string;
       password: string;
     };
+    hdhive: {
+      enabled: boolean;
+      base_url: string;
+      client_id: string;
+      redirect_uri: string;
+      scope: string;
+      api_key: string;
+      access_token: string;
+      refresh_token: string;
+      timeout_seconds: number;
+    };
     file_watcher?: any;
   };
 
@@ -1334,6 +1418,102 @@ declare namespace API {
   type AppConfigResult = {
     config: AppConfig;
     secrets: Record<string, boolean>;
+  };
+
+  type HDHiveAPIResponse<T> = {
+    success: boolean;
+    code: string;
+    message: string;
+    description?: string;
+    data: T;
+    meta?: Record<string, any>;
+  };
+
+  type HDHiveQuota = {
+    daily_reset: number;
+    endpoint_limit?: number | null;
+    endpoint_remaining?: number | null;
+  };
+
+  type HDHiveUsageToday = {
+    total_calls: number;
+    success_calls: number;
+    failed_calls: number;
+    avg_latency: number;
+  };
+
+  type HDHiveAuthorizeURLResult = {
+    authorize_url: string;
+    state: string;
+  };
+
+  type HDHiveOAuthToken = {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
+    refresh_expires_in: number;
+    scope: string;
+    scopes: string[];
+  };
+
+  type HDHiveMe = {
+    id: number;
+    level: string;
+    username: string;
+    nickname: string;
+    avatar_url: string;
+    is_blocked: boolean;
+    checked_in_today: boolean;
+    points: number;
+    signin_days_total: number;
+    share_num: number;
+    is_forever_vip: boolean;
+    weekly_free_quota: number;
+    weekly_free_quota_remaining: number;
+    weekly_free_quota_unlimited: boolean;
+    bonus_quota: number;
+  };
+
+  type HDHiveResource = {
+    slug: string;
+    title?: string | null;
+    pan_type?: string | null;
+    media_url?: string;
+    media_slug?: string;
+    share_size?: string | null;
+    video_resolution?: string[];
+    source?: string[];
+    subtitle_language?: string[];
+    subtitle_type?: string[];
+    unlock_points?: number | null;
+    is_unlocked: boolean;
+    user?: any;
+  };
+
+  type HDHiveUnlockResult = {
+    url: string;
+    access_code: string;
+    full_url: string;
+    already_owned: boolean;
+  };
+
+  type HDHiveBatchUnlockItem = {
+    slug: string;
+    success: boolean;
+    message: string;
+    error_code?: string;
+    url?: string;
+    access_code?: string;
+    full_url?: string;
+    already_owned: boolean;
+  };
+
+  type HDHiveBatchUnlockResult = {
+    items: HDHiveBatchUnlockItem[];
+    total: number;
+    success_count: number;
+    failed_count: number;
   };
 
   /** 观看记录 - 采集规则设置 */

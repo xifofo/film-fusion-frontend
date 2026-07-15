@@ -57,4 +57,6 @@ export default {
   'menu.Pickcode缓存管理': 'Pickcode Cache',
   'menu.Emby封面生成': 'Emby Cover',
   'menu.Emby媒体统计': 'Emby Stats',
+  'menu.Emby多版本检查': 'Emby Version Check',
+  'menu.多版本检查': 'Version Check',
 };
