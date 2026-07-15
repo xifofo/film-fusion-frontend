@@ -1697,26 +1697,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
                   : `TMDB ${ref.tmdb_id}`;
                 return (
-                  <Space
+                  <Tooltip
                     key={`${ref.media_type || 'media'}:${ref.tmdb_id}`}
-                    size={0}
-                    wrap
+                    title={`在 TMDB 打开：${title}`}
                   >
-                    <Tooltip title={`在 TMDB 打开：${title}`}>
-                      <Typography.Link
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {ref.tmdb_id} <ExportOutlined />
-                      </Typography.Link>
-                    </Tooltip>
-                    <HDHiveResourcesButton
-                      tmdbId={ref.tmdb_id}
-                      mediaType={ref.media_type}
-                      title={title}
-                    />
-                  </Space>
+                    <Typography.Link
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {ref.tmdb_id} <ExportOutlined />
+                    </Typography.Link>
+                  </Tooltip>
                 );
               })}
             </Space>
@@ -1813,13 +1805,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '操作',
         valueType: 'option',
-        width: 210,
+        width: 280,
         fixed: 'right',
         render: (_, row) => {
           const canView = row.status === 'completed' || row.status === 'failed';
           const isProcessing = row.status === 'processing';
+          const refs = row.tmdb_refs || [];
           return (
-            <Space size={4}>
+            <Space size={4} wrap>
               <Button
                 size="small"
                 type="link"
@@ -1830,6 +1823,22 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               >
                 查看结果
               </Button>
+              {refs.map((ref, index) => {
+                const title = ref.title
+                  ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
+                  : `TMDB ${ref.tmdb_id}`;
+                return (
+                  <HDHiveResourcesButton
+                    key={`${ref.media_type || 'media'}:${ref.tmdb_id}`}
+                    tmdbId={ref.tmdb_id}
+                    mediaType={ref.media_type}
+                    title={title}
+                    buttonText={
+                      refs.length > 1 ? `HDHive${index + 1}` : 'HDHive'
+                    }
+                  />
+                );
+              })}
               <Button
                 size="small"
                 type="link"

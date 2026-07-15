@@ -6,9 +6,24 @@ import {
   ProFormSwitch,
   ProFormText,
 } from '@ant-design/pro-components';
-import { Alert, Card, Modal, message, Spin, Tabs, Tag } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Modal,
+  message,
+  Space,
+  Spin,
+  Tabs,
+  Tag,
+} from 'antd';
 import React, { useCallback, useEffect, useState } from 'react';
-import { getAppConfig, saveAppConfig } from '@/services/film-fusion';
+import {
+  getAppConfig,
+  getHDHiveAuthorizeURL,
+  refreshHDHiveToken,
+  saveAppConfig,
+} from '@/services/film-fusion';
 
 const restartTag = (
   <Tag color="orange" style={{ marginInlineStart: 4 }}>
@@ -20,6 +35,8 @@ const SystemSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<API.AppConfig>();
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
+  const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
+  const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
   const load = useCallback(async () => {
@@ -70,6 +87,45 @@ const SystemSettingsPage: React.FC = () => {
     } catch (error: any) {
       messageApi.error(error?.message || '保存失败');
       return false;
+    }
+  };
+
+  const handleHDHiveAuthorize = async () => {
+    setHdhiveAuthorizing(true);
+    try {
+      const res = await getHDHiveAuthorizeURL({ response_mode: 'redirect' });
+      if (res.code === 0 && res.data?.authorize_url) {
+        window.localStorage.setItem('hdhive_oauth_state', res.data.state || '');
+        window.open(res.data.authorize_url, '_blank', 'noopener,noreferrer');
+        messageApi.info(
+          '已打开 HDHive 授权页，授权完成后会回到回调页写入 Token',
+        );
+      } else {
+        messageApi.error(res.message || '生成 HDHive 授权链接失败');
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '生成 HDHive 授权链接失败');
+    } finally {
+      setHdhiveAuthorizing(false);
+    }
+  };
+
+  const handleHDHiveRefresh = async () => {
+    setHdhiveRefreshing(true);
+    try {
+      const res = await refreshHDHiveToken();
+      if (res.code === 0 && res.data?.success) {
+        messageApi.success('HDHive Token 已刷新');
+        await load();
+      } else {
+        messageApi.error(
+          res.message || res.data?.message || '刷新 HDHive Token 失败',
+        );
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '刷新 HDHive Token 失败');
+    } finally {
+      setHdhiveRefreshing(false);
     }
   };
 
@@ -287,6 +343,32 @@ const SystemSettingsPage: React.FC = () => {
                           name={['hdhive', 'enabled']}
                           label="启用 HDHive OpenAPI"
                         />
+                        <Alert
+                          style={{ marginBottom: 16 }}
+                          type="warning"
+                          showIcon
+                          message="保存配置不会自动获得 Token"
+                          description="保存只会写入 Client ID、应用 Secret、回调地址等配置。需要点击“打开授权页”，在 HDHive 确认授权后，由回调页自动换取并保存 Access Token / Refresh Token。"
+                          action={
+                            <Space>
+                              <Button
+                                size="small"
+                                type="primary"
+                                loading={hdhiveAuthorizing}
+                                onClick={handleHDHiveAuthorize}
+                              >
+                                打开授权页
+                              </Button>
+                              <Button
+                                size="small"
+                                loading={hdhiveRefreshing}
+                                onClick={handleHDHiveRefresh}
+                              >
+                                刷新 Token
+                              </Button>
+                            </Space>
+                          }
+                        />
                         <ProFormText
                           width="lg"
                           name={['hdhive', 'base_url']}
@@ -303,7 +385,7 @@ const SystemSettingsPage: React.FC = () => {
                           width="lg"
                           name={['hdhive', 'redirect_uri']}
                           label="Redirect URI"
-                          placeholder="https://your.domain/openapi/callback"
+                          placeholder="https://your.domain/hdhive/callback"
                         />
                         <ProFormText
                           width="md"

@@ -138,6 +138,12 @@ export default [
     component: './system-settings',
   },
   {
+    name: 'HDHive授权回调',
+    path: '/hdhive/callback',
+    component: './hdhive-callback',
+    hideInMenu: true,
+  },
+  {
     path: '/',
     redirect: '/cloud-storage',
   },
