@@ -29,6 +29,14 @@ type UnlockResult = {
 
 const { Text } = Typography;
 
+const PAN_TYPE_COLOR: Record<string, string> = {
+  '115': 'blue',
+  '189': 'cyan',
+  aliyun: 'orange',
+  baidu: 'geekblue',
+  quark: 'purple',
+};
+
 const TV_MEDIA_TYPES = new Set([
   'tv',
   'tvshow',
@@ -61,6 +69,51 @@ function renderStringList(values?: string[]) {
       {values.map((value) => (
         <Tag key={value}>{value}</Tag>
       ))}
+    </Space>
+  );
+}
+
+function getPanTypeColor(value?: string | null) {
+  const key = (value || '').trim().toLowerCase();
+  return PAN_TYPE_COLOR[key] || 'default';
+}
+
+function renderPanType(value?: string | null) {
+  const text = (value || '').trim();
+  if (!text) return <Tag>未知</Tag>;
+  return <Tag color={getPanTypeColor(text)}>{text}</Tag>;
+}
+
+function getShareUserName(user: any): string {
+  if (!user || typeof user !== 'object') return '';
+  return (
+    user.nickname ||
+    user.username ||
+    user.name ||
+    user.display_name ||
+    user.displayName ||
+    ''
+  );
+}
+
+function getShareUserID(user: any): string {
+  if (!user || typeof user !== 'object') return '';
+  const id = user.id ?? user.user_id ?? user.userId;
+  return id == null ? '' : String(id);
+}
+
+function renderShareUser(user: any) {
+  const name = getShareUserName(user);
+  const id = getShareUserID(user);
+  if (!name && !id) return '-';
+  return (
+    <Space direction="vertical" size={0}>
+      <Text>{name || `用户 ${id}`}</Text>
+      {id && (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          ID {id}
+        </Text>
+      )}
     </Space>
   );
 }
@@ -178,11 +231,16 @@ const HDHiveResourcesButton: React.FC<HDHiveResourcesButtonProps> = ({
           <Space direction="vertical" size={2}>
             <Text strong>{value || record.slug}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.pan_type || '-'}
-              {record.share_size ? ` · ${record.share_size}` : ''}
+              {record.share_size || '-'}
             </Text>
           </Space>
         ),
+      },
+      {
+        title: '网盘来源',
+        dataIndex: 'pan_type',
+        width: 110,
+        render: (value: string | null | undefined) => renderPanType(value),
       },
       {
         title: '规格',
@@ -201,6 +259,12 @@ const HDHiveResourcesButton: React.FC<HDHiveResourcesButtonProps> = ({
             ...(record.subtitle_language || []),
             ...(record.subtitle_type || []),
           ]),
+      },
+      {
+        title: '分享人',
+        dataIndex: 'user',
+        width: 140,
+        render: (value: any) => renderShareUser(value),
       },
       {
         title: '积分',
@@ -268,7 +332,7 @@ const HDHiveResourcesButton: React.FC<HDHiveResourcesButtonProps> = ({
         open={open}
         onCancel={() => setOpen(false)}
         footer={null}
-        width={980}
+        width={1120}
       >
         <Table<API.HDHiveResource>
           rowKey="slug"

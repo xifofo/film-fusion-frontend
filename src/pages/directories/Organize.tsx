@@ -1391,22 +1391,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           const url = buildTmdbUrl(row.tmdb_id, row.media_type);
           if (!url) return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
           return (
-            <Space size={0} wrap>
-              <Tooltip title={`在 TMDB 打开：${url}`}>
-                <Typography.Link
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {row.tmdb_id} <ExportOutlined />
-                </Typography.Link>
-              </Tooltip>
-              <HDHiveResourcesButton
-                tmdbId={row.tmdb_id}
-                mediaType={row.media_type}
-                title={row.title || row.rename_to || row.file_name}
-              />
-            </Space>
+            <Tooltip title={`在 TMDB 打开：${url}`}>
+              <Typography.Link
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {row.tmdb_id} <ExportOutlined />
+              </Typography.Link>
+            </Tooltip>
           );
         },
       },
@@ -1719,7 +1712,23 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '结果数',
         dataIndex: 'total',
-        width: 90,
+        width: 120,
+        render: (_, row) => {
+          const tmdbEpisodeCount = (row.tmdb_refs || []).reduce(
+            (sum, ref) => sum + (ref.episode_count || 0),
+            0,
+          );
+          return (
+            <Space direction="vertical" size={2}>
+              <Typography.Text>{row.total || 0}</Typography.Text>
+              {tmdbEpisodeCount > 0 ? (
+                <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+                  TMDB {tmdbEpisodeCount} 集
+                </Tag>
+              ) : null}
+            </Space>
+          );
+        },
       },
       {
         title: '类型/分类',
