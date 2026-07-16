@@ -209,6 +209,32 @@ declare namespace API {
     media_type?: EmbyVersionCheckMediaType;
   };
 
+  type EmbyVersionCheckProgress = {
+    phase: 'preparing' | 'scanning' | 'finalizing' | 'done' | 'failed';
+    paths_total: number;
+    paths_completed: number;
+    current_path?: string;
+    files_scanned: number;
+  };
+
+  type EmbyVersionCheckJob = {
+    id: string;
+    running: boolean;
+    status: 'running' | 'completed' | 'failed';
+    media_type: EmbyVersionCheckMediaType;
+    cloud_path_ids: number[];
+    started_at: string;
+    finished_at?: string;
+    progress: EmbyVersionCheckProgress;
+    result?: EmbyVersionCheckResult;
+    error?: string;
+  };
+
+  type EmbyVersionCheckStatus = {
+    running: boolean;
+    job: EmbyVersionCheckJob | null;
+  };
+
   type EmbyVersionScannedPath = {
     cloud_path_id: number;
     storage_name?: string;

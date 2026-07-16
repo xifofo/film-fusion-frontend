@@ -16,6 +16,7 @@ import {
   Col,
   Empty,
   message,
+  Progress,
   Row,
   Segmented,
   Select,
@@ -27,10 +28,15 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import React, { useEffect, useMemo, useState } from 'react';
-import { getCloudPaths, scanEmbyVersionCheck } from '@/services/film-fusion';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  getCloudPaths,
+  getEmbyVersionCheckStatus,
+  scanEmbyVersionCheck,
+} from '@/services/film-fusion';
 
 const { Text, Title } = Typography;
+const POLL_MS = 2000;
 
 const cardStyle: React.CSSProperties = {
   borderRadius: 8,
@@ -183,6 +189,7 @@ const EmbyVersionCheckPage: React.FC = () => {
   const [selectedPathIds, setSelectedPathIds] = useState<number[]>([]);
   const [selectionReady, setSelectionReady] = useState(false);
   const [result, setResult] = useState<API.EmbyVersionCheckResult>();
+  const [job, setJob] = useState<API.EmbyVersionCheckJob | null>(null);
 
   const {
     data: cloudPathPage,
@@ -214,20 +221,45 @@ const EmbyVersionCheckPage: React.FC = () => {
     setSelectionReady(true);
   }, [cloudPaths, selectionReady]);
 
-  const { run: runScan, loading: scanLoading } = useRequest(
+  const fetchStatus = useCallback(async () => {
+    try {
+      const response = await getEmbyVersionCheckStatus();
+      const nextJob = response?.data?.job || null;
+      setJob(nextJob);
+      if (nextJob?.result) {
+        setResult(nextJob.result);
+      }
+    } catch {
+      // 状态轮询失败不影响后端任务，下一轮继续查询。
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  useEffect(() => {
+    if (!job?.running) return undefined;
+    const timer = window.setTimeout(fetchStatus, POLL_MS);
+    return () => window.clearTimeout(timer);
+  }, [fetchStatus, job?.running, job?.progress]);
+
+  const { run: runScan, loading: scanStarting } = useRequest(
     scanEmbyVersionCheck,
     {
       manual: true,
       formatResult: (res) => res?.data,
       onSuccess: (data) => {
-        setResult(data);
-        messageApi.success('检查完成');
+        setJob(data);
+        messageApi.success('检查已转入后台运行');
       },
       onError: (error) => {
         messageApi.error(error?.message || '检查失败');
       },
     },
   );
+
+  const scanRunning = Boolean(job?.running);
 
   const pathOptions = useMemo(
     () =>
@@ -295,7 +327,8 @@ const EmbyVersionCheckPage: React.FC = () => {
     },
   ];
 
-  const scanDisabled = selectedPathIds.length === 0 || cloudPathLoading;
+  const scanDisabled =
+    selectedPathIds.length === 0 || cloudPathLoading || scanRunning;
 
   const handleScan = async () => {
     if (selectedPathIds.length === 0) {
@@ -332,11 +365,11 @@ const EmbyVersionCheckPage: React.FC = () => {
             key="scan"
             type="primary"
             icon={<FileSearchOutlined />}
-            loading={scanLoading}
+            loading={scanStarting}
             disabled={scanDisabled}
             onClick={handleScan}
           >
-            开始检查
+            {scanRunning ? '后台检查中' : '开始检查'}
           </Button>,
         ],
       }}
@@ -347,6 +380,7 @@ const EmbyVersionCheckPage: React.FC = () => {
         <Space size={12} wrap style={{ width: '100%' }}>
           <Segmented
             value={mediaType}
+            disabled={scanRunning}
             onChange={(value) =>
               setMediaType(value as API.EmbyVersionCheckMediaType)
             }
@@ -366,14 +400,67 @@ const EmbyVersionCheckPage: React.FC = () => {
             value={selectedPathIds}
             options={pathOptions}
             loading={cloudPathLoading}
+            disabled={scanRunning}
             onChange={setSelectedPathIds}
             style={{ minWidth: 360, flex: 1 }}
           />
-          <Button icon={<FolderOpenOutlined />} onClick={handleSelectAll}>
+          <Button
+            icon={<FolderOpenOutlined />}
+            disabled={scanRunning}
+            onClick={handleSelectAll}
+          >
             全选
           </Button>
         </Space>
       </Card>
+
+      {job?.running && (
+        <Alert
+          showIcon
+          type="info"
+          style={{ marginBottom: 16 }}
+          message="本地多版本检查正在后台运行"
+          description={
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              <Progress
+                percent={
+                  job.progress.paths_total > 0
+                    ? Math.min(
+                        99,
+                        Math.round(
+                          (job.progress.paths_completed /
+                            job.progress.paths_total) *
+                            100,
+                        ),
+                      )
+                    : 0
+                }
+                status="active"
+              />
+              <Text type="secondary">
+                已完成 {job.progress.paths_completed}/{job.progress.paths_total}{' '}
+                条映射，扫描 {job.progress.files_scanned.toLocaleString()}{' '}
+                个文件。关闭或刷新页面不会中断检查。
+              </Text>
+              {job.progress.current_path && (
+                <Text type="secondary" ellipsis={{ tooltip: true }}>
+                  当前：{job.progress.current_path}
+                </Text>
+              )}
+            </Space>
+          }
+        />
+      )}
+
+      {job?.status === 'failed' && (
+        <Alert
+          showIcon
+          type="error"
+          style={{ marginBottom: 16 }}
+          message="后台检查失败"
+          description={job.error || '后台任务异常结束'}
+        />
+      )}
 
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} lg={6}>
@@ -436,7 +523,7 @@ const EmbyVersionCheckPage: React.FC = () => {
         />
       )}
 
-      <Spin spinning={scanLoading}>
+      <Spin spinning={scanStarting}>
         <Card
           variant="borderless"
           style={cardStyle}
