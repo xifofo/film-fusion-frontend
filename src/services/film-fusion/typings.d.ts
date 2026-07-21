@@ -414,6 +414,30 @@ declare namespace API {
     recent_events: EmbyProxy302LogEntry[];
   };
 
+  type EmbyLoginSecurityBlock = {
+    scope: 'ip' | 'account_ip';
+    ip: string;
+    username?: string;
+    failure_count: number;
+    blocked_until: string;
+  };
+
+  type EmbyLoginSecurityEvent = {
+    id: number;
+    timestamp: string;
+    type: 'failed' | 'blocked' | 'unblocked';
+    ip: string;
+    username?: string;
+    scope?: 'ip' | 'account_ip';
+  };
+
+  type EmbyLoginSecurityStatus = {
+    enabled: boolean;
+    blocked_count: number;
+    blocks: EmbyLoginSecurityBlock[];
+    recent_events: EmbyLoginSecurityEvent[];
+  };
+
   /** 通用响应结构 */
   type Response<T = any> = {
     code: number;
@@ -1411,6 +1435,14 @@ declare namespace API {
       add_current_media_info: boolean;
       add_next_media_info: boolean;
       run_proxy_port: number;
+      security: {
+        enabled: boolean;
+        window_minutes: number;
+        max_failures_per_account_ip: number;
+        max_failures_per_ip: number;
+        block_minutes: number;
+        trusted_proxy_cidrs: string[];
+      };
       image_optimization: EmbyImageOptimizationSettings;
       cover: {
         enabled: boolean;
@@ -1445,6 +1477,11 @@ declare namespace API {
       api_key: string;
       access_token: string;
       refresh_token: string;
+      access_token_expires_at: string;
+      refresh_token_expires_at: string;
+      auto_refresh: boolean;
+      refresh_before_minutes: number;
+      refresh_check_minutes: number;
       timeout_seconds: number;
     };
     file_watcher?: any;

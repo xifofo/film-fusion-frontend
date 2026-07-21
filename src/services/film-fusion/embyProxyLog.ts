@@ -30,3 +30,21 @@ export async function getEmbyProxyBalanceStatus() {
     },
   );
 }
+
+/** 拉取 Emby 登录保护状态。 */
+export async function getEmbyLoginSecurityStatus() {
+  return request<API.Response<API.EmbyLoginSecurityStatus>>(
+    '/api/emby-proxy/security-status',
+    { method: 'GET' },
+  );
+}
+
+/** 手动解除一条 Emby 登录封禁。 */
+export async function unblockEmbyLogin(
+  block: Pick<API.EmbyLoginSecurityBlock, 'scope' | 'ip' | 'username'>,
+) {
+  return request<API.Response<unknown>>('/api/emby-proxy/security-unblock', {
+    method: 'POST',
+    data: block,
+  });
+}

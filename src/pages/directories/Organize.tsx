@@ -1408,6 +1408,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         dataIndex: 'rename_to',
         width: 180,
         ellipsis: true,
+        sorter: (left, right) =>
+          (left.rename_to || '').localeCompare(right.rename_to || '', 'zh-CN', {
+            numeric: true,
+            sensitivity: 'base',
+          }),
       },
       {
         title: '标题年份',
@@ -2203,7 +2208,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               loading={previewTasksLoading}
               dataSource={previewTasks}
               columns={previewTaskColumns}
-              pagination={{ pageSize: 5, showSizeChanger: true }}
+              pagination={{ defaultPageSize: 5, showSizeChanger: true }}
               scroll={{ x: 'max-content' }}
               style={{ marginBottom: 12 }}
               locale={{
@@ -2401,7 +2406,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                             }}
                             search={false}
                             options={false}
-                            pagination={{ pageSize: 10, showSizeChanger: true }}
+                            pagination={{
+                              defaultPageSize: 10,
+                              showSizeChanger: true,
+                            }}
                             scroll={{ x: 'max-content', y: 420 }}
                             dataSource={flatItemsForTable}
                             columns={itemColumns}
@@ -2432,7 +2440,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                             }
                             search={false}
                             options={false}
-                            pagination={{ pageSize: 10, showSizeChanger: true }}
+                            pagination={{
+                              defaultPageSize: 10,
+                              showSizeChanger: true,
+                            }}
                             scroll={{ x: 'max-content', y: 420 }}
                             dataSource={flatDirDebugForTable}
                             columns={dirDebugColumns}

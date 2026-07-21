@@ -241,6 +241,52 @@ const SystemSettingsPage: React.FC = () => {
                           min={0}
                           fieldProps={{ precision: 0 }}
                         />
+                        <ProFormSwitch
+                          name={['emby', 'security', 'enabled']}
+                          label="启用登录保护"
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['emby', 'security', 'window_minutes']}
+                          label="失败统计窗口 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={[
+                            'emby',
+                            'security',
+                            'max_failures_per_account_ip',
+                          ]}
+                          label="单账号与 IP 最大失败次数"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['emby', 'security', 'max_failures_per_ip']}
+                          label="单 IP 最大失败次数"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['emby', 'security', 'block_minutes']}
+                          label="封禁时长 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormSelect
+                          width="lg"
+                          name={['emby', 'security', 'trusted_proxy_cidrs']}
+                          label="可信代理 IP / CIDR"
+                          fieldProps={{
+                            mode: 'tags',
+                            tokenSeparators: [',', ' '],
+                            placeholder: '直接开放 8097 时保持为空',
+                          }}
+                        />
                       </>
                     ),
                   },
@@ -400,12 +446,16 @@ const SystemSettingsPage: React.FC = () => {
                           name={['hdhive', 'enabled']}
                           label="启用 HDHive OpenAPI"
                         />
+                        <ProFormSwitch
+                          name={['hdhive', 'auto_refresh']}
+                          label="自动刷新 Access Token"
+                        />
                         <Alert
                           style={{ marginBottom: 16 }}
                           type="warning"
                           showIcon
                           message="保存配置不会自动获得 Token"
-                          description="保存只会写入 Client ID、应用 Secret、回调地址等配置。需要点击“打开授权页”，在 HDHive 确认授权后，由回调页自动换取并保存 Access Token / Refresh Token。"
+                          description="保存只会写入 Client ID、应用 Secret、回调地址等配置。需要点击“打开授权页”，在 HDHive 确认授权后，由回调页自动换取并保存 Access Token / Refresh Token。启用自动刷新后，后端会在启动时和定时任务中用 Refresh Token 续期 Access Token。"
                           action={
                             <Space>
                               <Button
@@ -472,12 +522,38 @@ const SystemSettingsPage: React.FC = () => {
                           width="lg"
                           name={['hdhive', 'refresh_token']}
                           label="用户 Refresh Token"
-                          tooltip="当前作为配置预留；Access Token 过期时可在这里更新或后续接 OAuth 刷新流程。"
+                          tooltip="后端自动刷新任务会使用该 Token 续期 Access Token。"
                           fieldProps={{
                             placeholder: secretPlaceholder(
                               'hdhive.refresh_token',
                             ),
                           }}
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['hdhive', 'access_token_expires_at']}
+                          label="Access Token 过期时间"
+                          fieldProps={{ disabled: true }}
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['hdhive', 'refresh_token_expires_at']}
+                          label="Refresh Token 过期时间"
+                          fieldProps={{ disabled: true }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['hdhive', 'refresh_before_minutes']}
+                          label="提前刷新 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['hdhive', 'refresh_check_minutes']}
+                          label="检查间隔 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
                         />
                         <ProFormDigit
                           width="md"

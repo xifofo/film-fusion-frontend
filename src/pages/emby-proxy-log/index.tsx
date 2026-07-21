@@ -1,7 +1,9 @@
 import {
   DeleteOutlined,
   ReloadOutlined,
+  SafetyCertificateOutlined,
   ThunderboltOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import {
@@ -25,12 +27,14 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   clearEmbyProxy302Logs,
+  getEmbyLoginSecurityStatus,
   getEmbyProxy302Logs,
   getEmbyProxyBalanceStatus,
   retryMatch302Assignment,
+  unblockEmbyLogin,
 } from '@/services/film-fusion';
 
-const { Text, Paragraph } = Typography;
+const { Text, Paragraph, Title } = Typography;
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -116,6 +120,8 @@ const EmbyProxyLogPage: React.FC = () => {
   const [data, setData] = useState<API.EmbyProxy302LogList | null>(null);
   const [balanceStatus, setBalanceStatus] =
     useState<API.EmbyProxyBalanceStatus | null>(null);
+  const [securityStatus, setSecurityStatus] =
+    useState<API.EmbyLoginSecurityStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,15 +129,19 @@ const EmbyProxyLogPage: React.FC = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, statusRes] = await Promise.all([
+      const [logsRes, statusRes, securityRes] = await Promise.all([
         getEmbyProxy302Logs(),
         getEmbyProxyBalanceStatus(),
+        getEmbyLoginSecurityStatus(),
       ]);
       if (logsRes?.code === 0 && logsRes.data) {
         setData(logsRes.data);
       }
       if (statusRes?.code === 0 && statusRes.data) {
         setBalanceStatus(statusRes.data);
+      }
+      if (securityRes?.code === 0 && securityRes.data) {
+        setSecurityStatus(securityRes.data);
       }
     } catch (_e) {
       // 静默失败，避免轮询时刷屏
@@ -189,6 +199,110 @@ const EmbyProxyLogPage: React.FC = () => {
       message.error(`重试失败: ${e?.message || e}`);
     }
   };
+
+  const handleUnblock = (record: API.EmbyLoginSecurityBlock) => {
+    Modal.confirm({
+      title: '确认解除这条登录封禁？',
+      content:
+        record.scope === 'ip'
+          ? `IP ${record.ip}`
+          : `${record.username || '未知账号'} · ${record.ip}`,
+      onOk: async () => {
+        try {
+          await unblockEmbyLogin(record);
+          message.success('已解除封禁');
+          await fetchData();
+        } catch (e: any) {
+          message.error(`解除失败: ${e?.message || e}`);
+        }
+      },
+    });
+  };
+
+  const securityBlockColumns: ColumnsType<API.EmbyLoginSecurityBlock> = [
+    {
+      title: '范围',
+      dataIndex: 'scope',
+      width: 130,
+      render: (scope: string) => (
+        <Tag color={scope === 'ip' ? 'red' : 'orange'}>
+          {scope === 'ip' ? '整个 IP' : '账号与 IP'}
+        </Tag>
+      ),
+    },
+    {
+      title: '客户端 IP',
+      dataIndex: 'ip',
+      width: 180,
+      render: (ip: string) => <Text code>{ip}</Text>,
+    },
+    {
+      title: '账号',
+      dataIndex: 'username',
+      render: (username: string) => username || '-',
+    },
+    {
+      title: '窗口内失败',
+      dataIndex: 'failure_count',
+      width: 120,
+    },
+    {
+      title: '解除时间',
+      dataIndex: 'blocked_until',
+      width: 180,
+      render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm:ss'),
+    },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, record) => (
+        <Button
+          type="link"
+          icon={<UnlockOutlined />}
+          onClick={() => handleUnblock(record)}
+        >
+          解除
+        </Button>
+      ),
+    },
+  ];
+
+  const securityEventColumns: ColumnsType<API.EmbyLoginSecurityEvent> = [
+    {
+      title: '时间',
+      dataIndex: 'timestamp',
+      width: 180,
+      render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm:ss'),
+    },
+    {
+      title: '事件',
+      dataIndex: 'type',
+      width: 120,
+      render: (type: string) => {
+        if (type === 'blocked') return <Tag color="red">触发封禁</Tag>;
+        if (type === 'unblocked') return <Tag color="green">手动解除</Tag>;
+        return <Tag color="orange">登录失败</Tag>;
+      },
+    },
+    {
+      title: '客户端 IP',
+      dataIndex: 'ip',
+      width: 180,
+      render: (ip: string) => <Text code>{ip}</Text>,
+    },
+    {
+      title: '账号',
+      dataIndex: 'username',
+      render: (username: string) => username || '-',
+    },
+    {
+      title: '范围',
+      dataIndex: 'scope',
+      width: 130,
+      render: (scope: string) =>
+        scope ? (scope === 'ip' ? '整个 IP' : '账号与 IP') : '-',
+    },
+  ];
 
   const activeColumns: ColumnsType<API.BalanceActivePlayback> = [
     {
@@ -439,8 +553,7 @@ const EmbyProxyLogPage: React.FC = () => {
   return (
     <PageContainer
       header={{
-        title: 'Emby 代理 302 日志',
-        subTitle: '内存环形缓冲，进程重启会丢失',
+        title: 'Emby 代理运维',
       }}
     >
       <Alert
@@ -504,6 +617,49 @@ const EmbyProxyLogPage: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      <Card
+        variant="borderless"
+        title={
+          <Space>
+            <SafetyCertificateOutlined />
+            <span>登录保护</span>
+            <Tag color={securityStatus?.enabled ? 'green' : 'default'}>
+              {securityStatus?.enabled ? '已启用' : '未启用'}
+            </Tag>
+          </Space>
+        }
+        extra={
+          <Text type={securityStatus?.blocked_count ? 'danger' : 'secondary'}>
+            当前封禁 {securityStatus?.blocked_count || 0}
+          </Text>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Table
+          rowKey={(record) =>
+            `${record.scope}-${record.ip}-${record.username || ''}`
+          }
+          size="small"
+          columns={securityBlockColumns}
+          dataSource={securityStatus?.blocks || []}
+          pagination={false}
+          locale={{ emptyText: '当前无封禁' }}
+          scroll={{ x: 900 }}
+        />
+        <Title level={5} style={{ marginTop: 20, marginBottom: 12 }}>
+          最近登录事件
+        </Title>
+        <Table
+          rowKey="id"
+          size="small"
+          columns={securityEventColumns}
+          dataSource={securityStatus?.recent_events || []}
+          pagination={{ pageSize: 5, hideOnSinglePage: true }}
+          locale={{ emptyText: '暂无登录失败记录' }}
+          scroll={{ x: 800 }}
+        />
+      </Card>
 
       <Card variant="borderless" title="当前播放" style={{ marginBottom: 16 }}>
         <Table
