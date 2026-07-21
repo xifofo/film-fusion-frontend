@@ -395,10 +395,10 @@ const RuleEditor: React.FC<{
       </div>
       <Form.Item name={[profile.key, 'quality']} style={{ marginBottom: 0 }}>
         <Slider
-          min={40}
+          min={10}
           max={100}
           step={1}
-          marks={{ 60: '60', 80: '80', 100: '100' }}
+          marks={{ 10: '10', 40: '40', 70: '70', 100: '100' }}
           disabled={!enabled}
           tooltip={{ formatter: (value) => `质量 ${value}` }}
         />
