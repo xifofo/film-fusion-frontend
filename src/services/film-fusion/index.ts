@@ -55,6 +55,9 @@ export * from './embyMissing';
 // Emby 本地多版本检查
 export * from './embyVersionCheck';
 
+// Emby 图片尺寸、质量控制与真实图片测试
+export * from './embyImageOptimization';
+
 // Emby 观看记录（多用户隔离统计）
 export * from './embyWatch';
 

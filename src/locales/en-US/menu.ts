@@ -58,5 +58,7 @@ export default {
   'menu.Emby封面生成': 'Emby Cover',
   'menu.Emby媒体统计': 'Emby Stats',
   'menu.Emby多版本检查': 'Emby Version Check',
+  'menu.Emby.图片优化': 'Image Optimization',
   'menu.多版本检查': 'Version Check',
+  'menu.图片优化': 'Image Optimization',
 };

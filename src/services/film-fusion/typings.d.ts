@@ -1411,6 +1411,7 @@ declare namespace API {
       add_current_media_info: boolean;
       add_next_media_info: boolean;
       run_proxy_port: number;
+      image_optimization: EmbyImageOptimizationSettings;
       cover: {
         enabled: boolean;
         cron: string;
@@ -1447,6 +1448,74 @@ declare namespace API {
       timeout_seconds: number;
     };
     file_watcher?: any;
+  };
+
+  type EmbyImageProfileKey =
+    | 'library_cover'
+    | 'poster'
+    | 'continue_backdrop'
+    | 'list_poster'
+    | 'detail_logo'
+    | 'detail_backdrop'
+    | 'other';
+
+  type EmbyImageRule = {
+    enabled: boolean;
+    max_width: number;
+    max_height: number;
+    quality: number;
+  };
+
+  type EmbyImageOptimizationSettings = {
+    enabled: boolean;
+    library_cover: EmbyImageRule;
+    poster: EmbyImageRule;
+    continue_backdrop: EmbyImageRule;
+    list_poster: EmbyImageRule;
+    detail_logo: EmbyImageRule;
+    detail_backdrop: EmbyImageRule;
+    other: EmbyImageRule;
+  };
+
+  type EmbyImageSample = {
+    id: string;
+    name: string;
+    type: string;
+    kind: 'library' | 'media';
+    image_tags: Record<string, string>;
+    backdrop_tags: string[];
+  };
+
+  type EmbyImageTestVariant = {
+    data_url: string;
+    bytes: number;
+    duration_ms: number;
+    content_type: string;
+    width: number;
+    height: number;
+    quality: number;
+    max_width: number;
+    max_height: number;
+  };
+
+  type EmbyImageTestRequest = {
+    profile: EmbyImageProfileKey;
+    item_id: string;
+    image_tag: string;
+    requested_width: number;
+    requested_height: number;
+    requested_quality: number;
+    settings: EmbyImageOptimizationSettings;
+  };
+
+  type EmbyImageTestResult = {
+    profile: EmbyImageProfileKey;
+    image_type: string;
+    changed: boolean;
+    original: EmbyImageTestVariant;
+    optimized: EmbyImageTestVariant;
+    original_query: string;
+    optimized_query: string;
   };
 
   /** 应用配置 - 读取结果（含密钥是否已设置） */

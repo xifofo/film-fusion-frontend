@@ -58,5 +58,7 @@ export default {
   'menu.Emby封面生成': 'Emby 封面生成',
   'menu.Emby媒体统计': 'Emby 媒体统计',
   'menu.Emby多版本检查': 'Emby 多版本检查',
+  'menu.Emby.图片优化': '图片优化',
   'menu.多版本检查': '多版本检查',
+  'menu.图片优化': '图片优化',
 };

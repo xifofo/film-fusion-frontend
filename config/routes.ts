@@ -94,6 +94,12 @@ export default [
         component: './emby-proxy-log',
       },
       {
+        name: '图片优化',
+        icon: 'picture',
+        path: '/emby/image-optimization',
+        component: './emby-image-optimization',
+      },
+      {
         name: '缺集扫描',
         icon: 'search',
         path: '/emby/missing',
