@@ -8,6 +8,7 @@ import {
   EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
+  MoreOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   SyncOutlined,
@@ -29,6 +30,7 @@ import {
   Card,
   Checkbox,
   Col,
+  Dropdown,
   Empty,
   Input,
   InputNumber,
@@ -531,8 +533,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     refreshCategoryConfig,
   ]);
 
+  const [previewTasksResolvedDirectoryId, setPreviewTasksResolvedDirectoryId] =
+    useState<number>();
   const {
-    data: previewTasks = [],
+    data: previewTasksData,
     loading: previewTasksLoading,
     refresh: refreshPreviewTasks,
   } = useRequest(
@@ -545,8 +549,26 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       refreshDeps: [directoryId],
       pollingInterval: 8000,
       formatResult: (res) => res.data?.list || [],
+      onSuccess: () => setPreviewTasksResolvedDirectoryId(directoryId),
+      onError: () => setPreviewTasksResolvedDirectoryId(directoryId),
     },
   );
+  const previewTasksResolved = previewTasksResolvedDirectoryId === directoryId;
+  const previewTasks = previewTasksResolved ? previewTasksData || [] : [];
+  const previewTasksInitialLoading =
+    previewTasksLoading && !previewTasksResolved;
+  const [previewTasksManualRefreshing, setPreviewTasksManualRefreshing] =
+    useState(false);
+  const handleRefreshPreviewTasks = useCallback(async () => {
+    setPreviewTasksManualRefreshing(true);
+    try {
+      await refreshPreviewTasks();
+    } catch (error: any) {
+      messageApi.error(error?.message || '刷新预整理队列失败');
+    } finally {
+      setPreviewTasksManualRefreshing(false);
+    }
+  }, [messageApi, refreshPreviewTasks]);
 
   const registerMeta = useCallback(
     (entries: Array<{ key: string; name: string; parentKey: string }>) => {
@@ -926,6 +948,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     () => previewTasks.filter((task) => task.status === 'failed').length,
     [previewTasks],
   );
+  const pendingPreviewTaskCount = useMemo(
+    () => previewTasks.filter((task) => task.status === 'pending').length,
+    [previewTasks],
+  );
   const clearablePreviewTaskCount = useMemo(
     () => previewTasks.filter((task) => task.status !== 'processing').length,
     [previewTasks],
@@ -947,9 +973,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         clearingPreviewTaskStatusRef.current = undefined;
         const deletedCount = payload?.deleted_count || 0;
         messageApi.success(
-          clearedStatus === 'failed'
-            ? `已清理失败预整理任务 ${deletedCount} 个`
-            : `已清理预整理任务 ${deletedCount} 个`,
+          clearedStatus === 'pending'
+            ? `已移除排队中任务 ${deletedCount} 个`
+            : clearedStatus === 'failed'
+              ? `已清理失败预整理任务 ${deletedCount} 个`
+              : `已清理预整理任务 ${deletedCount} 个`,
         );
         refreshPreviewTasks();
         if (
@@ -970,21 +998,36 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   const confirmClearPreviewTasks = useCallback(
     (status?: API.OrganizePreviewTaskStatus) => {
+      const isPendingOnly = status === 'pending';
       const isFailedOnly = status === 'failed';
-      const count = isFailedOnly
-        ? failedPreviewTaskCount
-        : clearablePreviewTaskCount;
+      const count = isPendingOnly
+        ? pendingPreviewTaskCount
+        : isFailedOnly
+          ? failedPreviewTaskCount
+          : clearablePreviewTaskCount;
       if (count <= 0) {
-        messageApi.info(isFailedOnly ? '没有失败任务可清理' : '没有任务可清理');
+        messageApi.info(
+          isPendingOnly
+            ? '没有排队中任务可移除'
+            : isFailedOnly
+              ? '没有失败任务可清理'
+              : '没有任务可清理',
+        );
         return;
       }
 
       modalApi.confirm({
-        title: isFailedOnly ? '清理失败预整理任务？' : '清理全部预整理任务？',
-        content: isFailedOnly
-          ? `将删除当前目录配置下 ${count} 个失败任务。`
-          : `将删除当前目录配置下 ${count} 个非处理中任务，正在处理的任务会保留。`,
-        okText: '清理',
+        title: isPendingOnly
+          ? '移除排队中预整理任务？'
+          : isFailedOnly
+            ? '清理失败预整理任务？'
+            : '清理全部预整理任务？',
+        content: isPendingOnly
+          ? `将移除当前目录配置下 ${count} 个排队中任务，不影响正在处理的任务。`
+          : isFailedOnly
+            ? `将删除当前目录配置下 ${count} 个失败任务。`
+            : `将删除当前目录配置下 ${count} 个非处理中任务，正在处理的任务会保留。`,
+        okText: isPendingOnly ? '移除' : '清理',
         okButtonProps: { danger: true },
         cancelText: '取消',
         onOk: () => {
@@ -1002,6 +1045,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       failedPreviewTaskCount,
       messageApi,
       modalApi,
+      pendingPreviewTaskCount,
       runClearPreviewTasks,
     ],
   );
@@ -1367,21 +1411,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         render: (_, row) => renderExternalSubtitleTag(row),
       },
       {
-        title: '版本',
-        dataIndex: 'best_version',
-        width: 130,
-        render: (_, row) => renderVersionTag(row),
-      },
-      {
-        title: '类型',
+        title: '类型/分类',
         dataIndex: 'media_type',
-        width: 80,
-      },
-      {
-        title: '分类',
-        dataIndex: 'category',
-        width: 120,
+        width: 180,
         ellipsis: true,
+        render: (_, row) =>
+          [row.media_type, row.category]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(' / ') || '-',
       },
       {
         title: 'TMDB',
@@ -1571,6 +1609,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         width: 200,
         ellipsis: true,
       },
+      {
+        title: '版本',
+        dataIndex: 'best_version',
+        width: 130,
+        render: (_, row) => renderVersionTag(row),
+      },
     ],
     [buildPathByKey, episodeMode],
   );
@@ -1663,9 +1707,36 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 120,
+        width: 240,
         fixed: 'left',
-        render: (_, row) => renderPreviewStatus(row.status),
+        render: (_, row) => {
+          const multiEpisodeCount = row.multi_episode_count || 0;
+          const multiEpisodeExamples = row.multi_episode_examples || [];
+          return (
+            <Space size={[4, 4]} wrap>
+              {renderPreviewStatus(row.status)}
+              {multiEpisodeCount > 0 ? (
+                <Tooltip
+                  title={`“重命名为”检测到 ${multiEpisodeCount} 个多集命名${
+                    multiEpisodeExamples.length
+                      ? `：${multiEpisodeExamples.join('、')}`
+                      : ''
+                  }`}
+                >
+                  <Tag
+                    color="warning"
+                    icon={<WarningOutlined />}
+                    style={{ marginInlineEnd: 0, whiteSpace: 'nowrap' }}
+                  >
+                    {multiEpisodeExamples[0]
+                      ? `含 ${multiEpisodeExamples[0]}`
+                      : `多集命名 ${multiEpisodeCount}`}
+                  </Tag>
+                </Tooltip>
+              ) : null}
+            </Space>
+          );
+        },
       },
       {
         title: '文件夹',
@@ -1842,22 +1913,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               >
                 查看结果
               </Button>
-              {refs.map((ref, index) => {
-                const title = ref.title
-                  ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
-                  : `TMDB ${ref.tmdb_id}`;
-                return (
-                  <HDHiveResourcesButton
-                    key={`${ref.media_type || 'media'}:${ref.tmdb_id}`}
-                    tmdbId={ref.tmdb_id}
-                    mediaType={ref.media_type}
-                    title={title}
-                    buttonText={
-                      refs.length > 1 ? `HDHive${index + 1}` : 'HDHive'
-                    }
-                  />
-                );
-              })}
               <Button
                 size="small"
                 type="link"
@@ -1868,6 +1923,41 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               >
                 重跑
               </Button>
+              {refs.length > 0 ? (
+                <Dropdown
+                  trigger={['click']}
+                  placement="bottomRight"
+                  destroyOnHidden={false}
+                  menu={{
+                    items: refs.map((ref, index) => {
+                      const title = ref.title
+                        ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
+                        : `TMDB ${ref.tmdb_id}`;
+                      return {
+                        key: `${ref.media_type || 'media'}:${ref.tmdb_id}`,
+                        label: (
+                          <HDHiveResourcesButton
+                            tmdbId={ref.tmdb_id}
+                            mediaType={ref.media_type}
+                            title={title}
+                            buttonText={
+                              refs.length > 1 ? `HDHive ${index + 1}` : 'HDHive'
+                            }
+                          />
+                        ),
+                      };
+                    }),
+                  }}
+                >
+                  <Button
+                    size="small"
+                    type="link"
+                    title="更多"
+                    aria-label="更多操作"
+                    icon={<MoreOutlined />}
+                  />
+                </Dropdown>
+              ) : null}
               <Tooltip title="删除">
                 <Button
                   size="small"
@@ -2025,25 +2115,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             }
             size="small"
             styles={{ body: { padding: 12 } }}
-            extra={
-              <Tooltip title="刷新根目录">
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<ReloadOutlined />}
-                  loading={rootLoading}
-                  onClick={() => {
-                    setTreeData([]);
-                    setNodeMeta(new Map());
-                    setSelectedKey(undefined);
-                    setCheckedKeys([]);
-                    setExpandedKeys([]);
-                    setRootLoading(true);
-                    loadChildren(ROOT_KEY).finally(() => setRootLoading(false));
-                  }}
-                />
-              </Tooltip>
-            }
           >
             <Input.Search
               allowClear
@@ -2210,7 +2281,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               size="small"
               search={false}
               options={false}
-              loading={previewTasksLoading}
+              loading={previewTasksInitialLoading}
               dataSource={previewTasks}
               columns={previewTaskColumns}
               pagination={{ defaultPageSize: 5, showSizeChanger: true }}
@@ -2221,6 +2292,17 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   '还没有预整理任务。勾选左侧目录后点“加入预整理”，后台会先展开子目录，再按间隔逐个生成预览结果。',
               }}
               toolBarRender={() => [
+                <Button
+                  key="clearPending"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={pendingPreviewTaskCount === 0}
+                  loading={clearPreviewTasksLoading}
+                  onClick={() => confirmClearPreviewTasks('pending')}
+                >
+                  移除排队中 ({pendingPreviewTaskCount})
+                </Button>,
                 <Button
                   key="clearFailed"
                   size="small"
@@ -2247,7 +2329,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   key="refresh"
                   size="small"
                   icon={<ReloadOutlined />}
-                  onClick={() => refreshPreviewTasks()}
+                  loading={previewTasksManualRefreshing}
+                  onClick={handleRefreshPreviewTasks}
                 >
                   刷新
                 </Button>,

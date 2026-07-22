@@ -132,6 +132,12 @@ export default [
     component: './organize-logs',
   },
   {
+    name: 'RSS监控',
+    icon: 'radarChart',
+    path: '/rss-monitor',
+    component: './rss-monitor',
+  },
+  {
     name: '运行日志',
     icon: 'profile',
     path: '/server-logs',

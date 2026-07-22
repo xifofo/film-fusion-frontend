@@ -700,6 +700,8 @@ declare namespace API {
     media_type?: 'movie' | 'tv';
     category?: string;
     tmdb_refs?: OrganizePreviewTmdbRef[];
+    multi_episode_count?: number;
+    multi_episode_examples?: string[];
     best_version_enabled?: boolean;
     status: OrganizePreviewTaskStatus;
     total: number;
@@ -1824,5 +1826,104 @@ declare namespace API {
     lines?: number;
     level?: string;
     keyword?: string;
+  };
+
+  type RSSMonitorSettings = {
+    id: number;
+    enabled: boolean;
+    feed_name: string;
+    feed_url: string;
+    interval_minutes: number;
+    initialized: boolean;
+    last_checked_at?: string;
+    last_success_at?: string;
+    last_error?: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type RSSMonitorSettingsInput = Pick<
+    RSSMonitorSettings,
+    'enabled' | 'feed_name' | 'feed_url' | 'interval_minutes'
+  >;
+
+  type RSSNotificationRule = {
+    id: number;
+    name: string;
+    enabled: boolean;
+    use_mp2_recognition: boolean;
+    priority: number;
+    title_pattern: string;
+    category_pattern: string;
+    message_template: string;
+    created_at: string;
+    updated_at: string;
+  };
+
+  type RSSNotificationRuleInput = Pick<
+    RSSNotificationRule,
+    | 'name'
+    | 'enabled'
+    | 'use_mp2_recognition'
+    | 'priority'
+    | 'title_pattern'
+    | 'category_pattern'
+    | 'message_template'
+  >;
+
+  type RSSNotificationStatus = 'baseline' | 'ignored' | 'sent' | 'failed';
+
+  type RSSMonitorItem = {
+    id: number;
+    guid?: string;
+    title: string;
+    link?: string;
+    category?: string;
+    published_at?: string;
+    size_bytes?: number;
+    media_title?: string;
+    media_year?: string;
+    media_type?: string;
+    media_category?: string;
+    season_episode?: string;
+    rating?: number;
+    quality?: string;
+    tmdb_id?: string;
+    poster_url?: string;
+    recognition_error?: string;
+    rule_id?: number;
+    rule_name?: string;
+    notification_status: RSSNotificationStatus;
+    notification_error?: string;
+    notified_at?: string;
+    discovered_at: string;
+    created_at: string;
+  };
+
+  type RSSMonitorDashboard = {
+    settings: RSSMonitorSettings;
+    rules: RSSNotificationRule[];
+    recent_items: RSSMonitorItem[];
+    running: boolean;
+    telegram_ready: boolean;
+    total_seen: number;
+    total_notified: number;
+  };
+
+  type RSSRefreshResult = {
+    baseline: boolean;
+    fetched: number;
+    new_items: number;
+    matched: number;
+    notified: number;
+    failed: number;
+    not_modified: boolean;
+    completed_at: string;
+    source_feed_name?: string;
+  };
+
+  type RSSRuleTestResult = {
+    matched: boolean;
+    preview?: string;
   };
 }

@@ -228,15 +228,6 @@ const DirectoryList: React.FC = () => {
           >
             整理
           </Button>
-          <Button
-            type="link"
-            size="small"
-            onClick={() =>
-              history.push(`/directories/episode-organize/${record.id}`)
-            }
-          >
-            剧集整理
-          </Button>
           <Popconfirm
             title="确定要删除这条目录配置吗？"
             onConfirm={() => delRun(record.id)}

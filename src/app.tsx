@@ -1,4 +1,8 @@
-import type { Settings as LayoutSettings } from '@ant-design/pro-components';
+import { FileTextOutlined } from '@ant-design/icons';
+import type {
+  Settings as LayoutSettings,
+  MenuDataItem,
+} from '@ant-design/pro-components';
 import { SettingDrawer } from '@ant-design/pro-components';
 import type { RequestConfig, RunTimeLayoutConfig } from '@umijs/max';
 import { history } from '@umijs/max';
@@ -17,6 +21,53 @@ import '@ant-design/v5-patch-for-react-19';
 
 const isDev = process.env.NODE_ENV === 'development';
 const loginPath = '/user/login';
+const logMenuPaths = new Set([
+  '/emby/proxy-log',
+  '/emby-watch',
+  '/organize-logs',
+  '/server-logs',
+]);
+
+const groupLogMenuItems = (menuData: MenuDataItem[]): MenuDataItem[] => {
+  const logItems: MenuDataItem[] = [];
+  const remainingItems = menuData.reduce<MenuDataItem[]>((items, item) => {
+    if (item.path === '/emby' && item.children) {
+      const children = item.children.filter((child) => {
+        if (!child.path || !logMenuPaths.has(child.path)) return true;
+        logItems.push(child);
+        return false;
+      });
+      items.push({ ...item, children });
+      return items;
+    }
+
+    if (item.path && logMenuPaths.has(item.path)) {
+      logItems.push(item);
+      return items;
+    }
+
+    items.push(item);
+    return items;
+  }, []);
+
+  if (logItems.length === 0) return remainingItems;
+
+  const logMenu: MenuDataItem = {
+    key: '/logs',
+    path: '/logs',
+    name: '日志中心',
+    icon: <FileTextOutlined />,
+    children: logItems,
+  };
+  const embyIndex = remainingItems.findIndex((item) => item.path === '/emby');
+  const insertAt = embyIndex >= 0 ? embyIndex + 1 : remainingItems.length;
+
+  return [
+    ...remainingItems.slice(0, insertAt),
+    logMenu,
+    ...remainingItems.slice(insertAt),
+  ];
+};
 
 /**
  * @see https://umijs.org/docs/api/runtime-config#getinitialstate
@@ -78,6 +129,7 @@ export const layout: RunTimeLayoutConfig = ({
     //   content: initialState?.currentUser?.username,
     // },
     footerRender: () => <Footer />,
+    menuDataRender: groupLogMenuItems,
     onPageChange: () => {
       const { location } = history;
       // 如果没有登录，重定向到 login
