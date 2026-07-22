@@ -1,3 +1,4 @@
+import { SendOutlined } from '@ant-design/icons';
 import {
   PageContainer,
   ProForm,
@@ -23,6 +24,7 @@ import {
   getHDHiveAuthorizeURL,
   refreshHDHiveToken,
   saveAppConfig,
+  testTelegramNotification,
 } from '@/services/film-fusion';
 
 const restartTag = (
@@ -37,6 +39,7 @@ const SystemSettingsPage: React.FC = () => {
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
   const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
   const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
+  const [telegramTesting, setTelegramTesting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
   const load = useCallback(async () => {
@@ -129,6 +132,22 @@ const SystemSettingsPage: React.FC = () => {
     }
   };
 
+  const handleTelegramTest = async () => {
+    setTelegramTesting(true);
+    try {
+      const res = await testTelegramNotification();
+      if (res.code === 0) {
+        messageApi.success('测试消息已发送');
+      } else {
+        messageApi.error(res.message || '测试消息发送失败');
+      }
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '测试消息发送失败');
+    } finally {
+      setTelegramTesting(false);
+    }
+  };
+
   return (
     <PageContainer header={{ title: '系统设置' }}>
       {contextHolder}
@@ -174,6 +193,52 @@ const SystemSettingsPage: React.FC = () => {
                           label="登录密码"
                           fieldProps={{
                             placeholder: secretPlaceholder('server.password'),
+                          }}
+                        />
+                        <ProFormSwitch
+                          name={['server', 'security', 'enabled']}
+                          label="启用管理后台登录保护"
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['server', 'security', 'window_minutes']}
+                          label="失败统计窗口 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={[
+                            'server',
+                            'security',
+                            'max_failures_per_account_ip',
+                          ]}
+                          label="单账号与 IP 最大失败次数"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['server', 'security', 'max_failures_per_ip']}
+                          label="单 IP 最大失败次数"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['server', 'security', 'block_minutes']}
+                          label="封禁时长 (分钟)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormSelect
+                          width="lg"
+                          name={['server', 'security', 'trusted_proxy_cidrs']}
+                          label="可信代理 IP / CIDR"
+                          fieldProps={{
+                            mode: 'tags',
+                            tokenSeparators: [',', ' '],
+                            placeholder: '直接对外开放时保持为空',
                           }}
                         />
                         <ProFormDigit
@@ -286,6 +351,89 @@ const SystemSettingsPage: React.FC = () => {
                             tokenSeparators: [',', ' '],
                             placeholder: '直接开放 8097 时保持为空',
                           }}
+                        />
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'telegram',
+                    label: 'Telegram',
+                    forceRender: true,
+                    children: (
+                      <>
+                        <ProFormSwitch
+                          name={['telegram', 'enabled']}
+                          label="启用 Telegram 通知"
+                        />
+                        <Alert
+                          style={{ marginBottom: 16 }}
+                          type="info"
+                          showIcon
+                          message="通知连接"
+                          description="测试消息使用已保存的配置。修改下方字段后请先保存。"
+                          action={
+                            <Button
+                              icon={<SendOutlined />}
+                              loading={telegramTesting}
+                              onClick={handleTelegramTest}
+                            >
+                              发送测试消息
+                            </Button>
+                          }
+                        />
+                        <ProFormText
+                          width="md"
+                          name={['telegram', 'instance_name']}
+                          label="实例名称"
+                          placeholder="FilmFusion"
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['telegram', 'bot_token']}
+                          label="Bot Token"
+                          fieldProps={{
+                            placeholder:
+                              secretPlaceholder('telegram.bot_token'),
+                          }}
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['telegram', 'chat_id']}
+                          label="Chat ID"
+                          placeholder="-1001234567890"
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['telegram', 'message_thread_id']}
+                          label="话题 ID"
+                          tooltip="论坛群需要指定话题时填写；0 表示发送到群组默认话题。"
+                          min={0}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormText
+                          width="lg"
+                          name={['telegram', 'api_base']}
+                          label="API 地址"
+                          placeholder="https://api.telegram.org"
+                        />
+                        <ProFormDigit
+                          width="md"
+                          name={['telegram', 'timeout_seconds']}
+                          label="请求超时 (秒)"
+                          min={1}
+                          fieldProps={{ precision: 0 }}
+                        />
+                        <ProFormSwitch
+                          name={['telegram', 'silent']}
+                          label="静默发送"
+                        />
+                        <ProFormSwitch
+                          name={['telegram', 'notify_emby_brute_force']}
+                          label="Emby 登录爆破告警"
+                        />
+                        <ProFormSwitch
+                          name={['telegram', 'notify_system_brute_force']}
+                          label="FilmFusion 登录爆破告警"
                         />
                       </>
                     ),

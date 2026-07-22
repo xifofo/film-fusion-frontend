@@ -42,11 +42,7 @@ export async function getInitialState(): Promise<{
 
   // 如果不是登录页面，执行
   const { location } = history;
-  if (
-    ![loginPath, '/user/register', '/user/register-result'].includes(
-      location.pathname,
-    )
-  ) {
+  if (location.pathname !== loginPath) {
     const currentUser = await fetchUserInfo();
     return {
       fetchUserInfo,
@@ -111,7 +107,7 @@ export const layout: RunTimeLayoutConfig = ({
     ],
     links: isDev
       ? [
-        <span key="ai-note">P.S. 前端代码 98% 由 AI 生成</span>
+          <span key="ai-note">P.S. 前端代码 98% 由 AI 生成</span>,
           // <Link key="openapi" to="/umi/plugin/openapi" target="_blank">
           //   <LinkOutlined />
           //   <span>OpenAPI 文档</span>

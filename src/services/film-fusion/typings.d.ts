@@ -1411,6 +1411,14 @@ declare namespace API {
       password: string;
       download_115_concurrency: number;
       process_new_media: boolean;
+      security: {
+        enabled: boolean;
+        window_minutes: number;
+        max_failures_per_account_ip: number;
+        max_failures_per_ip: number;
+        block_minutes: number;
+        trusted_proxy_cidrs: string[];
+      };
     };
     log: {
       level: string;
@@ -1425,6 +1433,18 @@ declare namespace API {
       secret: string;
       expire_time: number;
       issuer: string;
+    };
+    telegram: {
+      enabled: boolean;
+      bot_token: string;
+      chat_id: string;
+      message_thread_id: number;
+      instance_name: string;
+      api_base: string;
+      timeout_seconds: number;
+      silent: boolean;
+      notify_emby_brute_force: boolean;
+      notify_system_brute_force: boolean;
     };
     emby: {
       enabled: boolean;

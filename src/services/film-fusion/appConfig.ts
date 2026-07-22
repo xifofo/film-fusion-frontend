@@ -22,3 +22,13 @@ export async function saveAppConfig(
     },
   );
 }
+
+/** 使用已保存的 Telegram 配置发送测试消息 */
+export async function testTelegramNotification(options?: {
+  [key: string]: any;
+}) {
+  return request<API.Response<unknown>>('/api/telegram/test', {
+    method: 'POST',
+    ...(options || {}),
+  });
+}
