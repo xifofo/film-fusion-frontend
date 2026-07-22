@@ -1,4 +1,8 @@
-import { SendOutlined } from '@ant-design/icons';
+import {
+  KeyOutlined,
+  SafetyCertificateOutlined,
+  SendOutlined,
+} from '@ant-design/icons';
 import {
   PageContainer,
   ProForm,
@@ -11,12 +15,14 @@ import {
   Alert,
   Button,
   Card,
+  Form,
   Modal,
   message,
   Space,
   Spin,
   Tabs,
   Tag,
+  Typography,
 } from 'antd';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -34,6 +40,7 @@ const restartTag = (
 );
 
 const SystemSettingsPage: React.FC = () => {
+  const [form] = Form.useForm<API.AppConfig>();
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<API.AppConfig>();
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
@@ -41,6 +48,7 @@ const SystemSettingsPage: React.FC = () => {
   const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
   const [telegramTesting, setTelegramTesting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const webhookToken = Form.useWatch(['webhook', 'clouddrive2', 'token'], form);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +74,20 @@ const SystemSettingsPage: React.FC = () => {
   const secretPlaceholder = (key: string) =>
     secrets[key] ? '已设置，留空则不修改' : '未设置';
 
+  const generateWebhookToken = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const token = Array.from(bytes, (byte) =>
+      byte.toString(16).padStart(2, '0'),
+    ).join('');
+    form.setFieldValue(['webhook', 'clouddrive2', 'token'], token);
+    form.setFieldValue(['webhook', 'clouddrive2', 'enabled'], true);
+    messageApi.success('已生成 256 位随机 Token，保存后生效');
+  };
+
+  const cloudDrive2HeaderConfig = webhookToken
+    ? `authorization = "Bearer ${webhookToken}"`
+    : '';
+
   const onFinish = async (values: API.AppConfig) => {
     try {
       const res = await saveAppConfig(values);
@@ -81,8 +103,9 @@ const SystemSettingsPage: React.FC = () => {
         }
         // 刷新脱敏占位状态
         const fresh = await getAppConfig();
-        if (fresh.code === 0 && fresh.data)
+        if (fresh.code === 0 && fresh.data) {
           setSecrets(fresh.data.secrets || {});
+        }
         return true;
       }
       messageApi.error(res.message || '保存失败');
@@ -161,6 +184,7 @@ const SystemSettingsPage: React.FC = () => {
         <Spin spinning={loading}>
           {config && (
             <ProForm<API.AppConfig>
+              form={form}
               initialValues={config}
               onFinish={onFinish}
               layout="vertical"
@@ -253,6 +277,74 @@ const SystemSettingsPage: React.FC = () => {
                           label="处理新增媒体事件"
                         />
                       </>
+                    ),
+                  },
+                  {
+                    key: 'webhook',
+                    label: 'Webhook',
+                    forceRender: true,
+                    children: (
+                      <div style={{ maxWidth: 760 }}>
+                        <Alert
+                          style={{ marginBottom: 20 }}
+                          type={
+                            secrets['webhook.clouddrive2.token']
+                              ? 'success'
+                              : 'warning'
+                          }
+                          showIcon
+                          icon={<SafetyCertificateOutlined />}
+                          message={
+                            secrets['webhook.clouddrive2.token']
+                              ? 'CloudDrive2 Webhook Token 已配置'
+                              : '配置独立 Token 后再启用 Webhook'
+                          }
+                          description="Token 只用于 CloudDrive2，不要复用管理后台密码或 JWT 密钥。保存后立即生效。"
+                        />
+                        <ProFormSwitch
+                          name={['webhook', 'clouddrive2', 'enabled']}
+                          label="启用 CloudDrive2 Webhook"
+                        />
+                        <ProFormText.Password
+                          width="lg"
+                          name={['webhook', 'clouddrive2', 'token']}
+                          label="Bearer Token"
+                          tooltip="至少 32 个字符；留空表示保持当前 Token 不变。"
+                          fieldProps={{
+                            placeholder: secretPlaceholder(
+                              'webhook.clouddrive2.token',
+                            ),
+                            addonAfter: (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<KeyOutlined />}
+                                onClick={generateWebhookToken}
+                              >
+                                生成
+                              </Button>
+                            ),
+                          }}
+                        />
+                        <Typography.Title level={5} style={{ marginTop: 24 }}>
+                          添加到现有 [global_params.default_headers]
+                        </Typography.Title>
+                        {cloudDrive2HeaderConfig ? (
+                          <Typography.Paragraph
+                            code
+                            copyable={{ text: cloudDrive2HeaderConfig }}
+                            style={{ whiteSpace: 'pre-wrap' }}
+                          >
+                            {cloudDrive2HeaderConfig}
+                          </Typography.Paragraph>
+                        ) : (
+                          <Typography.Text type="secondary">
+                            已保存的 Token
+                            不会回显。点击“生成”后保存，并在刷新页面前复制配置到
+                            CloudDrive2；如果已经配置完成，无需再次生成。
+                          </Typography.Text>
+                        )}
+                      </div>
                     ),
                   },
                   {

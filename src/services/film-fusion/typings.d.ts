@@ -1425,6 +1425,12 @@ declare namespace API {
         trusted_proxy_cidrs: string[];
       };
     };
+    webhook: {
+      clouddrive2: {
+        enabled: boolean;
+        token: string;
+      };
+    };
     log: {
       level: string;
       format: string;
