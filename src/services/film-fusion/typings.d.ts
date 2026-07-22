@@ -680,7 +680,10 @@ declare namespace API {
     media_type?: 'movie' | 'tv';
     title?: string;
     year?: string;
-    episode_count?: number;
+    seasons?: Array<{
+      season_number: number;
+      episode_count?: number;
+    }>;
   };
 
   type OrganizePreviewTask = {

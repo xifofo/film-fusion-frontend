@@ -1717,20 +1717,25 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '结果数',
         dataIndex: 'total',
-        width: 120,
+        width: 170,
         render: (_, row) => {
-          const tmdbEpisodeCount = (row.tmdb_refs || []).reduce(
-            (sum, ref) => sum + (ref.episode_count || 0),
-            0,
+          const tmdbSeasons = (row.tmdb_refs || []).flatMap((ref) =>
+            (ref.seasons || [])
+              .filter((season) => season.episode_count !== undefined)
+              .map((season) => ({ ...season, tmdbId: ref.tmdb_id })),
           );
           return (
             <Space direction="vertical" size={2}>
               <Tag style={{ marginInlineEnd: 0 }}>本地 {row.total || 0}</Tag>
-              {tmdbEpisodeCount > 0 ? (
-                <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-                  TMDB 总 {tmdbEpisodeCount} 集
+              {tmdbSeasons.map((season) => (
+                <Tag
+                  key={`${season.tmdbId}:${season.season_number}`}
+                  color="blue"
+                  style={{ marginInlineEnd: 0, whiteSpace: 'nowrap' }}
+                >
+                  TMDB 第{season.season_number}季 {season.episode_count} 集
                 </Tag>
-              ) : null}
+              ))}
             </Space>
           );
         },

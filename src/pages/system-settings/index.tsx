@@ -541,8 +541,8 @@ const SystemSettingsPage: React.FC = () => {
                           style={{ marginBottom: 16 }}
                           type="info"
                           showIcon
-                          message="用于后台预整理队列展示 TMDB 总集数"
-                          description="启用后，队列会通过 TMDB TV Series Details 接口读取 number_of_episodes，并按缓存时间复用结果。"
+                          message="用于后台预整理队列对比 TMDB 本季集数"
+                          description="启用后，队列会按识别到的季号读取 TMDB TV Season Details 的 episodes 数量，并按缓存时间复用结果。"
                         />
                         <ProFormText
                           width="lg"
