@@ -4,7 +4,6 @@ import {
   ExperimentOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SaveOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import {
@@ -28,15 +27,17 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   createRSSRule,
+  createRSSSource,
   deleteRSSRule,
+  deleteRSSSource,
   getRSSMonitorDashboard,
   refreshRSSMonitor,
-  saveRSSMonitorSettings,
   testRSSRule,
   updateRSSRule,
+  updateRSSSource,
 } from '@/services/film-fusion';
 import styles from './index.less';
 
@@ -113,17 +114,18 @@ const recognizedMediaLabel = (item: API.RSSMonitorItem) => {
 const RSSMonitorPage: React.FC = () => {
   const [dashboard, setDashboard] = useState<API.RSSMonitorDashboard>();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sourceModalOpen, setSourceModalOpen] = useState(false);
+  const [sourceSaving, setSourceSaving] = useState(false);
+  const [editingSource, setEditingSource] = useState<API.RSSMonitorSettings>();
   const [ruleModalOpen, setRuleModalOpen] = useState(false);
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleTesting, setRuleTesting] = useState(false);
   const [editingRule, setEditingRule] = useState<API.RSSNotificationRule>();
   const [rulePreview, setRulePreview] = useState<string>();
-  const [settingsForm] = Form.useForm<API.RSSMonitorSettingsInput>();
+  const [sourceForm] = Form.useForm<API.RSSMonitorSettingsInput>();
   const [ruleForm] = Form.useForm<RuleFormValues>();
   const [messageApi, contextHolder] = message.useMessage();
-  const settingsHydrated = useRef(false);
 
   const load = useCallback(
     async (silent = false) => {
@@ -141,7 +143,7 @@ const RSSMonitorPage: React.FC = () => {
         if (!silent) setLoading(false);
       }
     },
-    [messageApi, settingsForm],
+    [messageApi],
   );
 
   useEffect(() => {
@@ -150,36 +152,59 @@ const RSSMonitorPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  useEffect(() => {
-    if (!dashboard?.settings || settingsHydrated.current) return;
-    settingsForm.setFieldsValue({
-      enabled: dashboard.settings.enabled,
-      feed_name: dashboard.settings.feed_name,
-      feed_url: dashboard.settings.feed_url,
-      interval_minutes: dashboard.settings.interval_minutes,
+  const openSourceModal = (source?: API.RSSMonitorSettings) => {
+    setEditingSource(source);
+    setSourceModalOpen(true);
+    window.setTimeout(() => {
+      sourceForm.setFieldsValue({
+        enabled: source?.enabled ?? true,
+        feed_name: source?.feed_name || '',
+        feed_url: source?.feed_url || '',
+        interval_minutes: source?.interval_minutes || 2,
+      });
     });
-    settingsHydrated.current = true;
-  }, [dashboard?.settings, settingsForm]);
+  };
 
-  const saveSettings = async (values: API.RSSMonitorSettingsInput) => {
-    setSaving(true);
+  const saveSource = async () => {
+    setSourceSaving(true);
     try {
-      const response = await saveRSSMonitorSettings(values);
+      const values = await sourceForm.validateFields();
+      const response = editingSource
+        ? await updateRSSSource(editingSource.id, values)
+        : await createRSSSource(values);
       if (response.code !== 0) throw new Error(response.message);
-      if (response.data) {
-        settingsForm.setFieldsValue({
-          enabled: response.data.enabled,
-          feed_name: response.data.feed_name,
-          feed_url: response.data.feed_url,
-          interval_minutes: response.data.interval_minutes,
-        });
-      }
-      messageApi.success('RSS 监控配置已保存');
+      messageApi.success(editingSource ? 'RSS 源已更新' : 'RSS 源已添加');
+      setSourceModalOpen(false);
       await load(true);
     } catch (error: any) {
-      messageApi.error(error?.data || error?.message || '保存失败');
+      if (error?.errorFields) return;
+      messageApi.error(error?.data || error?.message || '保存 RSS 源失败');
     } finally {
-      setSaving(false);
+      setSourceSaving(false);
+    }
+  };
+
+  const toggleSource = async (
+    source: API.RSSMonitorSettings,
+    enabled: boolean,
+  ) => {
+    try {
+      const response = await updateRSSSource(source.id, { ...source, enabled });
+      if (response.code !== 0) throw new Error(response.message);
+      await load(true);
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '更新 RSS 源失败');
+    }
+  };
+
+  const removeSource = async (id: number) => {
+    try {
+      const response = await deleteRSSSource(id);
+      if (response.code !== 0) throw new Error(response.message);
+      messageApi.success('RSS 源已删除');
+      await load(true);
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '删除 RSS 源失败');
     }
   };
 
@@ -191,7 +216,11 @@ const RSSMonitorPage: React.FC = () => {
         throw new Error(response.message || '刷新失败');
       }
       const result = response.data;
-      if (result.baseline) {
+      if (result.failed_sources) {
+        messageApi.warning(
+          `刷新完成：发现 ${result.new_items} 条，${result.failed_sources} 个源失败`,
+        );
+      } else if (result.baseline) {
         messageApi.success(`基线已建立，共记录 ${result.new_items} 条`);
       } else if (result.not_modified) {
         messageApi.info('RSS 内容未变化');
@@ -319,6 +348,86 @@ const RSSMonitorPage: React.FC = () => {
       messageApi.error(error?.data || error?.message || '删除规则失败');
     }
   };
+
+  const sourceColumns: ColumnsType<API.RSSMonitorSettings> = [
+    {
+      title: 'RSS 源',
+      dataIndex: 'feed_name',
+      render: (_, source) => (
+        <div className={styles.sourceContent}>
+          <Space size={8}>
+            <Badge status={source.enabled ? 'processing' : 'default'} />
+            <Text strong>{source.feed_name}</Text>
+          </Space>
+          <Tooltip title={source.feed_url}>
+            <div className={styles.sourceUrl}>{source.feed_url}</div>
+          </Tooltip>
+          {source.last_error ? (
+            <Tooltip title={source.last_error}>
+              <div className={styles.sourceError}>{source.last_error}</div>
+            </Tooltip>
+          ) : (
+            <div className={styles.sourceMeta}>
+              最近检查 {formatDateTime(source.last_checked_at)}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '间隔',
+      dataIndex: 'interval_minutes',
+      width: 80,
+      render: (value) => `${value} 分钟`,
+    },
+    {
+      title: '启用',
+      dataIndex: 'enabled',
+      width: 64,
+      render: (_, source) => (
+        <Switch
+          size="small"
+          checked={source.enabled}
+          onChange={(checked) => toggleSource(source, checked)}
+          aria-label={`${source.feed_name}启用状态`}
+        />
+      ),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 88,
+      render: (_, source) => (
+        <Space size={4}>
+          <Tooltip title="编辑 RSS 源">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => openSourceModal(source)}
+              aria-label="编辑 RSS 源"
+            />
+          </Tooltip>
+          <Popconfirm
+            title="删除这个 RSS 源？"
+            description="历史事件会保留。"
+            okText="删除"
+            okButtonProps={{ danger: true }}
+            cancelText="取消"
+            onConfirm={() => removeSource(source.id)}
+          >
+            <Tooltip title="删除 RSS 源">
+              <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                aria-label="删除 RSS 源"
+              />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   const ruleColumns: ColumnsType<API.RSSNotificationRule> = [
     {
@@ -455,6 +564,12 @@ const RSSMonitorPage: React.FC = () => {
       ),
     },
     {
+      title: '来源',
+      dataIndex: 'source_name',
+      width: 140,
+      render: (value) => value || <Text type="secondary">历史源</Text>,
+    },
+    {
       title: '规则',
       dataIndex: 'rule_name',
       width: 150,
@@ -474,7 +589,11 @@ const RSSMonitorPage: React.FC = () => {
     },
   ];
 
-  const settings = dashboard?.settings;
+  const sources = dashboard?.sources || [];
+  const enabledSourceCount = sources.filter((source) => source.enabled).length;
+  const failedSourceCount = sources.filter(
+    (source) => source.last_error,
+  ).length;
 
   return (
     <PageContainer
@@ -489,8 +608,15 @@ const RSSMonitorPage: React.FC = () => {
           立即刷新
         </Button>,
         <Button
-          key="rule"
+          key="source"
           type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => openSourceModal()}
+        >
+          添加 RSS 源
+        </Button>,
+        <Button
+          key="rule"
           icon={<PlusOutlined />}
           onClick={() => openRuleModal()}
         >
@@ -502,24 +628,24 @@ const RSSMonitorPage: React.FC = () => {
       {contextHolder}
       <section className={styles.statusStrip} aria-label="RSS 监控状态">
         <div className={`${styles.statusCell} ${styles.statusPrimary}`}>
-          <div className={styles.statusName} title={settings?.feed_name}>
-            {settings?.feed_name || '未配置 RSS 源'}
+          <div className={styles.statusName}>
+            {sources.length ? `${sources.length} 个 RSS 源` : '未配置 RSS 源'}
           </div>
           <div>
             <Badge
-              status={settings?.enabled ? 'processing' : 'default'}
-              text={settings?.enabled ? '监控中' : '已停用'}
+              status={enabledSourceCount ? 'processing' : 'default'}
+              text={enabledSourceCount ? '监控中' : '已停用'}
             />
             <div className={styles.statusMeta}>
-              最近检查 {formatDateTime(settings?.last_checked_at)}
+              {enabledSourceCount} 个源已启用
             </div>
           </div>
         </div>
         <div className={styles.statusCell}>
           <Statistic
-            title="刷新间隔"
-            value={settings?.interval_minutes || 2}
-            suffix="分钟"
+            title="启用源"
+            value={enabledSourceCount}
+            suffix={`/ ${sources.length}`}
           />
         </div>
         <div className={styles.statusCell}>
@@ -530,13 +656,12 @@ const RSSMonitorPage: React.FC = () => {
         </div>
       </section>
 
-      {settings?.last_error && (
+      {failedSourceCount > 0 && (
         <Alert
           type="error"
           showIcon
-          closable
-          message="最近一次刷新失败"
-          description={settings.last_error}
+          message={`${failedSourceCount} 个 RSS 源最近刷新失败`}
+          description="可在 RSS 源列表中查看具体错误。"
           style={{ marginBottom: 16 }}
         />
       )}
@@ -555,56 +680,31 @@ const RSSMonitorPage: React.FC = () => {
       )}
 
       <div className={styles.workspace}>
-        <Card title="监控配置" size="small">
-          <Form
-            form={settingsForm}
-            layout="vertical"
-            onFinish={saveSettings}
-            requiredMark={false}
-          >
-            <Form.Item name="enabled" label="监控状态" valuePropName="checked">
-              <Switch checkedChildren="启用" unCheckedChildren="停用" />
-            </Form.Item>
-            <Form.Item
-              name="feed_name"
-              label="源名称"
-              rules={[{ required: true, message: '请输入源名称' }]}
-            >
-              <Input placeholder="Torrent RSS" maxLength={120} />
-            </Form.Item>
-            <Form.Item
-              name="feed_url"
-              label="RSS 地址"
-              rules={[{ type: 'url', message: '请输入有效的 URL' }]}
-            >
-              <Input.Password
-                placeholder="https://example.com/torrentrss.php?..."
-                autoComplete="off"
-              />
-            </Form.Item>
-            <Form.Item
-              name="interval_minutes"
-              label="刷新间隔"
-              rules={[{ required: true, message: '请输入刷新间隔' }]}
-            >
-              <InputNumber
-                min={1}
-                max={1440}
-                precision={0}
-                addonAfter="分钟"
-                style={{ width: '100%' }}
-              />
-            </Form.Item>
-            <Button
-              block
-              type="primary"
-              htmlType="submit"
-              icon={<SaveOutlined />}
-              loading={saving}
-            >
-              保存配置
-            </Button>
-          </Form>
+        <Card
+          title={
+            <div className={styles.panelTitle}>
+              <span>RSS 源</span>
+              <Button
+                type="link"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={() => openSourceModal()}
+              >
+                添加
+              </Button>
+            </div>
+          }
+          size="small"
+        >
+          <Table
+            rowKey="id"
+            size="small"
+            columns={sourceColumns}
+            dataSource={sources}
+            pagination={false}
+            scroll={{ x: 620 }}
+            locale={{ emptyText: '暂无 RSS 源' }}
+          />
         </Card>
 
         <Card
@@ -634,10 +734,65 @@ const RSSMonitorPage: React.FC = () => {
           columns={eventColumns}
           dataSource={dashboard?.recent_items || []}
           pagination={{ pageSize: 10, showSizeChanger: false }}
-          scroll={{ x: 760 }}
+          scroll={{ x: 900 }}
           locale={{ emptyText: '暂无 RSS 事件' }}
         />
       </Card>
+
+      <Modal
+        title={editingSource ? '编辑 RSS 源' : '添加 RSS 源'}
+        open={sourceModalOpen}
+        destroyOnHidden
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={sourceSaving}
+        onOk={saveSource}
+        onCancel={() => setSourceModalOpen(false)}
+      >
+        <Form
+          form={sourceForm}
+          layout="vertical"
+          requiredMark={false}
+          preserve={false}
+        >
+          <Form.Item name="enabled" label="监控状态" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="停用" />
+          </Form.Item>
+          <Form.Item
+            name="feed_name"
+            label="源名称"
+            rules={[{ required: true, message: '请输入源名称' }]}
+          >
+            <Input placeholder="Torrent RSS" maxLength={120} />
+          </Form.Item>
+          <Form.Item
+            name="feed_url"
+            label="RSS 地址"
+            rules={[
+              { required: true, message: '请输入 RSS 地址' },
+              { type: 'url', message: '请输入有效的 URL' },
+            ]}
+          >
+            <Input.Password
+              placeholder="https://example.com/torrentrss.php?..."
+              autoComplete="off"
+            />
+          </Form.Item>
+          <Form.Item
+            name="interval_minutes"
+            label="刷新间隔"
+            rules={[{ required: true, message: '请输入刷新间隔' }]}
+          >
+            <InputNumber
+              min={1}
+              max={1440}
+              precision={0}
+              addonAfter="分钟"
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={editingRule ? '编辑通知规则' : '新建通知规则'}

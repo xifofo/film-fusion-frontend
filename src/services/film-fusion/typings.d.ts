@@ -1881,6 +1881,8 @@ declare namespace API {
 
   type RSSMonitorItem = {
     id: number;
+    source_id: number;
+    source_name?: string;
     guid?: string;
     title: string;
     link?: string;
@@ -1907,7 +1909,8 @@ declare namespace API {
   };
 
   type RSSMonitorDashboard = {
-    settings: RSSMonitorSettings;
+    settings?: RSSMonitorSettings;
+    sources: RSSMonitorSettings[];
     rules: RSSNotificationRule[];
     recent_items: RSSMonitorItem[];
     running: boolean;
@@ -1926,6 +1929,11 @@ declare namespace API {
     not_modified: boolean;
     completed_at: string;
     source_feed_name?: string;
+    source_id?: number;
+    source_name?: string;
+    error?: string;
+    failed_sources?: number;
+    source_results?: RSSRefreshResult[];
   };
 
   type RSSRuleTestResult = {

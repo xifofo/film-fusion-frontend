@@ -15,6 +15,30 @@ export async function saveRSSMonitorSettings(
   );
 }
 
+export async function createRSSSource(source: API.RSSMonitorSettingsInput) {
+  return request<API.Response<API.RSSMonitorSettings>>(
+    '/api/rss-monitor/sources',
+    { method: 'POST', data: source },
+  );
+}
+
+export async function updateRSSSource(
+  id: number,
+  source: API.RSSMonitorSettingsInput,
+) {
+  return request<API.Response<API.RSSMonitorSettings>>(
+    `/api/rss-monitor/sources/${id}`,
+    { method: 'PUT', data: source },
+  );
+}
+
+export async function deleteRSSSource(id: number) {
+  return request<API.Response<Record<string, never>>>(
+    `/api/rss-monitor/sources/${id}`,
+    { method: 'DELETE' },
+  );
+}
+
 export async function refreshRSSMonitor() {
   return request<API.Response<API.RSSRefreshResult>>(
     '/api/rss-monitor/refresh',

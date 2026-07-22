@@ -39,10 +39,35 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(420px, 1fr) minmax(0, 1.35fr);
   gap: 16px;
   align-items: start;
   margin-bottom: 16px;
+}
+
+.sourceContent {
+  min-width: 180px;
+}
+
+.sourceUrl,
+.sourceMeta,
+.sourceError {
+  max-width: 320px;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceUrl,
+.sourceMeta {
+  color: #6b7280;
+}
+
+.sourceError {
+  color: #dc2626;
+  cursor: help;
 }
 
 .workspace > * {
