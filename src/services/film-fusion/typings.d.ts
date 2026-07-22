@@ -633,6 +633,8 @@ declare namespace API {
     external_subtitle_files?: string[];
     version_score?: number;
     version_reasons?: string[];
+    version_key?: string;
+    version_label?: string;
     best_version?: boolean;
     alternate_version?: boolean;
     source_season?: number;
@@ -663,6 +665,17 @@ declare namespace API {
     total: number;
     dir_debug?: Organize115DirDebug[];
     items?: Organize115ItemResult[];
+    tmdb_refs?: OrganizePreviewTmdbRef[];
+    version_groups?: Array<{
+      key: string;
+      label: string;
+      file_ids: string[];
+      file_count: number;
+      episode_count: number;
+      best_count: number;
+      score: number;
+      recommended?: boolean;
+    }>;
     groups?: Organize115CookieGroup[];
     source_folder_deleted?: boolean;
     source_folder_deleted_count?: number;

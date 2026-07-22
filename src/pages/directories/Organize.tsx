@@ -162,6 +162,11 @@ type OrganizeDirDebug = NonNullable<
 
 type OrganizeItemRow = OrganizeItem & { __folder_id?: string };
 type OrganizeDirDebugRow = OrganizeDirDebug & { __folder_id?: string };
+type OrganizeVersionGroup = NonNullable<
+  API.Organize115CookieResult['version_groups']
+>[number];
+
+const ALL_VERSION_KEY = '__all_versions__';
 
 function getOrganizeItemRowKey(row: OrganizeItemRow): string {
   return `${row.__folder_id || ''}::${row.file_id}`;
@@ -180,6 +185,26 @@ function flattenOrganizeItems(
     ...it,
     __folder_id: result?.folder_id,
   }));
+}
+
+function getInitialPreviewSelection(result: API.Organize115CookieResult) {
+  const rows = flattenOrganizeItems(result);
+  const versionGroups = result.version_groups || [];
+  if (versionGroups.length < 2) {
+    return {
+      activeVersionKey: ALL_VERSION_KEY,
+      selectedRowKeys: getDefaultSelectedItemKeys(rows),
+    };
+  }
+  const preferred =
+    versionGroups.find((group) => group.recommended) || versionGroups[0];
+  const fileIDs = new Set(preferred.file_ids);
+  return {
+    activeVersionKey: preferred.key,
+    selectedRowKeys: rows
+      .filter((row) => fileIDs.has(row.file_id))
+      .map(getOrganizeItemRowKey),
+  };
 }
 
 const TV_MEDIA_TYPES = new Set([
@@ -457,6 +482,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [selectedItemRowKeys, setSelectedItemRowKeys] = useState<React.Key[]>(
     [],
   );
+  const [activeVersionKey, setActiveVersionKey] = useState(ALL_VERSION_KEY);
   const effectiveMediaType: OrganizeMediaType = episodeMode
     ? 'tv'
     : organizeMediaType;
@@ -638,6 +664,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     setActivePreviewTask(undefined);
     setRawResponse(undefined);
     setSelectedItemRowKeys([]);
+    setActiveVersionKey(ALL_VERSION_KEY);
     setRootLoading(true);
     loadChildren(ROOT_KEY).finally(() => setRootLoading(false));
   }, [cloudStorageId, loadChildren]);
@@ -651,6 +678,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     setActivePreviewTask(undefined);
     setRawResponse(undefined);
     setSelectedItemRowKeys([]);
+    setActiveVersionKey(ALL_VERSION_KEY);
   }, [checkedKeys]);
 
   const updateFilenameRegexConfig = useCallback(
@@ -787,19 +815,27 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           );
         }
         if (payload?.dry_run) {
+          const selection = getInitialPreviewSelection(payload);
           setResultData(payload);
           setActivePreviewTask(undefined);
           setRawResponse(response);
-          setSelectedItemRowKeys(
-            getDefaultSelectedItemKeys(flattenOrganizeItems(payload)),
-          );
+          setActiveVersionKey(selection.activeVersionKey);
+          setSelectedItemRowKeys(selection.selectedRowKeys);
         } else {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
           const shouldDeleteSourceFolder =
             deleteSourceFolderAfterApplyRef.current;
+          const failedApplyGroups = (payload?.groups || []).filter(
+            (group) => !!group.error,
+          );
           applyingPreviewTaskRef.current = undefined;
           deleteSourceFolderAfterApplyRef.current = false;
-          if (appliedPreviewTask) {
+          if (appliedPreviewTask && failedApplyGroups.length > 0) {
+            messageApi.warning(
+              `有 ${failedApplyGroups.length} 个分组整理失败，已保留源目录和预整理任务，未删除其他版本`,
+            );
+            refreshPreviewTasks();
+          } else if (appliedPreviewTask) {
             deleteOrganizePreviewTask(
               appliedPreviewTask.id,
               shouldDeleteSourceFolder
@@ -833,6 +869,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setActivePreviewTask(undefined);
           setRawResponse(undefined);
           setSelectedItemRowKeys([]);
+          setActiveVersionKey(ALL_VERSION_KEY);
           setCheckedKeys([]);
         }
       },
@@ -890,11 +927,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         }
         setOrganizeCategory(payload.task?.category || undefined);
         setBestVersionEnabled(!!payload.task?.best_version_enabled);
+        const selection = getInitialPreviewSelection(previewResult);
         setResultData(previewResult);
         setRawResponse(response);
-        setSelectedItemRowKeys(
-          getDefaultSelectedItemKeys(flattenOrganizeItems(previewResult)),
-        );
+        setActiveVersionKey(selection.activeVersionKey);
+        setSelectedItemRowKeys(selection.selectedRowKeys);
         window.setTimeout(() => {
           previewResultRef.current?.scrollIntoView({
             behavior: 'smooth',
@@ -988,6 +1025,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setResultData(undefined);
           setRawResponse(undefined);
           setSelectedItemRowKeys([]);
+          setActiveVersionKey(ALL_VERSION_KEY);
         }
       },
       onError: (error: any) => {
@@ -1055,6 +1093,45 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     [resultData],
   );
 
+  const versionGroups = useMemo<OrganizeVersionGroup[]>(
+    () => resultData?.version_groups || [],
+    [resultData?.version_groups],
+  );
+
+  const activeVersionGroup = useMemo(
+    () => versionGroups.find((group) => group.key === activeVersionKey),
+    [activeVersionKey, versionGroups],
+  );
+
+  const visibleItemsForTable = useMemo(() => {
+    if (!activeVersionGroup) {
+      return flatItemsForTable;
+    }
+    const fileIDs = new Set(activeVersionGroup.file_ids);
+    return flatItemsForTable.filter((row) => fileIDs.has(row.file_id));
+  }, [activeVersionGroup, flatItemsForTable]);
+
+  const handleVersionTabChange = useCallback(
+    (key: string) => {
+      setActiveVersionKey(key);
+      if (key === ALL_VERSION_KEY) {
+        setSelectedItemRowKeys(getDefaultSelectedItemKeys(flatItemsForTable));
+        return;
+      }
+      const group = versionGroups.find((item) => item.key === key);
+      if (!group) {
+        return;
+      }
+      const fileIDs = new Set(group.file_ids);
+      setSelectedItemRowKeys(
+        flatItemsForTable
+          .filter((row) => fileIDs.has(row.file_id))
+          .map(getOrganizeItemRowKey),
+      );
+    },
+    [flatItemsForTable, versionGroups],
+  );
+
   const itemFactSummary = useMemo(() => {
     return flatItemsForTable.reduce(
       (acc, row) => {
@@ -1081,6 +1158,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       selectedSet.has(getOrganizeItemRowKey(row)),
     );
   }, [flatItemsForTable, selectedItemRowKeys]);
+
+  const unselectedItemCount = Math.max(
+    0,
+    flatItemsForTable.length - selectedItemRowsForApply.length,
+  );
 
   const confirmDeletePreviewTask = useCallback(
     (row: API.OrganizePreviewTask) => {
@@ -1287,7 +1369,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         let deleteSourceFolder = true;
         modalApi.confirm({
           title: activePreviewTask
-            ? `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
+            ? activeVersionGroup
+              ? `确认只整理“${activeVersionGroup.label}”版本？`
+              : `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
             : `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
           content: (
             <Space direction="vertical" size={8}>
@@ -1303,6 +1387,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
                 单个目录失败不会阻断其它，错误会标注在对应分组上。
               </Typography.Text>
+              {activeVersionGroup ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  message={`${activeVersionGroup.label}：${
+                    activeVersionGroup.episode_count > 0
+                      ? `${activeVersionGroup.episode_count} 集`
+                      : `${activeVersionGroup.file_count} 个文件`
+                  }`}
+                  description={`本次选择 ${selectedItemRowsForApply.length} 个文件，原目录另有 ${unselectedItemCount} 个未选文件。`}
+                />
+              ) : null}
               <Space direction="vertical" size={4}>
                 <Checkbox
                   defaultChecked
@@ -1310,10 +1406,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     deleteSourceFolder = event.target.checked;
                   }}
                 >
-                  整理完成后删除原文件夹
+                  {activeVersionGroup
+                    ? '只保留此版本，整理后删除其他版本'
+                    : '整理完成后删除原文件夹'}
                 </Checkbox>
                 <Typography.Text type="secondary">
-                  仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。
+                  {activeVersionGroup
+                    ? `仅在所选版本整理成功后执行；原文件夹会移入 115 回收站，其中 ${unselectedItemCount} 个未选文件也会一并删除。`
+                    : '仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。'}
                 </Typography.Text>
               </Space>
             </Space>
@@ -1384,6 +1484,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     },
     [
       activePreviewTask,
+      activeVersionGroup,
       buildOrganizeParams,
       checkedKeys,
       episodeMode,
@@ -1392,6 +1493,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       resultData?.dry_run,
       runOrganize,
       selectedItemRowsForApply,
+      unselectedItemCount,
     ],
   );
 
@@ -2041,7 +2143,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     ? selectedItemRowsForApply.length === 0
     : checkedKeys.length === 0;
   const applyButtonText = hasPreviewResult
-    ? `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+    ? activeVersionGroup
+      ? `整理此版本 (${selectedItemRowsForApply.length}/${visibleItemsForTable.length})`
+      : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
     : `确认整理 (${checkedKeys.length})`;
   const activePreviewTaskLabel = activePreviewTask
     ? activePreviewTask.folder_path ||
@@ -2483,39 +2587,101 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     items={[
                       {
                         key: 'items',
-                        label: `处理明细 (${flatItemsForTable.length})`,
+                        label: `处理明细 (${visibleItemsForTable.length})`,
                         children: (
-                          <ProTable<OrganizeItemRow>
-                            rowKey={getOrganizeItemRowKey}
-                            rowSelection={{
-                              selectedRowKeys: selectedItemRowKeys,
-                              onChange: (keys) => setSelectedItemRowKeys(keys),
-                              preserveSelectedRowKeys: true,
-                            }}
-                            search={false}
-                            options={false}
-                            pagination={{
-                              defaultPageSize: 10,
-                              showSizeChanger: true,
-                            }}
-                            scroll={{ x: 'max-content', y: 420 }}
-                            dataSource={flatItemsForTable}
-                            columns={itemColumns}
-                            expandable={{
-                              expandedRowRender: (row) => (
-                                <Typography.Paragraph style={{ margin: 0 }}>
-                                  <pre
-                                    style={{
-                                      margin: 0,
-                                      whiteSpace: 'pre-wrap',
-                                    }}
-                                  >
-                                    {JSON.stringify(row, null, 2)}
-                                  </pre>
-                                </Typography.Paragraph>
-                              ),
-                            }}
-                          />
+                          <>
+                            {versionGroups.length > 1 ? (
+                              <div style={{ marginBottom: 12 }}>
+                                <Space
+                                  size={8}
+                                  wrap
+                                  style={{ marginBottom: 8 }}
+                                >
+                                  <Typography.Text strong>
+                                    版本轨道
+                                  </Typography.Text>
+                                  <Typography.Text type="secondary">
+                                    切换版本会同步选择该版本的全部文件
+                                  </Typography.Text>
+                                </Space>
+                                <Tabs
+                                  type="card"
+                                  size="small"
+                                  activeKey={activeVersionKey}
+                                  onChange={handleVersionTabChange}
+                                  items={[
+                                    ...versionGroups.map((group) => ({
+                                      key: group.key,
+                                      label: (
+                                        <Space size={4}>
+                                          <span>{group.label}</span>
+                                          <Tag
+                                            bordered={false}
+                                            color={
+                                              group.recommended
+                                                ? 'success'
+                                                : 'blue'
+                                            }
+                                            style={{ marginInlineEnd: 0 }}
+                                          >
+                                            {group.episode_count > 0
+                                              ? `${group.episode_count} 集`
+                                              : `${group.file_count} 个文件`}
+                                          </Tag>
+                                          {group.recommended ? (
+                                            <Tag
+                                              bordered={false}
+                                              color="gold"
+                                              style={{ marginInlineEnd: 0 }}
+                                            >
+                                              推荐
+                                            </Tag>
+                                          ) : null}
+                                        </Space>
+                                      ),
+                                    })),
+                                    {
+                                      key: ALL_VERSION_KEY,
+                                      label: `全部版本 (${flatItemsForTable.length})`,
+                                    },
+                                  ]}
+                                />
+                              </div>
+                            ) : null}
+                            <ProTable<OrganizeItemRow>
+                              key={activeVersionKey}
+                              rowKey={getOrganizeItemRowKey}
+                              rowSelection={{
+                                selectedRowKeys: selectedItemRowKeys,
+                                onChange: (keys) =>
+                                  setSelectedItemRowKeys(keys),
+                                preserveSelectedRowKeys: false,
+                              }}
+                              search={false}
+                              options={false}
+                              pagination={{
+                                defaultPageSize: 10,
+                                showSizeChanger: true,
+                              }}
+                              scroll={{ x: 'max-content', y: 420 }}
+                              dataSource={visibleItemsForTable}
+                              columns={itemColumns}
+                              expandable={{
+                                expandedRowRender: (row) => (
+                                  <Typography.Paragraph style={{ margin: 0 }}>
+                                    <pre
+                                      style={{
+                                        margin: 0,
+                                        whiteSpace: 'pre-wrap',
+                                      }}
+                                    >
+                                      {JSON.stringify(row, null, 2)}
+                                    </pre>
+                                  </Typography.Paragraph>
+                                ),
+                              }}
+                            />
+                          </>
                         ),
                       },
                       {
