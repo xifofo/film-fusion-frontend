@@ -50,18 +50,19 @@ declare namespace API {
     id: number;
     user_id: number;
     cloud_storage_id: number;
-    source_path: string;        // 云盘源路径
-    content_prefix?: string;    // STRM内容前缀
-    local_path?: string;        // 本地路径
-    emby_path_prefix?: string;  // Emby 上报路径前缀（替换为 local_path 以定位真实本地路径）
-    link_type: "strm";  // 链接类型
-    filter_rules?: string;      // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
-    strm_content_type?: "openlist" | "path";  // STRM文件内容类型
-    source_type?: "clouddrive2" | "moviepilot2";  // 源类型
-    content_encode_uri?: boolean;  // 是否对内容进行URI编码
+    source_path: string; // 云盘源路径
+    content_prefix?: string; // STRM内容前缀
+    local_path?: string; // 本地路径
+    emby_path_prefix?: string; // Emby 上报路径前缀（替换为 local_path 以定位真实本地路径）
+    link_type: 'strm'; // 链接类型
+    filter_rules?: string; // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
+    strm_content_type?: 'openlist' | 'path'; // STRM文件内容类型
+    source_type?: 'clouddrive2' | 'moviepilot2'; // 源类型
+    content_encode_uri?: boolean; // 是否对内容进行URI编码
     created_at: string;
     updated_at: string;
-    cloud_storage?: {           // 关联的云存储信息
+    cloud_storage?: {
+      // 关联的云存储信息
       id: number;
       storage_name: string;
       storage_type: string;
@@ -489,12 +490,12 @@ declare namespace API {
     cloud_storage_id?: number;
     source_path?: string;
     local_path?: string;
-    link_type?: "strm" | "symlink";
-    strm_content_type?: "openlist" | "path";
-    source_type?: "clouddrive2" | "moviepilot2";
+    link_type?: 'strm' | 'symlink';
+    strm_content_type?: 'openlist' | 'path';
+    source_type?: 'clouddrive2' | 'moviepilot2';
     search?: string;
     order_by?: string;
-    order_dir?: "asc" | "desc";
+    order_dir?: 'asc' | 'desc';
   };
 
   /** 目录配置查询参数 */
@@ -502,7 +503,7 @@ declare namespace API {
     cloud_storage_id?: number;
     search?: string;
     order_by?: string;
-    order_dir?: "asc" | "desc";
+    order_dir?: 'asc' | 'desc';
     page?: number;
     page_size?: number;
   };
@@ -514,10 +515,10 @@ declare namespace API {
     content_prefix?: string;
     local_path?: string;
     emby_path_prefix?: string;
-    link_type: "strm";
+    link_type: 'strm';
     filter_rules?: string;
-    strm_content_type?: "openlist" | "path";
-    source_type?: "clouddrive2" | "moviepilot2";
+    strm_content_type?: 'openlist' | 'path';
+    source_type?: 'clouddrive2' | 'moviepilot2';
     content_encode_uri?: boolean;
   };
 
@@ -543,10 +544,10 @@ declare namespace API {
     content_prefix?: string;
     local_path?: string;
     emby_path_prefix?: string;
-    link_type?: "strm";
+    link_type?: 'strm';
     filter_rules?: string;
-    strm_content_type?: "openlist" | "path";
-    source_type?: "clouddrive2" | "moviepilot2";
+    strm_content_type?: 'openlist' | 'path';
+    source_type?: 'clouddrive2' | 'moviepilot2';
     content_encode_uri?: boolean;
   };
 
@@ -683,10 +684,10 @@ declare namespace API {
   };
 
   type OrganizePreviewTaskStatus =
-    | "pending"
-    | "processing"
-    | "completed"
-    | "failed";
+    | 'pending'
+    | 'processing'
+    | 'completed'
+    | 'failed';
 
   type OrganizePreviewTmdbRef = {
     tmdb_id: string;
@@ -832,10 +833,10 @@ declare namespace API {
   /** 批量操作参数 */
   type BatchCloudPathParams = {
     ids: number[];
-    operation: "delete" | "sync" | "update";
+    operation: 'delete' | 'sync' | 'update';
     data?: {
-      link_type?: "strm";
-      strm_content_type?: "openlist" | "path";
+      link_type?: 'strm';
+      strm_content_type?: 'openlist' | 'path';
       content_prefix?: string;
       filter_rules?: string;
       content_encode_uri?: boolean;
@@ -851,14 +852,14 @@ declare namespace API {
 
   /** 链接类型选项 */
   type LinkTypeOption = {
-    value: "strm" | "symlink";
+    value: 'strm' | 'symlink';
     label: string;
     desc: string;
   };
 
   /** STRM内容类型选项 */
   type StrmContentTypeOption = {
-    value: "openlist" | "path";
+    value: 'openlist' | 'path';
     label: string;
     desc: string;
   };
@@ -869,9 +870,9 @@ declare namespace API {
     source_path: string;
     content_prefix?: string;
     local_path?: string;
-    link_type: "strm" | "symlink";
+    link_type: 'strm' | 'symlink';
     filter_rules?: string;
-    strm_content_type?: "openlist" | "path";
+    strm_content_type?: 'openlist' | 'path';
     content_encode_uri?: boolean;
   };
 
@@ -1081,7 +1082,13 @@ declare namespace API {
     last_ready_at?: string;
     last_played_at?: string;
     expires_at?: string;
-    cleanup_status: 'none' | 'pending' | 'cleaning' | 'cleaned' | 'failed' | string;
+    cleanup_status:
+      | 'none'
+      | 'pending'
+      | 'cleaning'
+      | 'cleaned'
+      | 'failed'
+      | string;
     cleanup_error?: string;
     cleaned_at?: string;
     created_at: string;
@@ -1100,9 +1107,9 @@ declare namespace API {
 
   type Match302 = {
     id: number;
-    source_path: string;        // 源路径（最大500字符）
-    target_path: string;        // 目标路径（最大500字符）
-    cloud_storage_id: number;   // 云存储ID（外键）
+    source_path: string; // 源路径（最大500字符）
+    target_path: string; // 目标路径（最大500字符）
+    cloud_storage_id: number; // 云存储ID（外键）
     balance_enabled: boolean;
     balance_strategy: string;
     balance_limit_mode: 'loose' | 'strict' | string;
@@ -1114,7 +1121,8 @@ declare namespace API {
     min_keep_ready: number;
     created_at?: string;
     updated_at?: string;
-    cloud_storage?: {           // 关联的云存储信息
+    cloud_storage?: {
+      // 关联的云存储信息
       id: number;
       storage_name: string;
       storage_type: string;
@@ -1167,9 +1175,9 @@ declare namespace API {
   /** 整理日志记录 */
   type OrganizeLog = {
     id: number;
-    action: string;             // strm_create / strm_delete / strm_rename / file_download / walk_dir
-    status: string;             // success / skipped / failed
-    trigger?: string;           // cd2_notify / mp2_notify / manual / download_worker / webhook
+    action: string; // strm_create / strm_delete / strm_rename / file_download / walk_dir
+    status: string; // success / skipped / failed
+    trigger?: string; // cd2_notify / mp2_notify / manual / download_worker / webhook
     source?: string;
     target?: string;
     cloud_path_id?: number;
@@ -1197,7 +1205,7 @@ declare namespace API {
     cloud_path_id?: number;
     cloud_storage_id?: number;
     search?: string;
-    start?: string;             // RFC3339
+    start?: string; // RFC3339
     end?: string;
   };
 

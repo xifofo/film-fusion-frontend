@@ -1809,7 +1809,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 240,
+        width: 140,
         fixed: 'left',
         render: (_, row) => {
           const multiEpisodeCount = row.multi_episode_count || 0;
