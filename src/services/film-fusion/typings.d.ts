@@ -1934,6 +1934,8 @@ declare namespace API {
     sources: RSSMonitorSettings[];
     rules: RSSNotificationRule[];
     recent_items: RSSMonitorItem[];
+    recent_matched_items: RSSMonitorItem[];
+    retention_limit: number;
     running: boolean;
     telegram_ready: boolean;
     total_seen: number;

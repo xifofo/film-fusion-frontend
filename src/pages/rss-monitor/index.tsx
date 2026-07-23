@@ -21,6 +21,7 @@ import {
   Statistic,
   Switch,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -594,6 +595,19 @@ const RSSMonitorPage: React.FC = () => {
   const failedSourceCount = sources.filter(
     (source) => source.last_error,
   ).length;
+  const recentItems = dashboard?.recent_items || [];
+  const recentMatchedItems = dashboard?.recent_matched_items || [];
+  const eventTable = (items: API.RSSMonitorItem[], emptyText: string) => (
+    <Table
+      rowKey="id"
+      size="small"
+      columns={eventColumns}
+      dataSource={items}
+      pagination={{ pageSize: 10, showSizeChanger: false }}
+      scroll={{ x: 900 }}
+      locale={{ emptyText }}
+    />
+  );
 
   return (
     <PageContainer
@@ -727,15 +741,33 @@ const RSSMonitorPage: React.FC = () => {
         </Card>
       </div>
 
-      <Card size="small" title="最近事件">
-        <Table
-          rowKey="id"
-          size="small"
-          columns={eventColumns}
-          dataSource={dashboard?.recent_items || []}
-          pagination={{ pageSize: 10, showSizeChanger: false }}
-          scroll={{ x: 900 }}
-          locale={{ emptyText: '暂无 RSS 事件' }}
+      <Card
+        size="small"
+        title={
+          <div className={styles.eventPanelTitle}>
+            <span>最近事件</span>
+            <Text type="secondary" className={styles.retentionHint}>
+              存入数据库；刷新时自动保留最近{' '}
+              {(dashboard?.retention_limit || 5000).toLocaleString()} 条
+            </Text>
+          </div>
+        }
+      >
+        <Tabs
+          defaultActiveKey="matched"
+          className={styles.eventTabs}
+          items={[
+            {
+              key: 'matched',
+              label: '命中规则',
+              children: eventTable(recentMatchedItems, '暂无命中规则的事件'),
+            },
+            {
+              key: 'all',
+              label: '所有事件',
+              children: eventTable(recentItems, '暂无 RSS 事件'),
+            },
+          ]}
         />
       </Card>
 
