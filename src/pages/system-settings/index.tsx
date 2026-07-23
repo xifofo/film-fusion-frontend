@@ -14,7 +14,6 @@ import {
 import {
   Alert,
   Button,
-  Card,
   Form,
   Modal,
   message,
@@ -48,20 +47,15 @@ const useStyles = createStyles(({ css, token }) => ({
   intro: css`
     margin-bottom: 16px;
     border: 1px solid ${token.colorInfoBorder};
-    border-radius: 10px;
-
-    .ant-alert-message {
-      font-weight: 600;
-    }
-  `,
-  settingsCard: css`
-    overflow: visible;
-    border-color: ${token.colorBorderSecondary};
     border-radius: var(--settings-panel-radius);
 
-    > .ant-card-body {
-      padding: 0;
+    .ant-alert-message {
+      line-height: 22px;
     }
+  `,
+  introTitle: css`
+    margin-inline-end: 16px;
+    white-space: nowrap;
   `,
   loadingArea: css`
     min-height: 420px;
@@ -73,6 +67,7 @@ const useStyles = createStyles(({ css, token }) => ({
       z-index: 8;
       margin: 0;
       padding: 0 24px;
+      border-radius: var(--settings-panel-radius);
       background: color-mix(in srgb, ${token.colorBgContainer} 94%, transparent);
       backdrop-filter: blur(12px);
     }
@@ -82,8 +77,8 @@ const useStyles = createStyles(({ css, token }) => ({
     }
 
     .ant-tabs-content-holder {
-      padding: 24px;
-      background: ${token.colorFillQuaternary};
+      padding: 24px 0;
+      background: transparent;
     }
 
     @media (max-width: 767px) {
@@ -93,7 +88,7 @@ const useStyles = createStyles(({ css, token }) => ({
       }
 
       .ant-tabs-content-holder {
-        padding: 16px;
+        padding: 16px 0;
       }
     }
   `,
@@ -104,7 +99,7 @@ const useStyles = createStyles(({ css, token }) => ({
     gap: 16px;
   `,
   section: css`
-    padding: 20px 20px 4px;
+    padding: 24px 24px 4px;
     border: 1px solid ${token.colorBorderSecondary};
     border-radius: var(--settings-panel-radius);
     background: ${token.colorBgContainer};
@@ -232,7 +227,7 @@ const useStyles = createStyles(({ css, token }) => ({
     margin-top: 16px;
     padding: 12px 14px;
     border: 1px solid ${token.colorBorderSecondary};
-    border-radius: 10px;
+    border-radius: var(--settings-panel-radius);
     background: color-mix(in srgb, ${token.colorBgContainer} 94%, transparent);
     box-shadow: ${token.boxShadowSecondary};
     backdrop-filter: blur(12px);
@@ -434,10 +429,18 @@ const SystemSettingsPage: React.FC = () => {
         className={styles.intro}
         type="info"
         showIcon
-        message="配置直接写入 config.yaml"
-        description="多数设置保存后立即生效；标有「需重启」的项目需重启后端。密钥类字段留空时会保留原值。"
+        message={
+          <span>
+            <Typography.Text strong className={styles.introTitle}>
+              配置直接写入 config.yaml
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              保存后立即生效；「需重启」项除外，密钥留空不修改。
+            </Typography.Text>
+          </span>
+        }
       />
-      <Card className={styles.settingsCard}>
+      <div>
         <Spin spinning={loading} className={styles.loadingArea}>
           {config && (
             <ProForm<API.AppConfig>
@@ -1342,7 +1345,7 @@ const SystemSettingsPage: React.FC = () => {
             </ProForm>
           )}
         </Spin>
-      </Card>
+      </div>
     </PageContainer>
   );
 };
