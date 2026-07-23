@@ -154,30 +154,41 @@ const useStyles = createStyles(({ css, token }) => ({
     }
   `,
   toggleGrid: css`
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
 
     > .ant-form-item {
+      flex: 0 1 320px;
+      min-width: 0;
       margin: 0;
-      padding: 11px 13px;
+      padding: 7px 10px 7px 12px;
       border: 1px solid ${token.colorBorderSecondary};
       border-radius: 8px;
       background: ${token.colorFillAlter};
+      transition:
+        border-color ${token.motionDurationFast},
+        background ${token.motionDurationFast};
+    }
+
+    > .ant-form-item:hover {
+      border-color: ${token.colorBorder};
+      background: ${token.colorFillQuaternary};
     }
 
     > .ant-form-item > .ant-form-item-row {
-      flex-flow: row nowrap;
+      flex-flow: row nowrap !important;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 12px;
     }
 
     > .ant-form-item .ant-form-item-label {
-      flex: 1;
+      flex: 1 1 auto !important;
       min-width: 0;
-      padding: 0;
+      max-width: none;
+      padding: 0 !important;
       text-align: start;
       white-space: normal;
     }
@@ -185,17 +196,31 @@ const useStyles = createStyles(({ css, token }) => ({
     > .ant-form-item .ant-form-item-label > label {
       height: auto;
       color: ${token.colorText};
+      line-height: 20px;
       white-space: normal;
     }
 
     > .ant-form-item .ant-form-item-control {
-      flex: none;
+      flex: 0 0 auto !important;
       width: auto;
       min-width: auto;
+      max-width: none;
+    }
+
+    > .ant-form-item .ant-form-item-control-input {
+      min-height: 24px;
+    }
+
+    > .ant-form-item .ant-form-item-control-input-content {
+      display: flex;
+      align-items: center;
+      line-height: 1;
     }
 
     @media (max-width: 700px) {
-      grid-template-columns: 1fr;
+      > .ant-form-item {
+        flex-basis: 100%;
+      }
     }
   `,
   sectionAlert: css`
@@ -293,6 +318,10 @@ const SystemSettingsPage: React.FC = () => {
   const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
   const [telegramTesting, setTelegramTesting] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const webhookAuthEnabled = Form.useWatch(
+    ['webhook', 'clouddrive2', 'enabled'],
+    form,
+  );
   const webhookToken = Form.useWatch(['webhook', 'clouddrive2', 'token'], form);
 
   const load = useCallback(async () => {
@@ -593,28 +622,38 @@ const SystemSettingsPage: React.FC = () => {
                       <div className={styles.tabPanel}>
                         <SettingsSection
                           title="CloudDrive2 Webhook"
-                          description="为 CloudDrive2 单独创建访问凭据，避免复用管理后台密码或 JWT 密钥。"
+                          description="Webhook 始终接收通知；启用鉴权后，只有携带正确 Bearer Token 的请求才会被接受。"
                         >
                           <Alert
                             className={styles.sectionAlert}
                             type={
-                              secrets['webhook.clouddrive2.token']
-                                ? 'success'
-                                : 'warning'
+                              !webhookAuthEnabled
+                                ? 'info'
+                                : secrets['webhook.clouddrive2.token'] ||
+                                    webhookToken
+                                  ? 'success'
+                                  : 'warning'
                             }
                             showIcon
                             icon={<SafetyCertificateOutlined />}
                             message={
-                              secrets['webhook.clouddrive2.token']
-                                ? 'Webhook Token 已配置'
-                                : '请先配置独立 Token'
+                              !webhookAuthEnabled
+                                ? 'Webhook 鉴权已关闭'
+                                : secrets['webhook.clouddrive2.token'] ||
+                                    webhookToken
+                                  ? 'Webhook Token 已配置'
+                                  : '请先配置独立 Token'
                             }
-                            description="保存后立即生效；出于安全考虑，已保存的 Token 不会再次回显。"
+                            description={
+                              webhookAuthEnabled
+                                ? '保存后立即生效；出于安全考虑，已保存的 Token 不会再次回显。'
+                                : '关闭鉴权不会停用 Webhook，CloudDrive2 通知仍会被正常接收。'
+                            }
                           />
                           <div className={styles.toggleGrid}>
                             <ProFormSwitch
                               name={['webhook', 'clouddrive2', 'enabled']}
-                              label="启用 CloudDrive2 Webhook"
+                              label="启用 Bearer Token 鉴权"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -622,7 +661,7 @@ const SystemSettingsPage: React.FC = () => {
                               width="lg"
                               name={['webhook', 'clouddrive2', 'token']}
                               label="Bearer Token"
-                              tooltip="至少 32 个字符；留空表示保持当前 Token 不变。"
+                              tooltip="启用鉴权时至少 32 个字符；留空表示保持当前 Token 不变。"
                               fieldProps={{
                                 placeholder: secretPlaceholder(
                                   'webhook.clouddrive2.token',
