@@ -155,7 +155,7 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
                 copyable={localDir ? { text: localDir } : false}
               >
                 {localDir ||
-                  '未定位到本地目录（Emby 路径后缀未能在任一映射 LocalPath 下匹配）'}
+                  '未定位到本地目录（若已由 Emby 前缀反推出云端目录，可忽略此项）'}
               </Text>
             </Form.Item>
             <Form.Item label="STRM 文件">
@@ -209,7 +209,7 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
                     required
                     cloudStorageId={opt?.cloud_storage_id}
                     placeholder="云端剧集目录，如 /电视剧/剧名 (2020)"
-                    extra="自动推断自 Emby 本地路径，可手动修正，或点右侧「选择」浏览云端目录后递归重生成。"
+                    extra="优先根据 Emby 路径前缀直接推断，可手动修正，或点右侧「选择」浏览、搜索云端目录后递归重生成。"
                   />
                 );
               }}

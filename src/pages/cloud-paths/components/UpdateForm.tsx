@@ -255,7 +255,7 @@ const UpdateForm: React.FC<UpdateFormProps> = (props) => {
                     name="emby_path_prefix"
                     label="Emby 路径前缀"
                     placeholder="如：/media/tvshows（Emby 容器内看到的前缀）"
-                    tooltip="Emby 上报路径的前缀（媒体服务器/容器视角，常与本地路径不一致）。配置后，缺集「查看位置 / 重生成STRM」会把 Emby 路径里的该前缀替换成上面的「本地路径」，从而确定性地定位真实本地目录，不再依赖路径后缀试探。例：Emby 路径 /media/tvshows/某剧，本地路径 /mnt/strm/tvshows，则此处填 /media/tvshows。留空则回退到原有的后缀试探逻辑。"
+                    tooltip="Emby 上报路径的前缀（媒体服务器/容器视角）。缺集「查看位置 / 重生成STRM」会去掉此前缀，将余下部分直接作为云端目录，不依赖本地挂载。例：Emby 路径 /MediaSTRM_115LongTerm/影视中心/某剧，此处填 /MediaSTRM_115LongTerm，反推出 /影视中心/某剧。若本地路径可访问，也会用于展示本地诊断信息。"
                   />
                   <ProFormSelect
                     width="md"

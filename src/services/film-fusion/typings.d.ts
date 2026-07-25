@@ -53,7 +53,7 @@ declare namespace API {
     source_path: string; // 云盘源路径
     content_prefix?: string; // STRM内容前缀
     local_path?: string; // 本地路径
-    emby_path_prefix?: string; // Emby 上报路径前缀（替换为 local_path 以定位真实本地路径）
+    emby_path_prefix?: string; // Emby 上报路径前缀（去掉后直接得到云端目录）
     link_type: 'strm'; // 链接类型
     filter_rules?: string; // JSON格式的文件扩展名过滤规则，如["mkv","mp4"]
     strm_content_type?: 'openlist' | 'path'; // STRM文件内容类型
@@ -716,6 +716,7 @@ declare namespace API {
     tmdb_refs?: OrganizePreviewTmdbRef[];
     multi_episode_count?: number;
     multi_episode_examples?: string[];
+    all_episodes_exist?: boolean;
     best_version_enabled?: boolean;
     status: OrganizePreviewTaskStatus;
     total: number;
@@ -1324,6 +1325,13 @@ declare namespace API {
     include_unaired?: boolean;
     /** true=忽略「近期已扫」窗口，逐剧强制全量重查 */
     force_full?: boolean;
+  };
+
+  /** 单剧强制重扫结果 */
+  type EmbyMissingSeriesScanResult = {
+    series_id: string;
+    missing_count: number;
+    resolved: boolean;
   };
 
   /** 更新缺集定时设置参数 */

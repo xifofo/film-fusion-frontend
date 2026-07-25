@@ -470,11 +470,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     undefined,
   );
   const deleteSourceFolderAfterApplyRef = useRef(false);
+  const requeuePreviewTaskAfterApplyRef = useRef(false);
   const clearingPreviewTaskStatusRef = useRef<
     API.OrganizePreviewTaskStatus | undefined
   >(undefined);
 
   const [dryRun, setDryRun] = useState(true);
+  const [organizeRequestMode, setOrganizeRequestMode] = useState<
+    'dry' | 'apply'
+  >();
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
   const [activePreviewTask, setActivePreviewTask] =
     useState<API.OrganizePreviewTask>();
@@ -825,16 +829,34 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
           const shouldDeleteSourceFolder =
             deleteSourceFolderAfterApplyRef.current;
+          const shouldRequeuePreviewTask =
+            requeuePreviewTaskAfterApplyRef.current;
           const failedApplyGroups = (payload?.groups || []).filter(
             (group) => !!group.error,
           );
           applyingPreviewTaskRef.current = undefined;
           deleteSourceFolderAfterApplyRef.current = false;
+          requeuePreviewTaskAfterApplyRef.current = false;
           if (appliedPreviewTask && failedApplyGroups.length > 0) {
             messageApi.warning(
               `有 ${failedApplyGroups.length} 个分组整理失败，已保留源目录和预整理任务，未删除其他版本`,
             );
             refreshPreviewTasks();
+          } else if (appliedPreviewTask && shouldRequeuePreviewTask) {
+            requeueOrganizePreviewTask(appliedPreviewTask.id)
+              .then(() => {
+                messageApi.success(
+                  '所选版本整理完成，已保留其他版本并重新加入预整理队列',
+                );
+                refreshPreviewTasks();
+              })
+              .catch((error: any) => {
+                messageApi.warning(
+                  error?.message ||
+                    '所选版本整理完成，但重新生成预整理任务失败，请在队列中手动重试',
+                );
+                refreshPreviewTasks();
+              });
           } else if (appliedPreviewTask) {
             deleteOrganizePreviewTask(
               appliedPreviewTask.id,
@@ -876,9 +898,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       onError: (error: any) => {
         applyingPreviewTaskRef.current = undefined;
         deleteSourceFolderAfterApplyRef.current = false;
+        requeuePreviewTaskAfterApplyRef.current = false;
         messageApi.error(error?.message || '整理失败，请重试');
       },
     },
+  );
+
+  const runOrganizeWithMode = useCallback(
+    (params: API.Organize115CookieParams) => {
+      setOrganizeRequestMode(params.dry_run ? 'dry' : 'apply');
+      return runOrganize(params).finally(() => {
+        setOrganizeRequestMode(undefined);
+      });
+    },
+    [runOrganize],
   );
 
   const { run: runCreatePreviewTasks, loading: createPreviewLoading } =
@@ -1331,7 +1364,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         }
         applyingPreviewTaskRef.current = undefined;
         deleteSourceFolderAfterApplyRef.current = false;
-        runOrganize(organizeParams);
+        requeuePreviewTaskAfterApplyRef.current = false;
+        runOrganizeWithMode(organizeParams);
         return;
       }
 
@@ -1412,7 +1446,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 </Checkbox>
                 <Typography.Text type="secondary">
                   {activeVersionGroup
-                    ? `仅在所选版本整理成功后执行；原文件夹会移入 115 回收站，其中 ${unselectedItemCount} 个未选文件也会一并删除。`
+                    ? `勾选后仅在所选版本整理成功时删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；取消勾选则保留其他版本，并重新生成预整理任务。`
                     : '仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。'}
                 </Typography.Text>
               </Space>
@@ -1425,7 +1459,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             applyingPreviewTaskRef.current = activePreviewTask;
             deleteSourceFolderAfterApplyRef.current =
               !!activePreviewTask && deleteSourceFolder;
-            runOrganize(
+            requeuePreviewTaskAfterApplyRef.current =
+              !!activePreviewTask &&
+              !!activeVersionGroup &&
+              !deleteSourceFolder;
+            runOrganizeWithMode(
               !activePreviewTask && deleteSourceFolder
                 ? { ...organizeParams, delete_source_folder: true }
                 : organizeParams,
@@ -1474,7 +1512,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         onOk: () => {
           applyingPreviewTaskRef.current = undefined;
           deleteSourceFolderAfterApplyRef.current = false;
-          runOrganize(
+          requeuePreviewTaskAfterApplyRef.current = false;
+          runOrganizeWithMode(
             deleteSourceFolder
               ? { ...organizeParams, delete_source_folder: true }
               : organizeParams,
@@ -1491,7 +1530,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       messageApi,
       modalApi,
       resultData?.dry_run,
-      runOrganize,
+      runOrganizeWithMode,
       selectedItemRowsForApply,
       unselectedItemCount,
     ],
@@ -1809,7 +1848,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 140,
+        width: 180,
         fixed: 'left',
         render: (_, row) => {
           const multiEpisodeCount = row.multi_episode_count || 0;
@@ -1817,6 +1856,17 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           return (
             <Space size={[4, 4]} wrap>
               {renderPreviewStatus(row.status)}
+              {row.all_episodes_exist ? (
+                <Tooltip title="预整理结果中的每一集都已在本地媒体库中存在">
+                  <Tag
+                    color="cyan"
+                    icon={<CheckCircleOutlined />}
+                    style={{ marginInlineEnd: 0, whiteSpace: 'nowrap' }}
+                  >
+                    已存在全集
+                  </Tag>
+                </Tooltip>
+              ) : null}
               {multiEpisodeCount > 0 ? (
                 <Tooltip
                   title={`“重命名为”检测到 ${multiEpisodeCount} 个多集命名${
@@ -2881,7 +2931,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           <Button
             icon={<PlayCircleOutlined />}
             onClick={() => triggerOrganize('dry')}
-            loading={organizeLoading && dryRun}
+            loading={organizeLoading && organizeRequestMode === 'dry'}
             disabled={checkedKeys.length === 0}
           >
             预览整理 ({checkedKeys.length})
@@ -2899,7 +2949,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             danger
             icon={<ThunderboltOutlined />}
             onClick={() => triggerOrganize('apply')}
-            loading={organizeLoading && !dryRun}
+            loading={organizeLoading && organizeRequestMode === 'apply'}
             disabled={applyDisabled}
           >
             {applyButtonText}

@@ -20,6 +20,20 @@ export async function scanEmbyMissing(
   });
 }
 
+/** 忽略增量扫描间隔，只重新检查指定剧集 */
+export async function rescanEmbyMissingSeries(
+  seriesId: string,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.EmbyMissingSeriesScanResult>>(
+    `/api/emby-missing/series/${encodeURIComponent(seriesId)}/scan`,
+    {
+      method: 'POST',
+      ...(options || {}),
+    },
+  );
+}
+
 /** 由剧集ID取 Emby 本地路径并反推云端源目录 */
 export async function resolveEmbyMissingCloudPath(
   data: { series_id: string },

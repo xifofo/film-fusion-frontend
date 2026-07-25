@@ -4,6 +4,7 @@ import {
   ScanOutlined,
   SettingOutlined,
   StopOutlined,
+  SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import {
@@ -41,6 +42,7 @@ import {
   getEmbyMissingBlacklist,
   getEmbyMissingLibraries,
   removeEmbyMissingBlacklist,
+  rescanEmbyMissingSeries,
   resolveEmbyMissingCloudPath,
   scanEmbyMissing,
   updateEmbyMissingSetting,
@@ -92,6 +94,7 @@ const EmbyMissingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [blacklistOpen, setBlacklistOpen] = useState(false);
   const [blacklist, setBlacklist] = useState<API.EmbyMissingBlacklist[]>([]);
+  const [rescanningSeriesId, setRescanningSeriesId] = useState('');
   const [pathModal, setPathModal] = useState<{
     open: boolean;
     loading: boolean;
@@ -116,7 +119,7 @@ const EmbyMissingPage: React.FC = () => {
     strmContent: '',
   });
   const [messageApi, contextHolder] = message.useMessage();
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +177,27 @@ const EmbyMissingPage: React.FC = () => {
       }
     } catch (error: any) {
       messageApi.error(error?.message || '加入黑名单失败');
+    }
+  };
+
+  const handleRescanSeries = async (record: API.EmbyMissingSeriesGroup) => {
+    setRescanningSeriesId(record.series_id);
+    try {
+      const res = await rescanEmbyMissingSeries(record.series_id);
+      if (res.code === 0 && res.data) {
+        if (res.data.resolved) {
+          messageApi.success('Emby 已确认补齐，已从缺集列表移除');
+        } else {
+          messageApi.success(`重扫完成，当前仍缺 ${res.data.missing_count} 集`);
+        }
+        await load();
+      } else {
+        messageApi.error(res.message || '单剧重扫失败');
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '单剧重扫失败');
+    } finally {
+      setRescanningSeriesId('');
     }
   };
 
@@ -294,9 +318,31 @@ const EmbyMissingPage: React.FC = () => {
     {
       title: '操作',
       key: 'option',
-      width: 460,
+      width: 550,
       render: (_, record) => (
         <Space size={0} wrap>
+          <Popconfirm
+            title="只重新检查这部剧？"
+            description="请先确保 Emby 已完成媒体库扫描并识别新补齐的剧集。"
+            okText="开始重扫"
+            cancelText="取消"
+            disabled={scanning || !!rescanningSeriesId}
+            onConfirm={() => handleRescanSeries(record)}
+          >
+            <Button
+              type="link"
+              size="small"
+              icon={<SyncOutlined />}
+              loading={rescanningSeriesId === record.series_id}
+              disabled={
+                scanning ||
+                (!!rescanningSeriesId &&
+                  rescanningSeriesId !== record.series_id)
+              }
+            >
+              重扫此剧
+            </Button>
+          </Popconfirm>
           <Button
             type="link"
             size="small"
@@ -507,8 +553,7 @@ const EmbyMissingPage: React.FC = () => {
                 </Text>
               ) : (
                 <Text type="warning">
-                  未定位到本地目录（Emby 路径后缀未能在任一映射 LocalPath
-                  下匹配）
+                  未定位到本地目录（若已由 Emby 前缀反推出云端目录，可忽略此项）
                 </Text>
               )}
             </div>
