@@ -187,8 +187,20 @@ function flattenOrganizeItems(
   }));
 }
 
+function isOrganizeSubtitleItem(row: OrganizeItemRow): boolean {
+  return !!row.is_subtitle;
+}
+
+function flattenOrganizeMediaItems(
+  result?: API.Organize115CookieResult,
+): OrganizeItemRow[] {
+  return flattenOrganizeItems(result).filter(
+    (row) => !isOrganizeSubtitleItem(row),
+  );
+}
+
 function getInitialPreviewSelection(result: API.Organize115CookieResult) {
-  const rows = flattenOrganizeItems(result);
+  const rows = flattenOrganizeMediaItems(result);
   const versionGroups = result.version_groups || [];
   if (versionGroups.length < 2) {
     return {
@@ -1122,7 +1134,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
 
   const flatItemsForTable = useMemo<OrganizeItemRow[]>(
-    () => flattenOrganizeItems(resultData),
+    () => flattenOrganizeMediaItems(resultData),
     [resultData],
   );
 

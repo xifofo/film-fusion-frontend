@@ -609,6 +609,8 @@ declare namespace API {
     file_id: string;
     file_name: string;
     file_size?: number;
+    is_subtitle?: boolean;
+    matched_video_file_id?: string;
     recognize_name?: string;
     recognize_input?: string;
     pickcode?: string;
