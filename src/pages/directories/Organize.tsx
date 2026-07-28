@@ -12,6 +12,7 @@ import {
   PlayCircleOutlined,
   ReloadOutlined,
   SyncOutlined,
+  TagOutlined,
   ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -58,6 +59,7 @@ import React, {
 } from 'react';
 import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import {
+  assignOrganizePreviewTaskTMDB,
   clearOrganizePreviewTasks,
   createOrganizePreviewTasks,
   deleteOrganizePreviewTask,
@@ -237,6 +239,12 @@ function buildTmdbUrl(tmdbId?: string, mediaType?: string): string | undefined {
   const type = (mediaType || '').trim().toLowerCase();
   const isTv = TV_MEDIA_TYPES.has(type);
   return `https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${id}`;
+}
+
+function buildTMDBFolderName(folderName: string, tmdbId: string): string {
+  const baseName = folderName.replace(/\s*\{tmdb(?:id)?-\d+\}/gi, '').trim();
+  const marker = `{tmdb-${tmdbId.trim()}}`;
+  return baseName ? `${baseName} ${marker}` : marker;
 }
 
 function updateTreeData(
@@ -494,6 +502,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
   const [activePreviewTask, setActivePreviewTask] =
     useState<API.OrganizePreviewTask>();
+  const [assignTMDBTask, setAssignTMDBTask] =
+    useState<API.OrganizePreviewTask>();
+  const [assignTMDBID, setAssignTMDBID] = useState('');
+  const [assignTMDBLoading, setAssignTMDBLoading] = useState(false);
   const [rawResponse, setRawResponse] = useState<unknown>();
   const [selectedItemRowKeys, setSelectedItemRowKeys] = useState<React.Key[]>(
     [],
@@ -1001,6 +1013,39 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         messageApi.error(error?.message || '重新加入队列失败');
       },
     });
+
+  const openAssignTMDB = useCallback((task: API.OrganizePreviewTask) => {
+    setAssignTMDBTask(task);
+    setAssignTMDBID('');
+  }, []);
+
+  const closeAssignTMDB = useCallback(() => {
+    if (assignTMDBLoading) return;
+    setAssignTMDBTask(undefined);
+    setAssignTMDBID('');
+  }, [assignTMDBLoading]);
+
+  const confirmAssignTMDB = useCallback(async () => {
+    const tmdbID = assignTMDBID.trim();
+    if (!assignTMDBTask || !/^[1-9]\d{0,19}$/.test(tmdbID)) {
+      messageApi.warning('请输入有效的 TMDB ID');
+      return;
+    }
+    setAssignTMDBLoading(true);
+    try {
+      await assignOrganizePreviewTaskTMDB(assignTMDBTask.id, {
+        tmdb_id: tmdbID,
+      });
+      messageApi.success('源文件夹已重命名，并重新加入预整理队列');
+      setAssignTMDBTask(undefined);
+      setAssignTMDBID('');
+      refreshPreviewTasks();
+    } catch (error: any) {
+      messageApi.error(error?.message || '指定 TMDB ID 失败');
+    } finally {
+      setAssignTMDBLoading(false);
+    }
+  }, [assignTMDBID, assignTMDBTask, messageApi, refreshPreviewTasks]);
 
   const { run: runDeletePreviewTask, loading: deletePreviewLoading } =
     useRequest(deleteOrganizePreviewTask, {
@@ -2059,7 +2104,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {
         title: '操作',
         valueType: 'option',
-        width: 280,
+        width: 360,
         fixed: 'right',
         render: (_, row) => {
           const canView = row.status === 'completed' || row.status === 'failed';
@@ -2086,6 +2131,16 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 onClick={() => runRequeuePreviewTask(row.id)}
               >
                 重跑
+              </Button>
+              <Button
+                size="small"
+                type="link"
+                icon={<TagOutlined />}
+                disabled={isProcessing}
+                loading={assignTMDBLoading && assignTMDBTask?.id === row.id}
+                onClick={() => openAssignTMDB(row)}
+              >
+                指定 TMDB
               </Button>
               {refs.length > 0 ? (
                 <Dropdown
@@ -2142,7 +2197,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     [
       confirmDeletePreviewTask,
       deletePreviewLoading,
+      assignTMDBLoading,
+      assignTMDBTask,
       loadPreviewTaskLoading,
+      openAssignTMDB,
       requeuePreviewLoading,
       runLoadPreviewTask,
       runRequeuePreviewTask,
@@ -2810,6 +2868,64 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title="指定 TMDB ID"
+        open={!!assignTMDBTask}
+        onCancel={closeAssignTMDB}
+        onOk={confirmAssignTMDB}
+        confirmLoading={assignTMDBLoading}
+        okText="重命名并重跑"
+        cancelText="取消"
+        okButtonProps={{
+          disabled: !/^[1-9]\d{0,19}$/.test(assignTMDBID.trim()),
+        }}
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="确认后会重命名 115 源文件夹，并重新运行预整理"
+            description="只需填写数字 ID；系统会自动添加 {tmdb-ID} 标记。已有 TMDB 标记时会替换，不会重复追加。"
+          />
+          <div>
+            <Typography.Text type="secondary">TMDB ID</Typography.Text>
+            <Input
+              autoFocus
+              inputMode="numeric"
+              maxLength={20}
+              addonBefore="TMDB"
+              placeholder="例如 603"
+              value={assignTMDBID}
+              onChange={(event) =>
+                setAssignTMDBID(event.target.value.replace(/\D/g, ''))
+              }
+              onPressEnter={() => {
+                if (/^[1-9]\d{0,19}$/.test(assignTMDBID.trim())) {
+                  void confirmAssignTMDB();
+                }
+              }}
+              style={{ marginTop: 6 }}
+            />
+          </div>
+          <div>
+            <Typography.Text type="secondary">重命名预览</Typography.Text>
+            <Typography.Paragraph
+              code
+              copyable={!!assignTMDBID}
+              style={{ marginTop: 6, marginBottom: 0 }}
+            >
+              {assignTMDBTask
+                ? buildTMDBFolderName(
+                    assignTMDBTask.folder_name || assignTMDBTask.folder_id,
+                    assignTMDBID || 'ID',
+                  )
+                : '-'}
+            </Typography.Paragraph>
+          </div>
+        </Space>
+      </Modal>
 
       <Modal
         title="加入预整理"

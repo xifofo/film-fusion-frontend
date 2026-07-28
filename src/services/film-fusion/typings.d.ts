@@ -758,6 +758,10 @@ declare namespace API {
     status?: OrganizePreviewTaskStatus;
   };
 
+  type AssignOrganizePreviewTaskTMDBParams = {
+    tmdb_id: string;
+  };
+
   type DeleteOrganizePreviewTaskParams = {
     delete_source_folder?: boolean;
   };

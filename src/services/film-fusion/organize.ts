@@ -81,6 +81,22 @@ export async function requeueOrganizePreviewTask(
   );
 }
 
+/** 为源文件夹指定 TMDB ID，重命名后重新加入后台预整理队列 */
+export async function assignOrganizePreviewTaskTMDB(
+  id: number,
+  data: API.AssignOrganizePreviewTaskTMDBParams,
+  options?: { [key: string]: any },
+) {
+  return request<API.Response<API.OrganizePreviewTask>>(
+    `/api/organize/preview-tasks/${id}/assign-tmdb`,
+    {
+      method: 'POST',
+      data,
+      ...(options || {}),
+    },
+  );
+}
+
 /** 删除后台预整理任务 */
 export async function deleteOrganizePreviewTask(
   id: number,
