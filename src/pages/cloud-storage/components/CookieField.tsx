@@ -18,10 +18,7 @@ const CookieField: React.FC<CookieFieldProps> = ({ record }) => {
     ready: is115,
   });
 
-  const status =
-    data?.code === 0
-      ? data.data?.list?.find((s) => s.storage_id === record.id)
-      : undefined;
+  const status = data?.list.find((item) => item.storage_id === record.id);
 
   return (
     <ProFormTextArea

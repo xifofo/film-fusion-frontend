@@ -55,7 +55,9 @@ const ServerLogsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const [messageApi, contextHolder] = message.useMessage();
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  );
 
   // 最新的查询条件引用，供轮询使用，避免闭包过期
   const queryRef = useRef({ file, level, keyword, lines });

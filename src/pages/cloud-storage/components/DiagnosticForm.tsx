@@ -4,6 +4,7 @@ import {
   ProFormItem,
   ProFormTextArea,
 } from '@ant-design/pro-components';
+import { Col } from 'antd';
 import React from 'react';
 import JsonEditor from './JsonEditor';
 import {
@@ -40,26 +41,27 @@ const DiagnosticForm: React.FC<StorageSectionFormProps> = ({
       placeholder="最后错误时间"
       disabled
     />
-    <ProFormItem
-      colProps={FULL_COL}
-      name="config"
-      label="额外配置"
-      tooltip="JSON 格式的额外配置信息"
-      rules={[
-        {
-          validator: async (_, val) => {
-            if (!val || !String(val).trim()) return;
-            try {
-              JSON.parse(val);
-            } catch {
-              throw new Error('额外配置必须是合法的 JSON');
-            }
+    <Col {...FULL_COL}>
+      <ProFormItem
+        name="config"
+        label="额外配置"
+        tooltip="JSON 格式的额外配置信息"
+        rules={[
+          {
+            validator: async (_, val) => {
+              if (!val || !String(val).trim()) return;
+              try {
+                JSON.parse(val);
+              } catch {
+                throw new Error('额外配置必须是合法的 JSON');
+              }
+            },
           },
-        },
-      ]}
-    >
-      <JsonEditor />
-    </ProFormItem>
+        ]}
+      >
+        <JsonEditor />
+      </ProFormItem>
+    </Col>
   </ProForm>
 );
 
