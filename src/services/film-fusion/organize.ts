@@ -53,6 +53,81 @@ export async function getOrganizePreviewTasks(
   );
 }
 
+type OrganizePreviewTaskEventOptions = {
+  signal: AbortSignal;
+  onOpen?: () => void;
+  onEvent: (event: API.OrganizePreviewQueueEvent) => void;
+};
+
+/** 订阅后台预整理队列实时事件；使用 fetch 流以便继续通过请求头携带 Bearer Token */
+export async function subscribeOrganizePreviewTaskEvents(
+  params: Pick<API.OrganizePreviewTaskQueryParams, 'cloud_directory_id'>,
+  options: OrganizePreviewTaskEventOptions,
+) {
+  const query = new URLSearchParams();
+  if (params.cloud_directory_id) {
+    query.set('cloud_directory_id', String(params.cloud_directory_id));
+  }
+  const token =
+    typeof window === 'undefined' ? '' : window.localStorage.getItem('token');
+  const response = await fetch(
+    `/api/organize/preview-tasks/events${query.size ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      cache: 'no-store',
+      signal: options.signal,
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`预整理实时连接失败（HTTP ${response.status}）`);
+  }
+  if (!response.body) {
+    throw new Error('当前浏览器不支持预整理实时连接');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const dispatchBlock = (block: string) => {
+    let eventType = 'message';
+    const dataLines: string[] = [];
+    for (const rawLine of block.split(/\r?\n/)) {
+      const line = rawLine.trimEnd();
+      if (!line || line.startsWith(':')) continue;
+      if (line.startsWith('event:')) {
+        eventType = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    }
+    if (eventType === 'ready') {
+      options.onOpen?.();
+      return;
+    }
+    if (eventType !== 'queue' || dataLines.length === 0) return;
+    options.onEvent(
+      JSON.parse(dataLines.join('\n')) as API.OrganizePreviewQueueEvent,
+    );
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() || '';
+    blocks.forEach(dispatchBlock);
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    dispatchBlock(buffer);
+  }
+}
+
 /** 获取单个后台预整理结果 */
 export async function getOrganizePreviewTask(
   id: number,

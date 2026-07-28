@@ -719,6 +719,7 @@ declare namespace API {
     multi_episode_count?: number;
     multi_episode_examples?: string[];
     all_episodes_exist?: boolean;
+    queue_position?: number;
     best_version_enabled?: boolean;
     status: OrganizePreviewTaskStatus;
     total: number;
@@ -745,6 +746,7 @@ declare namespace API {
     }>;
     interval_seconds?: number;
     recursive_depth?: number;
+    task_limit?: number;
     media_type?: 'movie' | 'tv';
     category?: string;
     best_version_enabled?: boolean;
@@ -785,6 +787,15 @@ declare namespace API {
     total: number;
     interval?: number;
     max_depth?: number;
+    task_limit?: number;
+    limit_reached?: boolean;
+  };
+
+  type OrganizePreviewQueueEvent = {
+    type: string;
+    task_id?: number;
+    cloud_directory_id: number;
+    occurred_at: string;
   };
 
   type OrganizePreviewTaskDetailResult = {

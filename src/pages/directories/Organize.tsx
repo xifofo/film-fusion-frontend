@@ -26,6 +26,7 @@ import {
 import { history, useParams, useRequest } from '@umijs/max';
 import {
   Alert,
+  Badge,
   Breadcrumb,
   Button,
   Card,
@@ -70,6 +71,7 @@ import {
   getOrganizePreviewTasks,
   organize115Cookie,
   requeueOrganizePreviewTask,
+  subscribeOrganizePreviewTaskEvents,
 } from '@/services/film-fusion';
 
 const ROOT_KEY = '0';
@@ -80,6 +82,8 @@ const EPISODE_FILENAME_REGEX_STORAGE_KEY =
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
+const DEFAULT_PREVIEW_TASK_LIMIT = 100;
+const MAX_PREVIEW_TASK_LIMIT = 1000;
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
 type PreviewQueueOptions = {
   mediaType: OrganizeMediaType;
@@ -87,6 +91,7 @@ type PreviewQueueOptions = {
   bestVersionEnabled: boolean;
   intervalSeconds: number;
   recursiveDepth: number;
+  taskLimit: number;
 };
 const mediaTypeOptions: Array<{ label: string; value: OrganizeMediaType }> = [
   { label: '自动', value: 'auto' },
@@ -420,15 +425,52 @@ const previewStatusMeta: Record<
   },
 };
 
-const renderPreviewStatus = (status?: API.OrganizePreviewTaskStatus) => {
+const renderPreviewStatus = (
+  status?: API.OrganizePreviewTaskStatus,
+  queuePosition?: number,
+) => {
   const meta = status ? previewStatusMeta[status] : undefined;
   if (!meta) return <Tag>-</Tag>;
+  const text =
+    status === 'pending' && queuePosition
+      ? `${meta.text} · 第 ${queuePosition} 位`
+      : meta.text;
   return (
     <Tag color={meta.color} icon={meta.icon}>
-      {meta.text}
+      {text}
     </Tag>
   );
 };
+
+type PreviewRealtimeStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'offline';
+
+const previewRealtimeMeta: Record<
+  PreviewRealtimeStatus,
+  { text: string; status: 'success' | 'processing' | 'warning' | 'error' }
+> = {
+  connecting: { text: '实时连接中', status: 'processing' },
+  connected: { text: '实时同步', status: 'success' },
+  reconnecting: { text: '实时重连中', status: 'warning' },
+  offline: { text: '网络离线', status: 'error' },
+};
+
+function formatElapsedSeconds(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}小时${minutes}分${remainingSeconds}秒`;
+  }
+  if (minutes > 0) {
+    return `${minutes}分${remainingSeconds}秒`;
+  }
+  return `${remainingSeconds}秒`;
+}
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-';
@@ -481,10 +523,16 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [previewIntervalDraft, setPreviewIntervalDraft] = useState(45);
   const [previewRecursiveDepthDraft, setPreviewRecursiveDepthDraft] =
     useState(1);
+  const [previewTaskLimitDraft, setPreviewTaskLimitDraft] = useState(
+    DEFAULT_PREVIEW_TASK_LIMIT,
+  );
   const [categoryConfig, setCategoryConfig] =
     useState<API.OrganizeCategoryConfigResult>();
   const [previewIntervalSeconds, setPreviewIntervalSeconds] = useState(45);
   const [previewRecursiveDepth, setPreviewRecursiveDepth] = useState(1);
+  const [previewTaskLimit, setPreviewTaskLimit] = useState(
+    DEFAULT_PREVIEW_TASK_LIMIT,
+  );
   const previewResultRef = useRef<HTMLDivElement>(null);
   const applyingPreviewTaskRef = useRef<API.OrganizePreviewTask | undefined>(
     undefined,
@@ -574,6 +622,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     setPreviewBestVersionDraft(bestVersionEnabled);
     setPreviewIntervalDraft(previewIntervalSeconds);
     setPreviewRecursiveDepthDraft(previewRecursiveDepth);
+    setPreviewTaskLimitDraft(previewTaskLimit);
     setPreviewOptionsOpen(true);
     refreshCategoryConfig();
   }, [
@@ -584,11 +633,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     organizeCategory,
     previewIntervalSeconds,
     previewRecursiveDepth,
+    previewTaskLimit,
     refreshCategoryConfig,
   ]);
 
   const [previewTasksResolvedDirectoryId, setPreviewTasksResolvedDirectoryId] =
     useState<number>();
+  const [previewRealtimeStatus, setPreviewRealtimeStatus] =
+    useState<PreviewRealtimeStatus>('connecting');
+  const [previewClockMs, setPreviewClockMs] = useState(() => Date.now());
+  const previewRealtimeRefreshTimerRef = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined);
   const {
     data: previewTasksData,
     loading: previewTasksLoading,
@@ -601,7 +657,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     {
       ready: Number.isFinite(directoryId) && directoryId > 0,
       refreshDeps: [directoryId],
-      pollingInterval: 8000,
       formatResult: (res) => res.data?.list || [],
       onSuccess: () => setPreviewTasksResolvedDirectoryId(directoryId),
       onError: () => setPreviewTasksResolvedDirectoryId(directoryId),
@@ -609,6 +664,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
   const previewTasksResolved = previewTasksResolvedDirectoryId === directoryId;
   const previewTasks = previewTasksResolved ? previewTasksData || [] : [];
+  const processingPreviewTask = previewTasks.find(
+    (task) => task.status === 'processing',
+  );
+  const queuedPreviewTaskCount = previewTasks.filter(
+    (task) => task.status === 'pending',
+  ).length;
   const previewTasksInitialLoading =
     previewTasksLoading && !previewTasksResolved;
   const [previewTasksManualRefreshing, setPreviewTasksManualRefreshing] =
@@ -623,6 +684,101 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       setPreviewTasksManualRefreshing(false);
     }
   }, [messageApi, refreshPreviewTasks]);
+
+  useEffect(() => {
+    if (!Number.isFinite(directoryId) || directoryId <= 0) {
+      setPreviewRealtimeStatus('offline');
+      return;
+    }
+
+    let stopped = false;
+    let connectedOnce = false;
+    let retryDelay = 1000;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+
+    const scheduleRefresh = () => {
+      if (stopped || previewRealtimeRefreshTimerRef.current) return;
+      previewRealtimeRefreshTimerRef.current = setTimeout(() => {
+        previewRealtimeRefreshTimerRef.current = undefined;
+        void refreshPreviewTasks().catch(() => undefined);
+      }, 120);
+    };
+
+    const connect = async () => {
+      if (stopped) return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setPreviewRealtimeStatus('offline');
+        reconnectTimer = setTimeout(() => void connect(), 3000);
+        return;
+      }
+
+      setPreviewRealtimeStatus(connectedOnce ? 'reconnecting' : 'connecting');
+      controller = new AbortController();
+      try {
+        await subscribeOrganizePreviewTaskEvents(
+          { cloud_directory_id: directoryId },
+          {
+            signal: controller.signal,
+            onOpen: () => {
+              if (stopped) return;
+              connectedOnce = true;
+              retryDelay = 1000;
+              setPreviewRealtimeStatus('connected');
+              scheduleRefresh();
+            },
+            onEvent: () => {
+              if (stopped) return;
+              setPreviewRealtimeStatus('connected');
+              scheduleRefresh();
+            },
+          },
+        );
+      } catch {
+        if (stopped || controller.signal.aborted) return;
+      }
+
+      if (stopped) return;
+      setPreviewRealtimeStatus(
+        typeof navigator !== 'undefined' && !navigator.onLine
+          ? 'offline'
+          : 'reconnecting',
+      );
+      reconnectTimer = setTimeout(() => void connect(), retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 15000);
+    };
+
+    void connect();
+    return () => {
+      stopped = true;
+      controller?.abort();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (previewRealtimeRefreshTimerRef.current) {
+        clearTimeout(previewRealtimeRefreshTimerRef.current);
+        previewRealtimeRefreshTimerRef.current = undefined;
+      }
+    };
+  }, [directoryId, refreshPreviewTasks]);
+
+  useEffect(() => {
+    if (!processingPreviewTask) return;
+    setPreviewClockMs(Date.now());
+    const timer = setInterval(() => setPreviewClockMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [processingPreviewTask]);
+
+  const processingElapsedSeconds = processingPreviewTask?.started_at
+    ? (previewClockMs - new Date(processingPreviewTask.started_at).getTime()) /
+      1000
+    : 0;
+
+  useEffect(() => {
+    if (previewRealtimeStatus === 'connected') return;
+    const timer = setInterval(() => {
+      void refreshPreviewTasks().catch(() => undefined);
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [previewRealtimeStatus, refreshPreviewTasks]);
 
   const registerMeta = useCallback(
     (entries: Array<{ key: string; name: string; parentKey: string }>) => {
@@ -951,7 +1107,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             ? response.data
             : response;
         messageApi.success(
-          `已加入预整理队列${payload?.total ? ` ${payload.total} 个目录` : ''}`,
+          `已加入预整理队列${payload?.total ? ` ${payload.total} 个目录` : ''}${
+            payload?.task_limit ? `（第一层最多 ${payload.task_limit} 个）` : ''
+          }`,
         );
         refreshPreviewTasks();
       },
@@ -1355,6 +1513,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         folders: buildPreviewFolders(),
         interval_seconds: options.intervalSeconds,
         recursive_depth: options.recursiveDepth,
+        task_limit: options.taskLimit,
         ...(options.mediaType !== 'auto'
           ? { media_type: options.mediaType }
           : {}),
@@ -1389,6 +1548,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       bestVersionEnabled: previewBestVersionDraft,
       intervalSeconds: previewIntervalDraft,
       recursiveDepth: previewRecursiveDepthDraft,
+      taskLimit: previewTaskLimitDraft,
     };
     if (triggerPreviewQueue(options)) {
       setOrganizeMediaType(previewMediaTypeDraft);
@@ -1396,6 +1556,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       setBestVersionEnabled(previewBestVersionDraft);
       setPreviewIntervalSeconds(previewIntervalDraft);
       setPreviewRecursiveDepth(previewRecursiveDepthDraft);
+      setPreviewTaskLimit(previewTaskLimitDraft);
       setPreviewOptionsOpen(false);
     }
   }, [
@@ -1404,6 +1565,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     previewIntervalDraft,
     previewMediaTypeDraft,
     previewRecursiveDepthDraft,
+    previewTaskLimitDraft,
     triggerPreviewQueue,
   ]);
 
@@ -1912,7 +2074,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           const multiEpisodeExamples = row.multi_episode_examples || [];
           return (
             <Space size={[4, 4]} wrap>
-              {renderPreviewStatus(row.status)}
+              {renderPreviewStatus(row.status, row.queue_position)}
               {row.all_episodes_exist ? (
                 <Tooltip title="预整理结果中的每一集都已在本地媒体库中存在">
                   <Tag
@@ -2501,7 +2663,37 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
             <ProTable<API.OrganizePreviewTask>
               rowKey="id"
-              headerTitle="后台预整理队列"
+              headerTitle={
+                <Space size={[10, 4]} wrap>
+                  <Typography.Text strong>后台预整理队列</Typography.Text>
+                  <Badge
+                    status={previewRealtimeMeta[previewRealtimeStatus].status}
+                    text={previewRealtimeMeta[previewRealtimeStatus].text}
+                  />
+                  {processingPreviewTask ? (
+                    <Typography.Text
+                      type="secondary"
+                      ellipsis={{
+                        tooltip:
+                          processingPreviewTask.folder_path ||
+                          processingPreviewTask.folder_name ||
+                          processingPreviewTask.folder_id,
+                      }}
+                      style={{ maxWidth: 460 }}
+                    >
+                      正在处理：
+                      {processingPreviewTask.folder_name ||
+                        processingPreviewTask.folder_id}
+                      {' · '}
+                      已用时 {formatElapsedSeconds(processingElapsedSeconds)}
+                    </Typography.Text>
+                  ) : queuedPreviewTaskCount > 0 ? (
+                    <Typography.Text type="secondary">
+                      等待处理 {queuedPreviewTaskCount} 项
+                    </Typography.Text>
+                  ) : null}
+                </Space>
+              }
               size="small"
               search={false}
               options={false}
@@ -3014,6 +3206,31 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               />
             </Col>
           </Row>
+          <div>
+            <Typography.Text type="secondary">第一层目录上限</Typography.Text>
+            <InputNumber
+              min={1}
+              max={MAX_PREVIEW_TASK_LIMIT}
+              step={10}
+              precision={0}
+              addonAfter="个目录"
+              value={previewTaskLimitDraft}
+              onChange={(value) =>
+                setPreviewTaskLimitDraft(
+                  typeof value === 'number'
+                    ? value
+                    : DEFAULT_PREVIEW_TASK_LIMIT,
+                )
+              }
+              style={{ width: '100%', marginTop: 6 }}
+            />
+            <Typography.Text
+              type="secondary"
+              style={{ display: 'block', marginTop: 6, fontSize: 12 }}
+            >
+              只限制第一层直接加入队列的目录，后续递归子目录不计入此上限。
+            </Typography.Text>
+          </div>
           <Space size={8}>
             <Typography.Text type="secondary">最佳版本</Typography.Text>
             <Switch
