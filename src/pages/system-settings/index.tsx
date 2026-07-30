@@ -1776,24 +1776,9 @@ const SystemSettingsPage: React.FC = () => {
                       <div className={styles.tabPanel}>
                         <SettingsSection
                           title="会话签名"
-                          description="管理后台登录会话的签名密钥、有效期与签发者。"
+                          description="管理后台登录会话的有效期与签发者。"
                         >
-                          <Alert
-                            className={styles.sectionAlert}
-                            type="warning"
-                            showIcon
-                            message="修改 JWT 密钥会使所有已登录会话失效"
-                            description="保存后新密钥立即生效，所有用户需要重新登录。"
-                          />
                           <div className={styles.fieldGrid}>
-                            <ProFormText.Password
-                              width="md"
-                              name={['jwt', 'secret']}
-                              label="JWT 密钥"
-                              fieldProps={{
-                                placeholder: secretPlaceholder('jwt.secret'),
-                              }}
-                            />
                             <ProFormDigit
                               width="md"
                               name={['jwt', 'expire_time']}

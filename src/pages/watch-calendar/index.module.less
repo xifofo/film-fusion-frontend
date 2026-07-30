@@ -1,0 +1,2287 @@
+.page {
+  --watch-bg: #07090d;
+  --watch-glass: rgba(10, 12, 16, 0.46);
+  --watch-glass-strong: rgba(7, 9, 12, 0.76);
+  --watch-line: rgba(255, 255, 255, 0.115);
+  --watch-line-soft: rgba(255, 255, 255, 0.07);
+  --watch-text: #f7f7f5;
+  --watch-muted: rgba(255, 255, 255, 0.58);
+  --watch-faint: rgba(255, 255, 255, 0.34);
+  --watch-accent: #1890ff;
+  --watch-accent-foreground: #fff;
+
+  position: relative;
+  min-height: 100svh;
+  overflow-x: hidden;
+  color: var(--watch-text);
+  color-scheme: dark;
+  background: var(--watch-bg);
+  isolation: isolate;
+}
+
+.page,
+.page * {
+  box-sizing: border-box;
+}
+
+.page button,
+.page select {
+  font: inherit;
+}
+
+.page button {
+  color: inherit;
+}
+
+.page button:focus-visible,
+.page select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--watch-accent) 80%, transparent);
+  outline-offset: 3px;
+}
+
+.background {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  overflow: hidden;
+  background: var(--watch-bg);
+  animation: backgroundEnter 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.backgroundSlide {
+  position: absolute;
+  inset: -2%;
+  opacity: 0;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.025);
+  transition: opacity 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: backgroundDrift 24s ease-in-out infinite alternate;
+}
+
+.backgroundSlideActive {
+  opacity: 1;
+}
+
+.backgroundVeil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% -10%, transparent 20%, rgba(2, 3, 5, 0.2) 64%),
+    linear-gradient(180deg, rgba(3, 4, 6, 0.08), rgba(3, 4, 6, 0.58));
+}
+
+.pageContent {
+  width: 100%;
+  min-height: 100svh;
+  padding:
+    max(22px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(28px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+}
+
+.topbar {
+  display: block;
+  width: min(100%, 1640px);
+  min-height: 72px;
+  margin: 0 auto 22px;
+  animation: topbarEnter 650ms 80ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.desktopTopbarLiquid {
+  position: relative;
+  width: 100%;
+  height: 72px;
+}
+
+.desktopTopbarLiquid > div,
+.desktopTopbarLiquid > span {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+}
+
+.desktopTopbarLiquid > span {
+  display: block !important;
+}
+
+.desktopTopbarGlass {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+  border-radius: 25px;
+  background: transparent;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.2);
+}
+
+.desktopTopbarGlass > :global(.glass) {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 25px !important;
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.105), transparent 38%),
+    rgba(8, 10, 13, 0.36);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+}
+
+.desktopTopbarGlass > :global(.glass) > div:last-child {
+  width: 100%;
+  height: 100%;
+}
+
+.desktopTopbarGlass :global(.glass__warp) {
+  border-radius: 25px;
+}
+
+.topbarContent {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: 10px 11px 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.topbarContent::after {
+  position: absolute;
+  top: 1px;
+  right: 10%;
+  left: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.38),
+    transparent
+  );
+  content: "";
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.brand {
+  display: inline-flex;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.brand img {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.2);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.brand:hover img {
+  border-color: rgba(255, 255, 255, 0.27);
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.28);
+  transform: scale(1.045);
+}
+
+.brand:active {
+  transform: scale(0.96);
+}
+
+.brand > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.brand strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand small {
+  color: var(--watch-muted);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+}
+
+.topbarActions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.desktopViewSwitch {
+  display: inline-flex;
+  height: 44px;
+  padding: 3px;
+  border: 1px solid var(--watch-line);
+  border-radius: 15px;
+  align-items: center;
+  background: rgba(7, 9, 12, 0.3);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.desktopViewSwitch button {
+  display: inline-flex;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 11px;
+  align-items: center;
+  gap: 7px;
+  color: var(--watch-muted);
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+}
+
+.desktopViewSwitch button:hover {
+  color: var(--watch-text);
+}
+
+.desktopViewSwitch button:active {
+  transform: scale(0.94);
+}
+
+.desktopViewSwitch button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.desktopViewSwitch .desktopViewSwitchActive {
+  color: var(--watch-text);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--watch-accent) 14%, rgba(255, 255, 255, 0.09)),
+      rgba(255, 255, 255, 0.035)
+    ),
+    rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.desktopViewSwitchActive svg {
+  color: var(--watch-accent);
+}
+
+.userPicker,
+.manageButton {
+  display: inline-flex;
+  height: 44px;
+  border: 1px solid var(--watch-line);
+  border-radius: 15px;
+  align-items: center;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.025)),
+    rgba(7, 9, 12, 0.3);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    0 16px 42px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(14px) saturate(125%);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+}
+
+.userPicker {
+  position: relative;
+  max-width: 250px;
+  padding: 0 13px;
+}
+
+.userPicker > svg:first-child,
+.manageButton svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--watch-muted);
+}
+
+.userPicker > svg:last-child {
+  width: 14px;
+  height: 14px;
+  margin-left: -5px;
+  flex: none;
+  color: var(--watch-faint);
+  pointer-events: none;
+}
+
+.userPicker span {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userPicker select {
+  min-width: 0;
+  max-width: 180px;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  color: inherit;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  background: transparent;
+  cursor: pointer;
+}
+
+.topbarContent .manageButton {
+  padding: 0 15px;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.manageButton:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.manageButton:active {
+  transform: translateY(0) scale(0.92);
+}
+
+.mobileTopbar,
+.mobileMenuBackdrop,
+.mobileMenuPanel,
+.mobileAppBar {
+  display: none;
+}
+
+.workspace {
+  display: grid;
+  width: min(100%, 1640px);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.workspaceWithDetails {
+  grid-template-columns: minmax(0, 1fr) 350px;
+}
+
+.calendarSurface,
+.detailPanel {
+  border: 1px solid var(--watch-line);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--watch-accent) 9%, transparent),
+      transparent 28%
+    ),
+    linear-gradient(180deg, rgba(11, 13, 17, 0.36), rgba(7, 9, 12, 0.54)),
+    var(--watch-glass);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 -1px rgba(255, 255, 255, 0.035),
+    0 34px 100px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(30px) saturate(125%);
+  -webkit-backdrop-filter: blur(30px) saturate(125%);
+}
+
+.calendarSurface {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 32px;
+  animation: surfaceEnter 760ms 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.calendarSurface::before,
+.detailPanel::before {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 8%;
+  left: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.calendarHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 150px;
+  padding: 30px 32px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.monthHeading > p:first-child {
+  margin: 0 0 10px;
+  color: var(--watch-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+}
+
+.monthTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.monthTitle span {
+  color: var(--watch-muted);
+  font-size: 17px;
+  font-weight: 450;
+  letter-spacing: 0.02em;
+}
+
+.monthTitle strong {
+  font-size: clamp(38px, 4.1vw, 62px);
+  font-weight: 580;
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+}
+
+.monthSummary {
+  display: flex;
+  margin: 14px 0 0;
+  align-items: center;
+  gap: 9px;
+  color: var(--watch-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.monthSummary i {
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--watch-faint);
+}
+
+.monthControls {
+  display: inline-flex;
+  padding: 5px;
+  border: 1px solid var(--watch-line);
+  border-radius: 17px;
+  align-items: center;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.02)),
+    rgba(4, 6, 8, 0.34);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.09),
+    0 14px 34px rgba(0, 0, 0, 0.16);
+}
+
+.monthControls button {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  place-items: center;
+  color: var(--watch-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.monthControls button:hover:not(:disabled) {
+  color: var(--watch-text);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.monthControls button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.monthControls button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.monthControls button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.monthControls .todayButton {
+  width: auto;
+  padding: 0 12px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+}
+
+.monthPickerBackdrop {
+  position: fixed;
+  z-index: 60;
+  padding: 0;
+  border: 0;
+  inset: 0;
+  background: rgba(2, 3, 5, 0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: backdropEnter 220ms ease-out both;
+  cursor: default;
+}
+
+.monthPickerPanel {
+  position: fixed;
+  z-index: 70;
+  top: 50%;
+  left: 50%;
+  width: min(370px, calc(100vw - 32px));
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(255, 255, 255, 0.14), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.095), transparent 34%),
+    rgba(8, 10, 13, 0.9);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.13),
+    inset 0 -1px rgba(255, 255, 255, 0.04),
+    0 38px 110px rgba(0, 0, 0, 0.54);
+  backdrop-filter: blur(34px) saturate(128%);
+  -webkit-backdrop-filter: blur(34px) saturate(128%);
+  transform: translate(-50%, -50%);
+  animation: monthPickerEnter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.monthPickerPanel::before {
+  position: absolute;
+  top: 0;
+  right: 14%;
+  left: 14%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.52),
+    transparent
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.monthPickerHandle {
+  display: none;
+}
+
+.monthPickerHeader {
+  display: flex;
+  margin-bottom: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.monthPickerHeader p {
+  margin: 0 0 5px;
+  color: var(--watch-faint);
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.22em;
+}
+
+.monthPickerHeader h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 580;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pickerYearControls {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--watch-line);
+  border-radius: 15px;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.pickerYearControls button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  place-items: center;
+  color: var(--watch-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.pickerYearControls button:hover {
+  color: var(--watch-text);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pickerYearControls button:active {
+  transform: scale(0.92);
+}
+
+.pickerYearControls svg {
+  width: 17px;
+  height: 17px;
+}
+
+.pickerMonthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pickerMonthGrid button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  height: 58px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 17px;
+  place-content: center;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 560;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.05), transparent 55%),
+    rgba(255, 255, 255, 0.025);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pickerMonthGrid button:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--watch-text);
+  background-color: rgba(255, 255, 255, 0.07);
+  transform: translateY(-1px);
+}
+
+.pickerMonthGrid button:active {
+  transform: scale(0.93);
+}
+
+.pickerMonthGrid small {
+  color: var(--watch-faint);
+  font-size: 8px;
+  font-weight: 550;
+  letter-spacing: 0.06em;
+}
+
+.pickerMonthGrid .pickerMonthSelected {
+  border-color: color-mix(in srgb, var(--watch-accent) 52%, transparent);
+  color: var(--watch-accent-foreground);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.34), transparent 48%),
+    var(--watch-accent);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.44),
+    0 12px 30px color-mix(in srgb, var(--watch-accent) 22%, transparent);
+}
+
+.pickerMonthGrid .pickerMonthSelected small {
+  color: color-mix(
+    in srgb,
+    var(--watch-accent-foreground) 64%,
+    transparent
+  );
+}
+
+.pickerMonthCurrent:not(.pickerMonthSelected)::after {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--watch-accent);
+  box-shadow: 0 0 12px
+    color-mix(in srgb, var(--watch-accent) 54%, transparent);
+  content: "";
+}
+
+.monthPickerFooter {
+  display: flex;
+  min-height: 38px;
+  margin-top: 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.monthPickerFooter span {
+  overflow: hidden;
+  color: var(--watch-faint);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthPickerFooter button {
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--watch-line);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.weekdays {
+  display: grid;
+  padding: 0 18px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--watch-line-soft);
+}
+
+.weekdays span {
+  display: grid;
+  height: 42px;
+  place-items: center;
+  color: var(--watch-faint);
+  font-size: 10px;
+  font-weight: 550;
+  letter-spacing: 0.12em;
+}
+
+.weekdays i {
+  display: none;
+  font-style: normal;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  animation: monthEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.calendarDay {
+  position: relative;
+  min-width: 0;
+  min-height: clamp(92px, 11.2vh, 132px);
+  padding: 12px;
+  overflow: hidden;
+  border: 0;
+  border-top: 1px solid var(--watch-line-soft);
+  border-right: 1px solid var(--watch-line-soft);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.006);
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.calendarDay:nth-child(7n) {
+  border-right: 0;
+}
+
+.calendarDay:hover:not(:disabled) {
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.075);
+}
+
+.calendarDay:disabled {
+  cursor: default;
+}
+
+.outsideMonth {
+  color: rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.selectedDay {
+  background: color-mix(in srgb, var(--watch-accent) 9%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--watch-accent) 38%, transparent);
+}
+
+.dayNumber {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+
+.today .dayNumber {
+  color: var(--watch-accent-foreground);
+  background: var(--watch-accent);
+  box-shadow: 0 6px 20px
+    color-mix(in srgb, var(--watch-accent) 30%, transparent);
+}
+
+.dayMeta {
+  position: absolute;
+  top: 17px;
+  right: 12px;
+  overflow: hidden;
+  color: var(--watch-faint);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeDay .dayMeta {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+.posterStrip {
+  position: absolute;
+  right: 11px;
+  bottom: 11px;
+  left: 11px;
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.calendarPoster,
+.hiddenCount {
+  position: relative;
+  display: grid;
+  width: clamp(34px, 3.4vw, 46px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 10px;
+  flex: none;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.025)),
+    #16191e;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px rgba(255, 255, 255, 0.12);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.calendarPoster + .calendarPoster,
+.calendarPoster + .hiddenCount {
+  margin-left: -8px;
+}
+
+.calendarPoster:nth-child(1) {
+  z-index: 4;
+}
+
+.calendarPoster:nth-child(2) {
+  z-index: 3;
+}
+
+.calendarPoster:nth-child(3) {
+  z-index: 2;
+}
+
+.calendarPoster:nth-child(4) {
+  z-index: 1;
+}
+
+.calendarDay:hover .calendarPoster {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36);
+}
+
+.calendarPoster img,
+.recordPoster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.calendarPoster > svg {
+  width: 42%;
+  height: 42%;
+}
+
+.posterCount {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  place-items: center;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1;
+  background: rgba(5, 6, 8, 0.76);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.hiddenCount {
+  z-index: 5;
+  margin-left: -8px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)),
+    rgba(8, 10, 13, 0.88);
+}
+
+.mobileDayCount {
+  display: none;
+}
+
+.loadingOverlay {
+  position: absolute;
+  z-index: 8;
+  inset: 150px 0 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: var(--watch-muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  background: rgba(7, 9, 12, 0.48);
+  backdrop-filter: blur(10px);
+}
+
+.loadingOverlay svg,
+.detailLoading svg {
+  width: 23px;
+  height: 23px;
+  color: var(--watch-accent);
+  animation: spin 900ms linear infinite;
+}
+
+.inlineError,
+.monthError {
+  display: flex;
+  margin: 0 28px 22px;
+  padding: 12px 14px;
+  border: 1px solid
+    color-mix(in srgb, var(--watch-accent) 28%, transparent);
+  border-radius: 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  background: color-mix(
+    in srgb,
+    var(--watch-accent) 14%,
+    rgba(7, 9, 12, 0.72)
+  );
+}
+
+.inlineError button,
+.monthError button {
+  display: inline-flex;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 9px;
+  align-items: center;
+  gap: 6px;
+  color: var(--watch-text);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.09);
+  cursor: pointer;
+}
+
+.inlineError svg,
+.monthError svg {
+  width: 13px;
+  height: 13px;
+}
+
+.monthError {
+  position: absolute;
+  z-index: 9;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  margin: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.emptyState {
+  display: grid;
+  min-height: 500px;
+  padding: 54px 24px;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  border-top: 1px solid var(--watch-line-soft);
+}
+
+.emptyState > svg {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 22px;
+  color: var(--watch-accent);
+  stroke-width: 1.3;
+}
+
+.emptyState h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 560;
+  letter-spacing: -0.025em;
+}
+
+.emptyState p {
+  max-width: 380px;
+  margin: 10px 0 24px;
+  color: var(--watch-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.emptyState button {
+  display: inline-flex;
+  height: 42px;
+  padding: 0 15px;
+  border: 1px solid var(--watch-line);
+  border-radius: 13px;
+  align-items: center;
+  gap: 8px;
+  color: var(--watch-text);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.09);
+  cursor: pointer;
+}
+
+.emptyState button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.detailPanel {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  width: 100%;
+  max-height: calc(100svh - 44px);
+  overflow: hidden;
+  border-radius: 28px;
+  flex-direction: column;
+  animation: detailEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.detailBackdrop,
+.detailHandle {
+  display: none;
+}
+
+.detailHeader {
+  display: flex;
+  padding: 24px 22px 18px;
+  border-bottom: 1px solid var(--watch-line-soft);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.detailHeader p {
+  margin: 0 0 5px;
+  color: var(--watch-muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.detailHeader h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 560;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+.detailHeader > button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--watch-line-soft);
+  border-radius: 12px;
+  flex: none;
+  place-items: center;
+  color: var(--watch-muted);
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+}
+
+.detailHeader button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.recordList {
+  min-height: 0;
+  padding: 8px 10px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-width: thin;
+}
+
+.recordItem {
+  display: flex;
+  margin: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--watch-line-soft);
+  align-items: center;
+  gap: 12px;
+}
+
+.recordPoster {
+  display: grid;
+  width: 52px;
+  height: 66px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 11px;
+  flex: none;
+  place-items: center;
+  color: var(--watch-faint);
+  background: #15181d;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+.recordPoster > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.recordCopy {
+  min-width: 0;
+}
+
+.recordCopy > p {
+  margin: 0 0 3px;
+  color: var(--watch-accent);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+}
+
+.recordCopy h3 {
+  overflow: hidden;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 580;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordCopy > span {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--watch-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordCopy small {
+  display: flex;
+  margin-top: 7px;
+  align-items: center;
+  gap: 4px;
+  color: var(--watch-faint);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recordCopy small svg {
+  width: 11px;
+  height: 11px;
+}
+
+.detailEmpty,
+.detailLoading,
+.detailError {
+  display: grid;
+  min-height: 190px;
+  padding: 30px 18px;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: var(--watch-muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.detailEmpty svg {
+  width: 30px;
+  height: 30px;
+  color: var(--watch-faint);
+  stroke-width: 1.4;
+}
+
+.detailEmpty p {
+  margin: 0;
+}
+
+.detailError button {
+  padding: 7px 11px;
+  border: 1px solid var(--watch-line);
+  border-radius: 10px;
+  color: var(--watch-text);
+  background: rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+}
+
+.loadMore {
+  display: flex;
+  width: calc(100% - 20px);
+  min-height: 44px;
+  margin: 14px 10px 0;
+  padding: 0 14px;
+  border: 1px solid var(--watch-line-soft);
+  border-radius: 13px;
+  align-items: center;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.045);
+  cursor: pointer;
+}
+
+.loadMore span {
+  color: var(--watch-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1240px) {
+  .workspaceWithDetails {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  .calendarHeader {
+    padding-right: 26px;
+    padding-left: 26px;
+  }
+
+  .calendarDay {
+    min-height: 104px;
+  }
+
+  .calendarPoster,
+  .hiddenCount {
+    width: 36px;
+  }
+}
+
+@media (max-width: 1099px) {
+  .workspaceWithDetails {
+    display: block;
+  }
+
+  .detailBackdrop {
+    position: fixed;
+    z-index: 40;
+    display: block;
+    padding: 0;
+    border: 0;
+    inset: 0;
+    background: rgba(2, 3, 5, 0.62);
+    backdrop-filter: blur(5px);
+    animation: backdropEnter 240ms ease-out both;
+    cursor: default;
+  }
+
+  .detailPanel {
+    position: fixed;
+    z-index: 50;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(72svh, 720px);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 28px 28px 0 0;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.105), transparent 28%),
+      rgba(8, 10, 13, 0.9);
+    animation: sheetEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .detailHandle {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 9px auto 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .detailHeader {
+    padding-top: 14px;
+  }
+
+  .recordList {
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-left: max(14px, env(safe-area-inset-left));
+  }
+
+  .recordItem {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .pageContent {
+    padding:
+      max(14px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(112px, calc(env(safe-area-inset-bottom) + 92px))
+      max(12px, env(safe-area-inset-left));
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .mobileTopbar {
+    position: relative;
+    z-index: 55;
+    display: flex;
+    width: 100%;
+    min-height: 50px;
+    margin: 0 auto 12px;
+    padding: 0 2px;
+    align-items: center;
+    justify-content: space-between;
+    animation: topbarEnter 560ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobileLogoButton {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border: 0;
+    border-radius: 15px;
+    place-items: center;
+    background: transparent;
+    cursor: pointer;
+    transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobileLogoButton img {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.08),
+      0 13px 34px rgba(0, 0, 0, 0.3);
+  }
+
+  .mobileLogoButton:active {
+    transform: scale(0.9);
+  }
+
+  .mobileMenuLiquid {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    touch-action: manipulation;
+  }
+
+  .mobileMenuLiquid > div,
+  .mobileMenuLiquid > span {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+  }
+
+  .mobileMenuLiquid > span {
+    display: block !important;
+  }
+
+  .mobileMenuGlass {
+    width: 100% !important;
+    height: 100% !important;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  }
+
+  .mobileMenuGlass > :global(.glass) {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 16px !important;
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--watch-accent) 12%, rgba(255, 255, 255, 0.08)),
+        transparent 52%
+      ),
+      rgba(8, 10, 13, 0.44);
+    backdrop-filter: blur(18px) saturate(132%);
+    -webkit-backdrop-filter: blur(18px) saturate(132%);
+  }
+
+  .mobileMenuGlass > :global(.glass) > div:last-child {
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobileMenuGlass :global(.glass__warp) {
+    border-radius: 16px;
+  }
+
+  .mobileMenuButtonContent,
+  .mobileMenuTrigger {
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobileMenuTrigger {
+    display: grid;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.82);
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobileMenuTrigger svg {
+    width: 19px;
+    height: 19px;
+    stroke-width: 1.8;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.34));
+    transition: transform 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mobileMenuTrigger:active svg {
+    transform: scale(0.78) rotate(-7deg);
+  }
+
+  .mobileMenuBackdrop {
+    position: fixed;
+    z-index: 40;
+    display: block;
+    padding: 0;
+    border: 0;
+    inset: 0;
+    background: rgba(2, 3, 5, 0.22);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: backdropEnter 180ms ease-out both;
+    cursor: default;
+  }
+
+  .mobileMenuPanel {
+    position: fixed;
+    z-index: 50;
+    top: max(76px, calc(env(safe-area-inset-top) + 66px));
+    right: max(14px, env(safe-area-inset-right));
+    display: grid;
+    width: min(286px, calc(100vw - 28px));
+    padding: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 27px;
+    gap: 4px;
+    background:
+      radial-gradient(
+        circle at 88% -8%,
+        color-mix(in srgb, var(--watch-accent) 16%, transparent),
+        transparent 44%
+      ),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.1), transparent 34%),
+      rgba(8, 10, 13, 0.82);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, 0.13),
+      inset 0 -1px rgba(255, 255, 255, 0.04),
+      0 30px 90px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(30px) saturate(130%);
+    -webkit-backdrop-filter: blur(30px) saturate(130%);
+    transform-origin: top right;
+    animation: mobileMenuEnter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .mobileMenuPanel::before {
+    position: absolute;
+    top: 0;
+    right: 15%;
+    left: 15%;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.48),
+      transparent
+    );
+    content: "";
+    pointer-events: none;
+  }
+
+  .mobileMenuUser,
+  .mobileMenuItem {
+    position: relative;
+    display: grid;
+    width: 100%;
+    min-height: 58px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 18px;
+    align-items: center;
+    grid-template-columns: 38px minmax(0, 1fr) 16px;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.88);
+    text-align: left;
+    background: transparent;
+  }
+
+  .mobileMenuUser {
+    background: color-mix(in srgb, var(--watch-accent) 9%, transparent);
+  }
+
+  .mobileMenuItem {
+    cursor: pointer;
+    transition:
+      background-color 180ms ease,
+      transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobileMenuItem:active {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(0.96);
+  }
+
+  .mobileMenuIcon {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    border: 1px solid color-mix(in srgb, var(--watch-accent) 22%, transparent);
+    border-radius: 13px;
+    place-items: center;
+    color: var(--watch-accent);
+    background: color-mix(in srgb, var(--watch-accent) 11%, transparent);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .mobileMenuIcon svg {
+    width: 17px;
+    height: 17px;
+    stroke-width: 1.75;
+  }
+
+  .mobileMenuCopy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .mobileMenuCopy strong,
+  .mobileMenuCopy select {
+    overflow: hidden;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileMenuCopy small {
+    overflow: hidden;
+    color: var(--watch-faint);
+    font-size: 9px;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileMenuCopy select {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .mobileMenuUser > svg,
+  .mobileMenuItem > svg {
+    width: 15px;
+    height: 15px;
+    color: var(--watch-faint);
+    pointer-events: none;
+  }
+
+  .mobileMenuDivider {
+    height: 1px;
+    margin: 3px 12px;
+    background: rgba(255, 255, 255, 0.075);
+  }
+
+  .brand {
+    gap: 9px;
+  }
+
+  .brand img {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .brand strong {
+    max-width: 118px;
+    font-size: 12px;
+  }
+
+  .brand small {
+    font-size: 9px;
+  }
+
+  .topbarActions {
+    gap: 7px;
+  }
+
+  .userPicker,
+  .manageButton {
+    height: 38px;
+    border-radius: 13px;
+  }
+
+  .userPicker {
+    max-width: 122px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .userPicker > svg:first-child {
+    display: none;
+  }
+
+  .userPicker select {
+    max-width: 88px;
+    font-size: 11px;
+  }
+
+  .userPicker span {
+    max-width: 92px;
+    font-size: 11px;
+  }
+
+  .manageButton {
+    display: none;
+  }
+
+  .monthPickerPanel {
+    top: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(12px, env(safe-area-inset-left));
+    width: auto;
+    max-height: calc(100svh - 24px);
+    padding: 18px;
+    border-radius: 27px;
+    transform: none;
+    animation: monthPickerSheetEnter 380ms
+      cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .monthPickerHandle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: -7px auto 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .monthPickerHeader {
+    margin-bottom: 16px;
+  }
+
+  .monthPickerHeader h2 {
+    font-size: 25px;
+  }
+
+  .pickerYearControls button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .pickerMonthGrid {
+    gap: 7px;
+  }
+
+  .pickerMonthGrid button {
+    height: 54px;
+    border-radius: 15px;
+  }
+
+  .monthPickerFooter {
+    margin-top: 13px;
+  }
+
+  .mobileAppBar {
+    position: fixed;
+    z-index: 30;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: max(14px, env(safe-area-inset-left));
+    display: block;
+    width: min(360px, calc(100vw - 28px));
+    height: 68px;
+    margin: 0 auto;
+    animation: appBarEnter 620ms 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    touch-action: manipulation;
+  }
+
+  .mobileAppBarLiquid {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobileAppBarLiquid > div,
+  .mobileAppBarLiquid > span {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+  }
+
+  .mobileAppBarLiquid > span {
+    display: block !important;
+  }
+
+  .mobileAppBarGlass {
+    width: 100% !important;
+    height: 100% !important;
+    border: 0;
+    border-radius: 30px;
+    background: transparent;
+    box-shadow: none !important;
+  }
+
+  .mobileAppBarGlass > :global(.glass) {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 30px !important;
+    background:
+      linear-gradient(150deg, rgba(255, 255, 255, 0.07), transparent 42%),
+      rgba(8, 10, 13, 0.48);
+    box-shadow: none !important;
+    backdrop-filter: blur(18px) saturate(132%);
+    -webkit-backdrop-filter: blur(18px) saturate(132%);
+  }
+
+  .mobileAppBarGlass > :global(.glass) > div:last-child {
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobileAppBarGlass :global(.glass__warp) {
+    border-radius: 30px;
+  }
+
+  .mobileAppBarContent {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    padding: 6px 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    isolation: isolate;
+  }
+
+  .mobileAppBarContent .appBarButton {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-width: 0;
+    min-height: 48px;
+    padding: 5px 8px 4px;
+    border: 0;
+    border-radius: 23px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    font-weight: 590;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color 220ms ease,
+      transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .appBarButton::before {
+    position: absolute;
+    z-index: -1;
+    border: 1px solid transparent;
+    border-radius: inherit;
+    inset: 0;
+    content: "";
+    opacity: 0;
+    transform: scale(0.82);
+    transition:
+      opacity 220ms ease,
+      transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .appBarButton svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.75;
+    transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .mobileAppBarContent .appBarButtonActive {
+    color: rgba(255, 255, 255, 0.96);
+  }
+
+  .appBarButtonActive::before {
+    border-color: transparent;
+    background:
+      radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.12), transparent 58%),
+      rgba(255, 255, 255, 0.075);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.1);
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .appBarButtonActive svg {
+    color: var(--watch-accent);
+    filter: drop-shadow(
+      0 4px 10px color-mix(in srgb, var(--watch-accent) 26%, transparent)
+    );
+  }
+
+  .appBarButton:active {
+    color: #fff;
+    transform: translateY(1px) scale(0.86);
+    transition-duration: 80ms;
+  }
+
+  .appBarButton:active::before {
+    opacity: 1;
+    transform: scale(0.9);
+    transition-duration: 80ms;
+  }
+
+  .appBarButton:active svg {
+    transform: scale(1.12);
+    transition-duration: 80ms;
+  }
+
+  .calendarSurface {
+    border-radius: 23px;
+  }
+
+  .calendarHeader {
+    min-height: 126px;
+    padding: 20px 18px 17px;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .monthHeading > p:first-child {
+    margin-bottom: 7px;
+    font-size: 8px;
+  }
+
+  .monthTitle {
+    display: grid;
+    gap: 2px;
+  }
+
+  .monthTitle span {
+    font-size: 11px;
+  }
+
+  .monthTitle strong {
+    font-size: 34px;
+    line-height: 1;
+  }
+
+  .monthSummary {
+    margin-top: 9px;
+    gap: 6px;
+    font-size: 9px;
+  }
+
+  .monthControls {
+    padding: 4px;
+    border-radius: 15px;
+  }
+
+  .monthControls button {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .monthControls .todayButton {
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .weekdays {
+    padding: 0;
+  }
+
+  .weekdays span {
+    height: 32px;
+    font-size: 10px;
+  }
+
+  .weekdays b {
+    display: none;
+  }
+
+  .weekdays i {
+    display: inline;
+  }
+
+  .calendarDay {
+    min-height: 72px;
+    padding: 5px;
+  }
+
+  .dayNumber {
+    position: absolute;
+    z-index: 4;
+    top: 5px;
+    left: 5px;
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+
+  .dayMeta {
+    display: none;
+  }
+
+  .posterStrip {
+    right: 5px;
+    bottom: 6px;
+    left: 5px;
+  }
+
+  .calendarPoster {
+    width: 29px;
+    border-radius: 8px;
+  }
+
+  .calendarPoster:nth-child(n + 2),
+  .hiddenCount {
+    display: none;
+  }
+
+  .posterCount {
+    display: none;
+  }
+
+  .loadingOverlay {
+    inset: 126px 0 0;
+  }
+
+  .inlineError {
+    margin: 0 16px 16px;
+  }
+
+  .monthError {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+  }
+
+  .emptyState {
+    min-height: 430px;
+  }
+
+  .detailPanel {
+    max-height: 70svh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .detailHeader {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .detailHeader h2 {
+    font-size: 23px;
+  }
+}
+
+@media (max-width: 430px) {
+  .brand small {
+    display: none;
+  }
+
+  .brand strong {
+    max-width: 92px;
+  }
+
+  .userPicker {
+    max-width: 104px;
+  }
+
+  .userPicker select,
+  .userPicker span {
+    max-width: 74px;
+  }
+
+  .monthSummary span:last-child,
+  .monthSummary i:last-of-type {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background,
+  .backgroundSlide,
+  .topbar,
+  .calendarSurface,
+  .calendarGrid,
+  .detailPanel,
+  .detailBackdrop,
+  .monthPickerPanel,
+  .monthPickerBackdrop,
+  .mobileTopbar,
+  .mobileMenuBackdrop,
+  .mobileMenuPanel {
+    animation: none;
+    transition: none;
+  }
+
+  .calendarPoster,
+  .brand,
+  .brand img,
+  .manageButton,
+  .monthControls button,
+  .pickerYearControls button,
+  .pickerMonthGrid button,
+  .mobileLogoButton,
+  .mobileMenuTrigger svg,
+  .mobileMenuItem,
+  .mobileAppBar,
+  .appBarButton,
+  .appBarButton::before,
+  .appBarButton svg {
+    transition: none;
+    animation: none;
+  }
+}
+
+@keyframes backgroundEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backgroundDrift {
+  from {
+    transform: scale(1.025) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.045) translate3d(0.45%, 0.35%, 0);
+  }
+}
+
+@keyframes topbarEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes surfaceEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes monthEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detailEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes backdropEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheetEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 30px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes monthPickerEnter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 18px)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes monthPickerSheetEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes appBarEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes mobileMenuEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, -8px, 0) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -9,7 +9,7 @@ interface CookieFieldProps {
   record: API.CloudStorage;
 }
 
-/** 云存储编辑表单中的 Cookie 字段：Cookie 输入 + 115 Cookie 保活状态/续期操作 */
+/** 云存储编辑表单中的 Cookie 字段：Cookie 输入 + 115 Cookie 保活状态 */
 const CookieField: React.FC<CookieFieldProps> = ({ record }) => {
   // 仅 115open 存储有 cookie 保活能力
   const is115 = record.storage_type === '115open';

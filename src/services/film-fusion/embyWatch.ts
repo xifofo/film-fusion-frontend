@@ -14,11 +14,15 @@ function withToken(
 }
 
 /** Emby 条目图片代理 URL（供 <img src> 使用，自动带 JWT token） */
-export function embyWatchImageUrl(itemId?: string, maxWidth = 200): string {
+export function embyWatchImageUrl(
+  itemId?: string,
+  maxWidth = 200,
+  imageType = 'Primary',
+): string {
   if (!itemId) return '';
   return `/api/emby-watch/image?${withToken({
     item_id: itemId,
-    type: 'Primary',
+    type: imageType,
     max_width: maxWidth,
   })}`;
 }
@@ -144,7 +148,12 @@ export async function getEmbyWatchGallery(
 
 /** 某年月逐日聚合 */
 export async function getEmbyWatchCalendar(
-  params: { emby_user_id: string; year: number; month: number },
+  params: {
+    emby_user_id: string;
+    year: number;
+    month: number;
+    include_items?: boolean;
+  },
   options?: { [key: string]: any },
 ) {
   return apiClient.get<API.Response<API.EmbyWatchCalendarDay[]>>(

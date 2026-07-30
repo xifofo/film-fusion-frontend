@@ -1,4 +1,8 @@
-import { ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import {
+  CalendarOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
 import { Alert, Button, Card, Empty, message, Select, Space, Tabs } from 'antd';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -90,6 +94,9 @@ const EmbyWatchPage: React.FC = () => {
             showSearch
             optionFilterProp="label"
           />
+          <Button href="/watch" icon={<CalendarOutlined />}>
+            打开观影日历
+          </Button>
           <Button
             icon={<ReloadOutlined />}
             onClick={loadUsers}

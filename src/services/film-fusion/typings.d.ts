@@ -1501,7 +1501,6 @@ declare namespace API {
       compress: boolean;
     };
     jwt: {
-      secret: string;
       expire_time: number;
       issuer: string;
     };
@@ -1825,12 +1824,21 @@ declare namespace API {
     years: number[];
   };
 
+  /** 观看记录 - 日历格代表条目（剧集按剧聚合） */
+  type EmbyWatchCalendarItem = {
+    poster_id: string;
+    title: string;
+    item_type: 'Movie' | 'Episode' | string;
+    count: number;
+  };
+
   /** 观看记录 - 日历某天聚合 */
   type EmbyWatchCalendarDay = {
     date: string;
     total: number;
     movie_count: number;
     episode_count: number;
+    items?: EmbyWatchCalendarItem[];
   };
 
   /** 观看记录 - Top 剧集 */

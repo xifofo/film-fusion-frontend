@@ -16,7 +16,9 @@ import {
   getCloudStorageList,
   getWeb115KeepaliveStatus,
 } from '@/services/film-fusion';
-import CookieKeepAlive from './components/CookieKeepAlive';
+import CookieKeepAlive, {
+  CookieRefreshAction,
+} from './components/CookieKeepAlive';
 import CreateForm from './components/CreateForm';
 import ReloginModal from './components/ReloginModal';
 import UpdateForm from './components/UpdateForm';
@@ -289,6 +291,14 @@ const CloudStorageList: React.FC = () => {
           onOk={actionRef.current?.reload}
           values={record}
         />,
+        record.storage_type === '115open' ? (
+          <CookieRefreshAction
+            key="cookie-refresh"
+            record={record}
+            status={cookieStatusMap[record.id]}
+            onChanged={loadCookieStatus}
+          />
+        ) : null,
         <Tooltip key="relogin" title="重新配置云盘授权信息">
           <a
             style={{ color: '#1890ff' }}

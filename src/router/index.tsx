@@ -9,6 +9,7 @@ import { PageLoadingBoundary, PageLoadingIndicator } from '@/components';
 import { useLoadingPresence } from '@/hooks/useLoadingPresence';
 import AppLayout from '@/layouts/AppLayout';
 import Loading from '@/loading';
+import RequireAuth from '@/router/RequireAuth';
 
 const Login = lazy(() => import('@/pages/user/login'));
 const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
@@ -30,6 +31,7 @@ const EmbyMissing = lazy(() => import('@/pages/emby-missing'));
 const EmbyVersionCheck = lazy(() => import('@/pages/emby-version-check'));
 const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
 const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
+const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const RSSMonitor = lazy(() => import('@/pages/rss-monitor'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
@@ -108,6 +110,15 @@ const routes: RouteObject[] = [
   {
     path: '/user/login',
     element: page(<Login />),
+  },
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        path: 'watch',
+        element: page(<WatchCalendar />),
+      },
+    ],
   },
   {
     element: <AppLayout />,
