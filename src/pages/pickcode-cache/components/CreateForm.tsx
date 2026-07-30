@@ -1,7 +1,11 @@
-import { ModalForm, ProFormText, ProFormDigit } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
+import {
+  ModalForm,
+  ProFormDigit,
+  ProFormText,
+} from '@ant-design/pro-components';
 import { message } from 'antd';
 import React from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { createPickcodeCache } from '@/services/film-fusion';
 
 interface CreateFormProps {
@@ -10,10 +14,14 @@ interface CreateFormProps {
   onSuccess: () => void;
 }
 
-const CreateForm: React.FC<CreateFormProps> = ({ open, onClose, onSuccess }) => {
+const CreateForm: React.FC<CreateFormProps> = ({
+  open,
+  onClose,
+  onSuccess,
+}) => {
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run: createRun, loading } = useRequest(createPickcodeCache, {
+  const { run: createRun, loading } = useApiRequest(createPickcodeCache, {
     manual: true,
     onSuccess: () => {
       messageApi.success('创建成功');

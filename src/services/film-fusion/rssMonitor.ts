@@ -1,24 +1,24 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 export async function getRSSMonitorDashboard() {
-  return request<API.Response<API.RSSMonitorDashboard>>('/api/rss-monitor', {
-    method: 'GET',
-  });
+  return apiClient.get<API.Response<API.RSSMonitorDashboard>>(
+    '/api/rss-monitor',
+  );
 }
 
 export async function saveRSSMonitorSettings(
   settings: API.RSSMonitorSettingsInput,
 ) {
-  return request<API.Response<API.RSSMonitorSettings>>(
+  return apiClient.put<API.Response<API.RSSMonitorSettings>>(
     '/api/rss-monitor/settings',
-    { method: 'PUT', data: { settings } },
+    { settings },
   );
 }
 
 export async function createRSSSource(source: API.RSSMonitorSettingsInput) {
-  return request<API.Response<API.RSSMonitorSettings>>(
+  return apiClient.post<API.Response<API.RSSMonitorSettings>>(
     '/api/rss-monitor/sources',
-    { method: 'POST', data: source },
+    source,
   );
 }
 
@@ -26,30 +26,29 @@ export async function updateRSSSource(
   id: number,
   source: API.RSSMonitorSettingsInput,
 ) {
-  return request<API.Response<API.RSSMonitorSettings>>(
+  return apiClient.put<API.Response<API.RSSMonitorSettings>>(
     `/api/rss-monitor/sources/${id}`,
-    { method: 'PUT', data: source },
+    source,
   );
 }
 
 export async function deleteRSSSource(id: number) {
-  return request<API.Response<Record<string, never>>>(
+  return apiClient.delete<API.Response<Record<string, never>>>(
     `/api/rss-monitor/sources/${id}`,
-    { method: 'DELETE' },
   );
 }
 
 export async function refreshRSSMonitor() {
-  return request<API.Response<API.RSSRefreshResult>>(
+  return apiClient.post<API.Response<API.RSSRefreshResult>>(
     '/api/rss-monitor/refresh',
-    { method: 'POST' },
+    undefined,
   );
 }
 
 export async function createRSSRule(rule: API.RSSNotificationRuleInput) {
-  return request<API.Response<API.RSSNotificationRule>>(
+  return apiClient.post<API.Response<API.RSSNotificationRule>>(
     '/api/rss-monitor/rules',
-    { method: 'POST', data: rule },
+    rule,
   );
 }
 
@@ -57,16 +56,15 @@ export async function updateRSSRule(
   id: number,
   rule: API.RSSNotificationRuleInput,
 ) {
-  return request<API.Response<API.RSSNotificationRule>>(
+  return apiClient.put<API.Response<API.RSSNotificationRule>>(
     `/api/rss-monitor/rules/${id}`,
-    { method: 'PUT', data: rule },
+    rule,
   );
 }
 
 export async function deleteRSSRule(id: number) {
-  return request<API.Response<Record<string, never>>>(
+  return apiClient.delete<API.Response<Record<string, never>>>(
     `/api/rss-monitor/rules/${id}`,
-    { method: 'DELETE' },
   );
 }
 
@@ -75,8 +73,8 @@ export async function testRSSRule(data: {
   title: string;
   category: string;
 }) {
-  return request<API.Response<API.RSSRuleTestResult>>(
+  return apiClient.post<API.Response<API.RSSRuleTestResult>>(
     '/api/rss-monitor/rules/test',
-    { method: 'POST', data },
+    data,
   );
 }

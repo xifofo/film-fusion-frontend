@@ -1,50 +1,64 @@
-import React, { useState } from 'react';
-import { Button, Upload, message, Modal, Space } from 'antd';
-import { DownloadOutlined, UploadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { useRequest } from '@umijs/max';
-import { exportCloudPaths, importCloudPaths } from '@/services/film-fusion';
+import {
+  DownloadOutlined,
+  ExclamationCircleOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import { Button, Modal, message, Space, Upload } from 'antd';
+import React, { useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
+import { exportCloudPaths, importCloudPaths } from '@/services/film-fusion';
 
 interface ImportExportActionsProps {
   onSuccess?: () => void;
 }
 
-const ImportExportActions: React.FC<ImportExportActionsProps> = ({ onSuccess }) => {
+const ImportExportActions: React.FC<ImportExportActionsProps> = ({
+  onSuccess,
+}) => {
   const [messageApi, contextHolder] = message.useMessage();
 
   // 导出
-  const { run: exportRun, loading: exportLoading } = useRequest(exportCloudPaths, {
-    manual: true,
-    onSuccess: (data) => {
-      // 创建下载链接
-      const dataStr = JSON.stringify(data, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `cloud-paths-export-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      messageApi.success('导出成功');
+  const { run: exportRun, loading: exportLoading } = useApiRequest(
+    exportCloudPaths,
+    {
+      manual: true,
+      onSuccess: (data) => {
+        // 创建下载链接
+        const dataStr = JSON.stringify(data, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cloud-paths-export-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        messageApi.success('导出成功');
+      },
+      onError: () => {
+        messageApi.error('导出失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('导出失败，请重试');
-    },
-  });
+  );
 
   // 导入
-  const { run: importRun, loading: importLoading } = useRequest(importCloudPaths, {
-    manual: true,
-    onSuccess: (data) => {
-      messageApi.success(`导入完成：成功 ${data.success_count} 个，失败 ${data.error_count} 个`);
-      onSuccess?.();
+  const { run: importRun, loading: importLoading } = useApiRequest(
+    importCloudPaths,
+    {
+      manual: true,
+      onSuccess: (data) => {
+        messageApi.success(
+          `导入完成：成功 ${data.success_count} 个，失败 ${data.error_count} 个`,
+        );
+        onSuccess?.();
+      },
+      onError: () => {
+        messageApi.error('导入失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('导入失败，请重试');
-    },
-  });
+  );
 
   const handleExport = () => {
     exportRun();

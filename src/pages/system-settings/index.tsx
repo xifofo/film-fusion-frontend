@@ -1,7 +1,9 @@
 import {
   KeyOutlined,
+  PictureOutlined,
   SafetyCertificateOutlined,
   SendOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import {
   PageContainer,
@@ -22,6 +24,7 @@ import {
   Tabs,
   Tag,
   Typography,
+  Upload,
 } from 'antd';
 import { createStyles } from 'antd-style';
 import type { ReactNode } from 'react';
@@ -32,6 +35,7 @@ import {
   refreshHDHiveToken,
   saveAppConfig,
   testTelegramNotification,
+  uploadLoginBackground,
 } from '@/services/film-fusion';
 
 const restartTag = (
@@ -240,6 +244,95 @@ const useStyles = createStyles(({ css, token }) => ({
     margin-bottom: 20px;
     line-height: 22px;
   `,
+  backgroundAsset: css`
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+
+    @media (max-width: 760px) {
+      grid-template-columns: 1fr;
+    }
+  `,
+  backgroundPreview: css`
+    position: relative;
+    display: grid;
+    min-width: 0;
+    aspect-ratio: 16 / 9;
+    align-self: start;
+    overflow: hidden;
+    place-items: center;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 10px;
+    background:
+      linear-gradient(45deg, ${token.colorFillAlter} 25%, transparent 25%),
+      linear-gradient(-45deg, ${token.colorFillAlter} 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, ${token.colorFillAlter} 75%),
+      linear-gradient(-45deg, transparent 75%, ${token.colorFillAlter} 75%);
+    background-position:
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0;
+    background-size: 16px 16px;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  `,
+  backgroundPreviewEmpty: css`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 24px;
+    color: ${token.colorTextSecondary};
+    text-align: center;
+
+    .anticon {
+      color: ${token.colorTextQuaternary};
+      font-size: 30px;
+    }
+  `,
+  backgroundUploadPanel: css`
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+  `,
+  backgroundUploader: css`
+    flex: 1;
+
+    &.ant-upload-wrapper .ant-upload-drag {
+      min-height: 126px;
+      border-color: ${token.colorBorder};
+      border-radius: 10px;
+      background: ${token.colorFillAlter};
+    }
+
+    &.ant-upload-wrapper .ant-upload-drag:hover {
+      border-color: ${token.colorText};
+    }
+
+    .ant-upload-drag-icon {
+      margin-bottom: 10px !important;
+    }
+
+    .ant-upload-drag-icon .anticon {
+      color: ${token.colorTextSecondary} !important;
+    }
+  `,
+  backgroundUploadActions: css`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+  `,
   formActions: css`
     position: sticky;
     bottom: 16px;
@@ -317,12 +410,54 @@ const SystemSettingsPage: React.FC = () => {
   const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
   const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
   const [telegramTesting, setTelegramTesting] = useState(false);
+  const [backgroundUploading, setBackgroundUploading] = useState(false);
+  const [backgroundPreviewFailed, setBackgroundPreviewFailed] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const webhookAuthEnabled = Form.useWatch(
     ['webhook', 'clouddrive2', 'enabled'],
     form,
   );
   const webhookToken = Form.useWatch(['webhook', 'clouddrive2', 'token'], form);
+  const loginBackgroundURL = Form.useWatch(
+    ['site', 'login_background_url'],
+    form,
+  );
+  const loginBackgroundSource =
+    Form.useWatch(['site', 'login_background_source'], form) || 'custom';
+  const embyEnabled = Form.useWatch(['emby', 'enabled'], form);
+  const embyURL = Form.useWatch(['emby', 'url'], form);
+  const embyAPIKey = Form.useWatch(['emby', 'api_key'], form);
+  const embyBackgroundAvailable = Boolean(
+    embyEnabled &&
+      embyURL?.trim() &&
+      (embyAPIKey?.trim() || secrets['emby.api_key']),
+  );
+  const tmdbEnabled = Form.useWatch(['tmdb', 'enabled'], form);
+  const tmdbAPIKey = Form.useWatch(['tmdb', 'api_key'], form);
+  const tmdbAccessToken = Form.useWatch(['tmdb', 'access_token'], form);
+  const tmdbCredentialsConfigured = Boolean(
+    tmdbAPIKey?.trim() ||
+      tmdbAccessToken?.trim() ||
+      secrets['tmdb.api_key'] ||
+      secrets['tmdb.access_token'],
+  );
+  const tmdbBackgroundAvailable = Boolean(
+    tmdbEnabled && tmdbCredentialsConfigured,
+  );
+  const unavailableBackgroundSourceHint = [
+    !embyBackgroundAvailable
+      ? 'Emby 来源不可用：请先在「Emby」标签页启用服务，并配置地址和 API Key'
+      : '',
+    !tmdbBackgroundAvailable
+      ? 'TMDB 来源不可用：请先在「TMDB」标签页启用 API，并配置 API Key 或 Access Token'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('；');
+
+  useEffect(() => {
+    setBackgroundPreviewFailed(false);
+  }, [loginBackgroundURL]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -445,6 +580,37 @@ const SystemSettingsPage: React.FC = () => {
     }
   };
 
+  const handleLoginBackgroundUpload = async (file: File) => {
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (file.type && !allowedTypes.has(file.type)) {
+      messageApi.error('仅支持 JPG、PNG 和 WebP 图片');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      messageApi.error('背景图片不能超过 10 MiB');
+      return;
+    }
+
+    setBackgroundUploading(true);
+    try {
+      const response = await uploadLoginBackground(file);
+      if (response.code !== 0 || !response.data?.url) {
+        messageApi.error(response.message || '背景图片上传失败');
+        return;
+      }
+
+      form.setFieldValue(['site', 'login_background_url'], response.data.url);
+      form.setFieldValue(['site', 'login_background_source'], 'custom');
+      messageApi.success(
+        `上传完成（${response.data.width} × ${response.data.height}），点击“保存配置”后生效`,
+      );
+    } catch (error: any) {
+      messageApi.error(error?.message || '背景图片上传失败');
+    } finally {
+      setBackgroundUploading(false);
+    }
+  };
+
   return (
     <PageContainer
       className={styles.page}
@@ -461,10 +627,11 @@ const SystemSettingsPage: React.FC = () => {
         message={
           <span>
             <Typography.Text strong className={styles.introTitle}>
-              配置直接写入 config.yaml
+              配置按用途持久化
             </Typography.Text>
             <Typography.Text type="secondary">
-              保存后立即生效；「需重启」项除外，密钥留空不修改。
+              登录页外观保存到数据库，其余运行配置写入
+              config.yaml；「需重启」项除外。
             </Typography.Text>
           </span>
         }
@@ -608,6 +775,271 @@ const SystemSettingsPage: React.FC = () => {
                             <ProFormSwitch
                               name={['server', 'process_new_media']}
                               label="处理新增媒体事件"
+                            />
+                          </div>
+                        </SettingsSection>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'appearance',
+                    label: '外观设置',
+                    forceRender: true,
+                    children: (
+                      <div className={styles.tabPanel}>
+                        <SettingsSection
+                          title="登录页外观"
+                          description="配置登录页品牌文案、全屏背景及底部备案信息；上传图片会保存在持久化 data 目录。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormText
+                              width="md"
+                              name={['site', 'login_title']}
+                              label="左上角站点标题"
+                              placeholder="例如：Film Fusion"
+                              rules={[
+                                {
+                                  required: true,
+                                  whitespace: true,
+                                  message: '请输入登录页内容标题',
+                                },
+                              ]}
+                            />
+                            <ProFormText
+                              width="md"
+                              name={['site', 'login_subtitle']}
+                              label="左上角站点副标题"
+                              placeholder="例如：简单的 Emby + 网盘辅助工具"
+                              rules={[
+                                {
+                                  required: true,
+                                  whitespace: true,
+                                  message: '请输入登录页内容副标题',
+                                },
+                              ]}
+                            />
+                            <ProFormText
+                              width="md"
+                              name={['site', 'login_form_title']}
+                              label="表单主标题"
+                              placeholder="例如：欢迎回来"
+                              rules={[
+                                {
+                                  required: true,
+                                  whitespace: true,
+                                  message: '请输入登录表单主标题',
+                                },
+                              ]}
+                            />
+                            <ProFormText
+                              width="md"
+                              name={['site', 'login_form_subtitle']}
+                              label="表单说明"
+                              placeholder="例如：使用管理员账户进入控制台"
+                              rules={[
+                                {
+                                  required: true,
+                                  whitespace: true,
+                                  message: '请输入登录表单说明',
+                                },
+                              ]}
+                            />
+                            <ProFormSelect
+                              width="md"
+                              name={['site', 'login_background_source']}
+                              label="背景图片来源"
+                              initialValue="custom"
+                              extra={
+                                unavailableBackgroundSourceHint || undefined
+                              }
+                              options={[
+                                { label: '手动图片', value: 'custom' },
+                                {
+                                  label: embyBackgroundAvailable
+                                    ? 'Emby 媒体库'
+                                    : 'Emby 媒体库（请先完成 Emby 配置）',
+                                  value: 'emby',
+                                  disabled: !embyBackgroundAvailable,
+                                },
+                                {
+                                  label: tmdbBackgroundAvailable
+                                    ? 'TMDB'
+                                    : 'TMDB（请先完成 TMDB 配置）',
+                                  value: 'tmdb',
+                                  disabled: !tmdbBackgroundAvailable,
+                                },
+                              ]}
+                              rules={[
+                                {
+                                  validator: async (_, value) => {
+                                    if (
+                                      value === 'emby' &&
+                                      !embyBackgroundAvailable
+                                    ) {
+                                      throw new Error(
+                                        '请先启用 Emby 服务，并配置 Emby 地址和 API Key',
+                                      );
+                                    }
+                                    if (
+                                      value === 'tmdb' &&
+                                      !tmdbBackgroundAvailable
+                                    ) {
+                                      throw new Error(
+                                        '请先启用 TMDB API，并配置 API Key 或 Access Token',
+                                      );
+                                    }
+                                  },
+                                },
+                              ]}
+                            />
+                            {loginBackgroundSource !== 'custom' && (
+                              <>
+                                <ProFormSelect
+                                  width="md"
+                                  name={['site', 'login_background_mode']}
+                                  label="动态内容"
+                                  initialValue="latest"
+                                  options={[
+                                    { label: '最新内容', value: 'latest' },
+                                    { label: '最流行内容', value: 'popular' },
+                                  ]}
+                                />
+                                <ProFormDigit
+                                  width="md"
+                                  name={['site', 'login_background_interval']}
+                                  label="轮播间隔（秒）"
+                                  initialValue={12}
+                                  min={5}
+                                  max={300}
+                                  fieldProps={{ precision: 0 }}
+                                />
+                                <ProFormDigit
+                                  width="md"
+                                  name={['site', 'login_background_limit']}
+                                  label="轮播图片数量"
+                                  initialValue={10}
+                                  min={1}
+                                  max={20}
+                                  fieldProps={{ precision: 0 }}
+                                />
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                  <Alert
+                                    className={styles.sectionAlert}
+                                    type="info"
+                                    showIcon
+                                    message={
+                                      loginBackgroundSource === 'emby'
+                                        ? '从 Emby 媒体库读取横向 Backdrop'
+                                        : '从 TMDB 电影与剧集榜单读取横向 Backdrop'
+                                    }
+                                    description="登录页会预加载并交叉淡化轮播；动态来源未配置、请求失败或没有剧照时，自动使用下方手动图片。"
+                                  />
+                                </div>
+                              </>
+                            )}
+                            <ProFormText
+                              width="md"
+                              name={['site', 'footer_text']}
+                              label="底部版权文字"
+                              placeholder="例如：Powered by Kumayi"
+                            />
+                            <div className={styles.backgroundAsset}>
+                              <div className={styles.backgroundPreview}>
+                                {loginBackgroundURL &&
+                                !backgroundPreviewFailed ? (
+                                  <img
+                                    alt="当前登录页背景预览"
+                                    onError={() =>
+                                      setBackgroundPreviewFailed(true)
+                                    }
+                                    src={loginBackgroundURL}
+                                  />
+                                ) : (
+                                  <div
+                                    className={styles.backgroundPreviewEmpty}
+                                  >
+                                    <PictureOutlined aria-hidden="true" />
+                                    <span>
+                                      {backgroundPreviewFailed
+                                        ? '当前图片无法加载，请检查 URL 或重新上传'
+                                        : loginBackgroundSource === 'custom'
+                                          ? '当前使用内置黑白渐变背景'
+                                          : '未设置动态来源的回退图片'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className={styles.backgroundUploadPanel}>
+                                <Upload.Dragger
+                                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                                  beforeUpload={async (file) => {
+                                    await handleLoginBackgroundUpload(file);
+                                    return Upload.LIST_IGNORE;
+                                  }}
+                                  className={styles.backgroundUploader}
+                                  disabled={backgroundUploading}
+                                  maxCount={1}
+                                  showUploadList={false}
+                                >
+                                  <p className="ant-upload-drag-icon">
+                                    <UploadOutlined />
+                                  </p>
+                                  <p className="ant-upload-text">
+                                    {backgroundUploading
+                                      ? '正在上传背景图片'
+                                      : '点击或拖拽图片到这里上传'}
+                                  </p>
+                                  <p className="ant-upload-hint">
+                                    JPG / PNG / WebP，最大 10 MiB
+                                  </p>
+                                </Upload.Dragger>
+                                <div className={styles.backgroundUploadActions}>
+                                  <Typography.Text type="secondary">
+                                    文件保存到
+                                    {' data/uploads/login-backgrounds/'}
+                                  </Typography.Text>
+                                  <Button
+                                    disabled={
+                                      !loginBackgroundURL || backgroundUploading
+                                    }
+                                    onClick={() =>
+                                      form.setFieldValue(
+                                        ['site', 'login_background_url'],
+                                        '',
+                                      )
+                                    }
+                                    size="small"
+                                  >
+                                    清除手动背景
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <ProFormText
+                                width="xl"
+                                name={['site', 'login_background_url']}
+                                label={
+                                  loginBackgroundSource === 'custom'
+                                    ? '登录页背景图片 URL'
+                                    : '动态来源失败时的回退图片 URL'
+                                }
+                                tooltip="上传后会自动填写并切换为手动图片；也支持 HTTPS 地址或站内绝对路径"
+                                placeholder="例如：https://example.com/background.jpg"
+                              />
+                            </div>
+                            <ProFormText
+                              width="md"
+                              name={['site', 'icp_number']}
+                              label="ICP备案号"
+                              placeholder="例如：京ICP备12345678号"
+                            />
+                            <ProFormText
+                              width="md"
+                              name={['site', 'police_number']}
+                              label="公安备案号"
+                              placeholder="例如：京公网安备 11000002000001号"
                             />
                           </div>
                         </SettingsSection>

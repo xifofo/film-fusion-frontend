@@ -1,4 +1,3 @@
-import { getEmbyStats } from '@/services/film-fusion';
 import {
   AppstoreOutlined,
   ClockCircleOutlined,
@@ -7,7 +6,6 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import {
   Alert,
   Button,
@@ -23,6 +21,8 @@ import {
   Typography,
 } from 'antd';
 import React, { useMemo } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
+import { getEmbyStats } from '@/services/film-fusion';
 
 const { Text, Title } = Typography;
 
@@ -188,8 +188,7 @@ const LibraryCard: React.FC<{
             style={{
               padding: 12,
               borderRadius: 10,
-              background:
-                'linear-gradient(135deg, #e6f0ff 0%, #f5faff 100%)',
+              background: 'linear-gradient(135deg, #e6f0ff 0%, #f5faff 100%)',
               border: '1px solid #d6e4ff',
             }}
           >
@@ -226,8 +225,7 @@ const LibraryCard: React.FC<{
             style={{
               padding: 12,
               borderRadius: 10,
-              background:
-                'linear-gradient(135deg, #f5e8ff 0%, #fbf5ff 100%)',
+              background: 'linear-gradient(135deg, #f5e8ff 0%, #fbf5ff 100%)',
               border: '1px solid #efdbff',
             }}
           >
@@ -265,12 +263,7 @@ const LibraryCard: React.FC<{
 };
 
 const EmbyStatsPage: React.FC = () => {
-  const {
-    data,
-    loading,
-    refresh,
-    error,
-  } = useRequest(getEmbyStats, {
+  const { data, loading, refresh, error } = useApiRequest(getEmbyStats, {
     formatResult: (res) => res?.data,
   });
 
@@ -332,8 +325,8 @@ const EmbyStatsPage: React.FC = () => {
           message={`部分媒体库统计失败（${stats.partial_errors.length} 项）`}
           description={
             <div style={{ maxHeight: 160, overflow: 'auto' }}>
-              {stats.partial_errors.map((e, i) => (
-                <div key={i} style={{ marginBottom: 2 }}>
+              {stats.partial_errors.map((e) => (
+                <div key={e} style={{ marginBottom: 2 }}>
                   <Text type="warning">· {e}</Text>
                 </div>
               ))}
@@ -378,7 +371,11 @@ const EmbyStatsPage: React.FC = () => {
         <div style={{ marginTop: 24 }}>
           <Space
             align="baseline"
-            style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}
+            style={{
+              marginBottom: 12,
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
           >
             <Title level={5} style={{ margin: 0 }}>
               媒体库明细

@@ -40,7 +40,7 @@ import {
   updateRSSRule,
   updateRSSSource,
 } from '@/services/film-fusion';
-import styles from './index.less';
+import styles from './index.module.less';
 
 const { Text, Link } = Typography;
 

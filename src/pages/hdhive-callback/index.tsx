@@ -1,7 +1,7 @@
 import { PageContainer } from '@ant-design/pro-components';
-import { history } from '@umijs/max';
 import { Button, message, Result, Spin, Typography } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { exchangeHDHiveToken } from '@/services/film-fusion';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
@@ -9,6 +9,7 @@ type CallbackStatus = 'loading' | 'success' | 'error';
 const { Text } = Typography;
 
 const HDHiveCallbackPage: React.FC = () => {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<CallbackStatus>('loading');
   const [detail, setDetail] = useState('');
   const [messageApi, contextHolder] = message.useMessage();
@@ -82,7 +83,7 @@ const HDHiveCallbackPage: React.FC = () => {
             <Button
               key="settings"
               type="primary"
-              onClick={() => history.push('/system-settings')}
+              onClick={() => navigate('/system-settings')}
             >
               返回系统设置
             </Button>,

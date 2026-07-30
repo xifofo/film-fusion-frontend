@@ -1,4 +1,4 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /**
  * 生成 115 目录树 STRM
@@ -12,10 +12,10 @@ import { request } from '@umijs/max';
  * - filter_rules: string (JSON: { include?: string[]; download?: string[] })
  */
 export async function generate115DirectoryTree(formData: FormData) {
-  return request<API.Response<any>>('/api/strm/gen/115-directory-tree', {
-    method: 'POST',
-    data: formData,
-  });
+  return apiClient.post<API.Response<any>>(
+    '/api/strm/gen/115-directory-tree',
+    formData,
+  );
 }
 
 /**
@@ -26,9 +26,9 @@ export async function regenerateStrmDirectory(
   data: { cloud_path_id: number; cloud_dir: string },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<any>>('/api/strm/regenerate-directory', {
-    method: 'POST',
+  return apiClient.post<API.Response<any>>(
+    '/api/strm/regenerate-directory',
     data,
-    ...(options || {}),
-  });
+    { ...(options || {}) },
+  );
 }

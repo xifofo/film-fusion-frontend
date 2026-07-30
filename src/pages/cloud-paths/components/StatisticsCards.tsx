@@ -1,12 +1,14 @@
+import { Card, Col, Row, Statistic } from 'antd';
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic } from 'antd';
-import { useRequest } from '@umijs/max';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { getCloudPathStatistics } from '@/services/film-fusion';
 
 const StatisticsCards: React.FC = () => {
-  const [statistics, setStatistics] = useState<API.CloudPathStatistics | null>(null);
+  const [statistics, setStatistics] = useState<API.CloudPathStatistics | null>(
+    null,
+  );
 
-  const { run, loading } = useRequest(getCloudPathStatistics, {
+  const { run, loading } = useApiRequest(getCloudPathStatistics, {
     manual: true,
     onSuccess: (data) => {
       setStatistics(data);

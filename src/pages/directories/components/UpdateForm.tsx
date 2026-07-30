@@ -7,9 +7,9 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import { Button, message, Tabs } from 'antd';
 import React, { useMemo, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { updateCloudDirectory } from '@/services/film-fusion';
 import DirectoryStrmPreview from './DirectoryStrmPreview';
 
@@ -51,7 +51,7 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
   const [activeTab, setActiveTab] = useState('basic');
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run, loading } = useRequest(updateCloudDirectory, {
+  const { runAsync: run, loading } = useApiRequest(updateCloudDirectory, {
     manual: true,
     onSuccess: () => {
       messageApi.success('更新成功');

@@ -8,10 +8,10 @@ import {
   ProFormSwitch,
   ProFormText,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import { Button, message, Tabs } from 'antd';
 import type { FC } from 'react';
 import { useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { createMatch302, getCloudStorageList } from '@/services/film-fusion';
 import DirectoryPathField from './DirectoryPathField';
 
@@ -57,12 +57,10 @@ const CreateForm: FC<CreateFormProps> = (props) => {
   const [activeTab, setActiveTab] = useState('basic');
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { data: cloudStorageData, loading: cloudStorageLoading } = useRequest(
-    () => getCloudStorageList({ current: 1, pageSize: 1000 }),
-    {
+  const { data: cloudStorageData, loading: cloudStorageLoading } =
+    useApiRequest(() => getCloudStorageList({ current: 1, pageSize: 1000 }), {
       formatResult: (res) => res.data?.list || [],
-    },
-  );
+    });
   const storageOptions = cloudStorageData?.map((item: API.CloudStorage) => ({
     label: `${item.storage_name} (${item.storage_type})`,
     value: item.id,

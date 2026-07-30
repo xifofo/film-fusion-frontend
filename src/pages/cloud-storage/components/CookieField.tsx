@@ -1,7 +1,7 @@
 import { ProFormTextArea } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import { Space } from 'antd';
 import React from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { getWeb115KeepaliveStatus } from '@/services/film-fusion';
 import CookieKeepAlive from './CookieKeepAlive';
 
@@ -14,7 +14,7 @@ const CookieField: React.FC<CookieFieldProps> = ({ record }) => {
   // 仅 115open 存储有 cookie 保活能力
   const is115 = record.storage_type === '115open';
 
-  const { data, refresh } = useRequest(getWeb115KeepaliveStatus, {
+  const { data, refresh } = useApiRequest(getWeb115KeepaliveStatus, {
     ready: is115,
   });
 

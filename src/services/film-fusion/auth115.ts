@@ -1,10 +1,10 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 // 统一响应结构
 export interface ApiResponse<T = any> {
-  code: number;        // 状态码，0表示成功，其他值表示错误
-  message: string;     // 响应消息
-  data: T | null;      // 响应数据，成功时包含具体数据，失败时为null
+  code: number; // 状态码，0表示成功，其他值表示错误
+  message: string; // 响应消息
+  data: T | null; // 响应数据，成功时包含具体数据，失败时为null
 }
 
 export interface Auth115QRCodeRequest {
@@ -27,7 +27,7 @@ export interface Auth115StatusData {
 
 export interface Auth115CompleteRequest {
   session_id: string;
-  storage_id?: number;  // 可选的存储ID，用于更新现有记录
+  storage_id?: number; // 可选的存储ID，用于更新现有记录
 }
 
 export interface Auth115CompleteData {
@@ -38,15 +38,19 @@ export interface Auth115CompleteData {
 }
 
 // 获取授权二维码
-export async function getAuth115QRCode(params: Auth115QRCodeRequest): Promise<Auth115QRCodeData> {
-  const response = await request<ApiResponse<Auth115QRCodeData>>('/api/auth/115/qrcode', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+export async function getAuth115QRCode(
+  params: Auth115QRCodeRequest,
+): Promise<Auth115QRCodeData> {
+  const response = await apiClient.post<ApiResponse<Auth115QRCodeData>>(
+    '/api/auth/115/qrcode',
+    params,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      skipErrorHandler: true,
     },
-    data: params,
-    skipErrorHandler: true,
-  });
+  );
 
   if (response.code !== 0) {
     throw new Error(response.message || '请求失败');
@@ -60,15 +64,19 @@ export async function getAuth115QRCode(params: Auth115QRCodeRequest): Promise<Au
 }
 
 // 检查授权状态
-export async function checkAuth115Status(params: Auth115StatusRequest): Promise<Auth115StatusData> {
-  const response = await request<ApiResponse<Auth115StatusData>>('/api/auth/115/status', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+export async function checkAuth115Status(
+  params: Auth115StatusRequest,
+): Promise<Auth115StatusData> {
+  const response = await apiClient.post<ApiResponse<Auth115StatusData>>(
+    '/api/auth/115/status',
+    params,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      skipErrorHandler: true,
     },
-    data: params,
-    skipErrorHandler: true,
-  });
+  );
 
   if (response.code !== 0) {
     throw new Error(response.message || '请求失败');
@@ -82,15 +90,19 @@ export async function checkAuth115Status(params: Auth115StatusRequest): Promise<
 }
 
 // 完成授权
-export async function completeAuth115(params: Auth115CompleteRequest): Promise<Auth115CompleteData> {
-  const response = await request<ApiResponse<Auth115CompleteData>>('/api/auth/115/complete', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+export async function completeAuth115(
+  params: Auth115CompleteRequest,
+): Promise<Auth115CompleteData> {
+  const response = await apiClient.post<ApiResponse<Auth115CompleteData>>(
+    '/api/auth/115/complete',
+    params,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      skipErrorHandler: true,
     },
-    data: params,
-    skipErrorHandler: true,
-  });
+  );
 
   if (response.code !== 0) {
     throw new Error(response.message || '请求失败');

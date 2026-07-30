@@ -1,37 +1,37 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 用户登录 */
 export async function login(params: API.LoginParams) {
   try {
-    const response = await request<API.Response<API.LoginResult>>('/api/auth/login', {
-      method: 'POST',
-      data: params,
-    });
+    const response = await apiClient.post<API.Response<API.LoginResult>>(
+      '/api/auth/login',
+      params,
+      { skipErrorHandler: true },
+    );
 
     if (response.code !== 0) {
-      return { error: response.message || '登录失败'};
+      return { error: response.message || '登录失败' };
     }
 
     return { response };
   } catch (error: any) {
-    return { error }
+    return { error };
   }
 }
 
 /** 获取当前用户信息 */
 export async function getCurrentUser() {
-  return request<API.Response<API.User>>('/api/me', {
-    method: 'GET',
+  return apiClient.get<API.Response<API.User>>('/api/me', {
     skipErrorHandler: true,
   });
 }
 
 /** 获取用户列表 */
 export async function getUsers(params?: API.PageParams) {
-  return request<API.Response<API.PageResult<API.User>>>('/api/user/list', {
-    method: 'GET',
-    params,
-  });
+  return apiClient.get<API.Response<API.PageResult<API.User>>>(
+    '/api/user/list',
+    { params },
+  );
 }
 
 /** 创建用户 */
@@ -40,10 +40,7 @@ export async function createUser(params: {
   password: string;
   email?: string;
 }) {
-  return request<API.Response<API.User>>('/api/user', {
-    method: 'POST',
-    data: params,
-  });
+  return apiClient.post<API.Response<API.User>>('/api/user', params);
 }
 
 /** 更新用户信息 */
@@ -55,17 +52,12 @@ export async function updateUser(
     avatar?: string;
   },
 ) {
-  return request<API.Response<API.User>>(`/api/user/${id}`, {
-    method: 'PUT',
-    data: params,
-  });
+  return apiClient.put<API.Response<API.User>>(`/api/user/${id}`, params);
 }
 
 /** 删除用户 */
 export async function deleteUser(id: number) {
-  return request<API.Response<any>>(`/api/user/${id}`, {
-    method: 'DELETE',
-  });
+  return apiClient.delete<API.Response<any>>(`/api/user/${id}`);
 }
 
 /** 修改密码 */
@@ -73,15 +65,10 @@ export async function changePassword(params: {
   oldPassword: string;
   newPassword: string;
 }) {
-  return request<API.Response<any>>('/api/user/password', {
-    method: 'PUT',
-    data: params,
-  });
+  return apiClient.put<API.Response<any>>('/api/user/password', params);
 }
 
 /** 用户登出 */
 export async function logout() {
-  return request<API.Response<any>>('/api/auth/logout', {
-    method: 'POST',
-  });
+  return apiClient.post<API.Response<any>>('/api/auth/logout', undefined);
 }

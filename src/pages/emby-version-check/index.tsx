@@ -8,7 +8,6 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import {
   Alert,
   Button,
@@ -29,6 +28,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   getCloudPaths,
   getEmbyVersionCheckStatus,
@@ -195,7 +195,7 @@ const EmbyVersionCheckPage: React.FC = () => {
     data: cloudPathPage,
     loading: cloudPathLoading,
     refresh: refreshCloudPaths,
-  } = useRequest(
+  } = useApiRequest(
     () =>
       getCloudPaths({
         page: 1,
@@ -244,7 +244,7 @@ const EmbyVersionCheckPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchStatus, job?.running, job?.progress]);
 
-  const { run: runScan, loading: scanStarting } = useRequest(
+  const { run: runScan, loading: scanStarting } = useApiRequest(
     scanEmbyVersionCheck,
     {
       manual: true,

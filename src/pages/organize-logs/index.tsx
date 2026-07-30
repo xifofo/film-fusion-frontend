@@ -1,29 +1,29 @@
+import {
+  CheckCircleOutlined,
+  ClearOutlined,
+  CloseCircleOutlined,
+  EyeOutlined,
+  MinusCircleOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import {
   Button,
   Card,
   Col,
-  Drawer,
   Descriptions,
+  Drawer,
   Modal,
+  message,
   Row,
   Statistic,
   Tag,
   Tooltip,
-  message,
 } from 'antd';
-import {
-  ClearOutlined,
-  EyeOutlined,
-  ReloadOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  MinusCircleOutlined,
-} from '@ant-design/icons';
-import React, { useRef, useState } from 'react';
 import dayjs from 'dayjs';
+import React, { useRef, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   clearOrganizeLogs,
   getOrganizeLogList,
@@ -39,7 +39,10 @@ const ACTION_OPTIONS: Record<string, { text: string; color?: string }> = {
   webhook_received: { text: 'Webhook 接收', color: 'gold' },
 };
 
-const STATUS_OPTIONS: Record<string, { text: string; color: string; icon: React.ReactNode }> = {
+const STATUS_OPTIONS: Record<
+  string,
+  { text: string; color: string; icon: React.ReactNode }
+> = {
   success: { text: '成功', color: 'success', icon: <CheckCircleOutlined /> },
   skipped: { text: '跳过', color: 'default', icon: <MinusCircleOutlined /> },
   failed: { text: '失败', color: 'error', icon: <CloseCircleOutlined /> },
@@ -49,7 +52,7 @@ const formatSize = (bytes?: number) => {
   if (!bytes || bytes <= 0) return '-';
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+  return `${(bytes / 1024 ** i).toFixed(2)} ${sizes[i]}`;
 };
 
 const formatDuration = (ms?: number) => {
@@ -63,9 +66,12 @@ const OrganizeLogList: React.FC = () => {
   const [detail, setDetail] = useState<API.OrganizeLog | undefined>();
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { data: stats, refresh: refreshStats } = useRequest(getOrganizeLogStats, {
-    formatResult: (res: any) => res?.data || {},
-  });
+  const { data: stats, refresh: refreshStats } = useApiRequest(
+    getOrganizeLogStats,
+    {
+      formatResult: (res: any) => res?.data || {},
+    },
+  );
 
   // 从 breakdown 中算出汇总指标
   const counts = (() => {
@@ -76,20 +82,24 @@ const OrganizeLogList: React.FC = () => {
     return acc;
   })();
 
-  const { run: clearRun, loading: clearLoading } = useRequest(clearOrganizeLogs, {
-    manual: true,
-    onSuccess: (res: any) => {
-      messageApi.success(`清理成功，共删除 ${res?.deleted_count || 0} 条`);
-      actionRef.current?.reloadAndRest?.();
-      refreshStats();
+  const { run: clearRun, loading: clearLoading } = useApiRequest(
+    clearOrganizeLogs,
+    {
+      manual: true,
+      onSuccess: (res: any) => {
+        messageApi.success(`清理成功，共删除 ${res?.deleted_count || 0} 条`);
+        actionRef.current?.reloadAndRest?.();
+        refreshStats();
+      },
+      onError: (err) => messageApi.error(`清理失败：${err.message}`),
     },
-    onError: (err) => messageApi.error(`清理失败：${err.message}`),
-  });
+  );
 
   const handleClearSuccess = () => {
     Modal.confirm({
       title: '清理所有成功记录？',
-      content: '将删除全部 status=success 的整理日志（保留 skipped 与 failed）。',
+      content:
+        '将删除全部 status=success 的整理日志（保留 skipped 与 failed）。',
       okText: '清理',
       okType: 'danger',
       cancelText: '取消',
@@ -125,7 +135,11 @@ const OrganizeLogList: React.FC = () => {
       ),
       render: (_, record) => {
         const opt = ACTION_OPTIONS[record.action];
-        return <Tag color={opt?.color || 'default'}>{opt?.text || record.action}</Tag>;
+        return (
+          <Tag color={opt?.color || 'default'}>
+            {opt?.text || record.action}
+          </Tag>
+        );
       },
     },
     {
@@ -134,7 +148,10 @@ const OrganizeLogList: React.FC = () => {
       width: 100,
       valueType: 'select',
       valueEnum: Object.fromEntries(
-        Object.entries(STATUS_OPTIONS).map(([k, v]) => [k, { text: v.text, status: v.color }]),
+        Object.entries(STATUS_OPTIONS).map(([k, v]) => [
+          k,
+          { text: v.text, status: v.color },
+        ]),
       ),
       render: (_, record) => {
         const opt = STATUS_OPTIONS[record.status];
@@ -222,7 +239,8 @@ const OrganizeLogList: React.FC = () => {
       valueType: 'dateTimeRange',
       hideInTable: false,
       sorter: false,
-      render: (_, record) => dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) =>
+        dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
       search: {
         transform: (value: any) => {
           if (!value || value.length !== 2) return {};
@@ -263,17 +281,29 @@ const OrganizeLogList: React.FC = () => {
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="成功" value={counts.success} valueStyle={{ color: '#3f8600' }} />
+            <Statistic
+              title="成功"
+              value={counts.success}
+              valueStyle={{ color: '#3f8600' }}
+            />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="跳过" value={counts.skipped} valueStyle={{ color: '#8c8c8c' }} />
+            <Statistic
+              title="跳过"
+              value={counts.skipped}
+              valueStyle={{ color: '#8c8c8c' }}
+            />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="失败" value={counts.failed} valueStyle={{ color: '#cf1322' }} />
+            <Statistic
+              title="失败"
+              value={counts.failed}
+              valueStyle={{ color: '#cf1322' }}
+            />
           </Card>
         </Col>
       </Row>
@@ -294,7 +324,11 @@ const OrganizeLogList: React.FC = () => {
           >
             刷新
           </Button>,
-          <Button key="clearOld" loading={clearLoading} onClick={handleClearOld}>
+          <Button
+            key="clearOld"
+            loading={clearLoading}
+            onClick={handleClearOld}
+          >
             清理 30 天前
           </Button>,
           <Button
@@ -321,7 +355,11 @@ const OrganizeLogList: React.FC = () => {
           };
         }}
         columns={columns}
-        pagination={{ defaultPageSize: 20, showSizeChanger: true, showQuickJumper: true }}
+        pagination={{
+          defaultPageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+        }}
         scroll={{ x: 1400 }}
       />
 
@@ -342,30 +380,51 @@ const OrganizeLogList: React.FC = () => {
                 {STATUS_OPTIONS[detail.status]?.text || detail.status}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="触发">{detail.trigger || '-'}</Descriptions.Item>
+            <Descriptions.Item label="触发">
+              {detail.trigger || '-'}
+            </Descriptions.Item>
             <Descriptions.Item label="源路径">
-              <span style={{ wordBreak: 'break-all' }}>{detail.source || '-'}</span>
+              <span style={{ wordBreak: 'break-all' }}>
+                {detail.source || '-'}
+              </span>
             </Descriptions.Item>
             <Descriptions.Item label="目标路径">
-              <span style={{ wordBreak: 'break-all' }}>{detail.target || '-'}</span>
+              <span style={{ wordBreak: 'break-all' }}>
+                {detail.target || '-'}
+              </span>
             </Descriptions.Item>
-            <Descriptions.Item label="CloudPath ID">{detail.cloud_path_id || '-'}</Descriptions.Item>
+            <Descriptions.Item label="CloudPath ID">
+              {detail.cloud_path_id || '-'}
+            </Descriptions.Item>
             <Descriptions.Item label="CloudStorage">
               {detail.cloud_storage
                 ? `${detail.cloud_storage.storage_name} (${detail.cloud_storage.storage_type})`
                 : detail.cloud_storage_id || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="PickCode">{detail.pick_code || '-'}</Descriptions.Item>
+            <Descriptions.Item label="PickCode">
+              {detail.pick_code || '-'}
+            </Descriptions.Item>
             <Descriptions.Item label="说明">
-              <span style={{ wordBreak: 'break-all' }}>{detail.message || '-'}</span>
+              <span style={{ wordBreak: 'break-all' }}>
+                {detail.message || '-'}
+              </span>
             </Descriptions.Item>
             <Descriptions.Item label="错误">
-              <span style={{ wordBreak: 'break-all', color: detail.error ? '#cf1322' : undefined }}>
+              <span
+                style={{
+                  wordBreak: 'break-all',
+                  color: detail.error ? '#cf1322' : undefined,
+                }}
+              >
                 {detail.error || '-'}
               </span>
             </Descriptions.Item>
-            <Descriptions.Item label="耗时">{formatDuration(detail.duration_ms)}</Descriptions.Item>
-            <Descriptions.Item label="大小">{formatSize(detail.size_bytes)}</Descriptions.Item>
+            <Descriptions.Item label="耗时">
+              {formatDuration(detail.duration_ms)}
+            </Descriptions.Item>
+            <Descriptions.Item label="大小">
+              {formatSize(detail.size_bytes)}
+            </Descriptions.Item>
             <Descriptions.Item label="时间">
               {dayjs(detail.created_at).format('YYYY-MM-DD HH:mm:ss')}
             </Descriptions.Item>

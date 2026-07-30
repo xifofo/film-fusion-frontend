@@ -17,7 +17,6 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import {
   Button,
   Card,
@@ -34,6 +33,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   batchDeletePickcodeCache,
   clearAllPickcodeCache,
@@ -57,7 +57,7 @@ const PickcodeCacheList: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
 
   // 获取统计信息
-  const { data: statsData, refresh: refreshStats } = useRequest(
+  const { data: statsData, refresh: refreshStats } = useApiRequest(
     getPickcodeCacheStats,
     {
       formatResult: (res: any) => res?.data || {},
@@ -65,7 +65,7 @@ const PickcodeCacheList: React.FC = () => {
   );
 
   // 删除单个缓存记录
-  const { run: deleteRun, loading: deleteLoading } = useRequest(
+  const { run: deleteRun, loading: deleteLoading } = useApiRequest(
     deletePickcodeCache,
     {
       manual: true,
@@ -81,7 +81,7 @@ const PickcodeCacheList: React.FC = () => {
   );
 
   // 批量删除缓存记录
-  const { run: batchDeleteRun, loading: batchDeleteLoading } = useRequest(
+  const { run: batchDeleteRun, loading: batchDeleteLoading } = useApiRequest(
     batchDeletePickcodeCache,
     {
       manual: true,
@@ -100,7 +100,7 @@ const PickcodeCacheList: React.FC = () => {
   );
 
   // 清空所有缓存
-  const { run: clearAllRun, loading: clearAllLoading } = useRequest(
+  const { run: clearAllRun, loading: clearAllLoading } = useApiRequest(
     clearAllPickcodeCache,
     {
       manual: true,

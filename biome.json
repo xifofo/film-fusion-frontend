@@ -8,7 +8,7 @@
       "!**/.umi-production/**",
       "!**/.umi-test/**",
       "!**/.umi-test-production/**",
-      "!**/src/services/**",
+      "!**/src/services/**/*.d.ts",
       "!**/mock/**",
       "!**/dist/**",
       "!**/server/**",

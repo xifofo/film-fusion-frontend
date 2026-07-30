@@ -6,9 +6,9 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import { Button, message, Tabs } from 'antd';
 import React, { useEffect, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   createCloudPath,
   getCloudStorageList,
@@ -56,7 +56,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
   const [messageApi, contextHolder] = message.useMessage();
 
   // 获取云存储列表
-  const { run: getStorageList } = useRequest(
+  const { run: getStorageList } = useApiRequest(
     async () => {
       const result = await getCloudStorageList({ current: 1, pageSize: 100 });
       if (result.code === 0 && result.data?.list) {
@@ -74,7 +74,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
   );
 
   // 获取链接类型列表
-  const { run: getLinkTypeList } = useRequest(
+  const { run: getLinkTypeList } = useApiRequest(
     async () => {
       const result = await getLinkTypes();
       if (result.code === 0 && result.data) {
@@ -92,7 +92,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
   );
 
   // 获取STRM内容类型列表
-  const { run: getStrmContentTypeList } = useRequest(
+  const { run: getStrmContentTypeList } = useApiRequest(
     async () => {
       const result = await getStrmContentTypes();
       if (result.code === 0 && result.data) {
@@ -110,7 +110,7 @@ const CreateForm: React.FC<CreateFormProps> = (props) => {
   );
 
   // 创建云路径
-  const { run, loading } = useRequest(createCloudPath, {
+  const { runAsync: run, loading } = useApiRequest(createCloudPath, {
     manual: true,
     onSuccess: () => {
       messageApi.success('创建成功');

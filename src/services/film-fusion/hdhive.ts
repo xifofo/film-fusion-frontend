@@ -1,42 +1,28 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 export async function pingHDHive(options?: { [key: string]: any }) {
-  return request<API.Response<API.HDHiveAPIResponse<Record<string, any>>>>(
-    '/api/hdhive/ping',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
-  );
+  return apiClient.get<
+    API.Response<API.HDHiveAPIResponse<Record<string, any>>>
+  >('/api/hdhive/ping', { ...(options || {}) });
 }
 
 export async function getHDHiveQuota(options?: { [key: string]: any }) {
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveQuota>>>(
+  return apiClient.get<API.Response<API.HDHiveAPIResponse<API.HDHiveQuota>>>(
     '/api/hdhive/quota',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
+    { ...(options || {}) },
   );
 }
 
 export async function getHDHiveUsageToday(options?: { [key: string]: any }) {
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveUsageToday>>>(
-    '/api/hdhive/usage/today',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
-  );
+  return apiClient.get<
+    API.Response<API.HDHiveAPIResponse<API.HDHiveUsageToday>>
+  >('/api/hdhive/usage/today', { ...(options || {}) });
 }
 
 export async function getHDHiveMe(options?: { [key: string]: any }) {
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveMe>>>(
+  return apiClient.get<API.Response<API.HDHiveAPIResponse<API.HDHiveMe>>>(
     '/api/hdhive/me',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
+    { ...(options || {}) },
   );
 }
 
@@ -44,13 +30,9 @@ export async function getHDHiveAuthorizeURL(
   params?: { state?: string; scope?: string; response_mode?: string },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.HDHiveAuthorizeURLResult>>(
+  return apiClient.get<API.Response<API.HDHiveAuthorizeURLResult>>(
     '/api/hdhive/oauth/authorize-url',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -58,24 +40,15 @@ export async function exchangeHDHiveToken(
   data: { code: string; redirect_uri?: string },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveOAuthToken>>>(
-    '/api/hdhive/oauth/exchange',
-    {
-      method: 'POST',
-      data,
-      ...(options || {}),
-    },
-  );
+  return apiClient.post<
+    API.Response<API.HDHiveAPIResponse<API.HDHiveOAuthToken>>
+  >('/api/hdhive/oauth/exchange', data, { ...(options || {}) });
 }
 
 export async function refreshHDHiveToken(options?: { [key: string]: any }) {
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveOAuthToken>>>(
-    '/api/hdhive/oauth/refresh',
-    {
-      method: 'POST',
-      ...(options || {}),
-    },
-  );
+  return apiClient.post<
+    API.Response<API.HDHiveAPIResponse<API.HDHiveOAuthToken>>
+  >('/api/hdhive/oauth/refresh', undefined, { ...(options || {}) });
 }
 
 export async function queryHDHiveResources(
@@ -85,26 +58,22 @@ export async function queryHDHiveResources(
 ) {
   const encodedMediaType = encodeURIComponent(mediaType);
   const encodedTmdbId = encodeURIComponent(tmdbId);
-  return request<API.Response<API.HDHiveAPIResponse<API.HDHiveResource[]>>>(
-    `/api/hdhive/resources/${encodedMediaType}/${encodedTmdbId}`,
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
-  );
+  return apiClient.get<
+    API.Response<API.HDHiveAPIResponse<API.HDHiveResource[]>>
+  >(`/api/hdhive/resources/${encodedMediaType}/${encodedTmdbId}`, {
+    ...(options || {}),
+  });
 }
 
 export async function unlockHDHiveResources(
   data: { slug?: string; slugs?: string[] },
   options?: { [key: string]: any },
 ) {
-  return request<
+  return apiClient.post<
     API.Response<
-      API.HDHiveAPIResponse<API.HDHiveUnlockResult | API.HDHiveBatchUnlockResult>
+      API.HDHiveAPIResponse<
+        API.HDHiveUnlockResult | API.HDHiveBatchUnlockResult
+      >
     >
-  >('/api/hdhive/resources/unlock', {
-    method: 'POST',
-    data,
-    ...(options || {}),
-  });
+  >('/api/hdhive/resources/unlock', data, { ...(options || {}) });
 }

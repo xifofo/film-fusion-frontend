@@ -1,8 +1,17 @@
 import { ExperimentOutlined } from '@ant-design/icons';
-import { Modal, Form, Input, Button, message, Alert, Space, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Modal,
+  message,
+  Space,
+  Typography,
+} from 'antd';
 import type { FC } from 'react';
 import { useState } from 'react';
-import { useRequest } from '@umijs/max';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { testMatch302Redirect } from '@/services/film-fusion';
 
 const { Text, Paragraph } = Typography;
@@ -22,15 +31,18 @@ const TestModal: FC<TestModalProps> = (props) => {
     message?: string;
   } | null>(null);
 
-  const { run: testRun, loading: testLoading } = useRequest(testMatch302Redirect, {
-    manual: true,
-    onSuccess: (result: any) => {
-      setTestResult(result.data);
+  const { run: testRun, loading: testLoading } = useApiRequest(
+    testMatch302Redirect,
+    {
+      manual: true,
+      onSuccess: (result: any) => {
+        setTestResult(result.data);
+      },
+      onError: () => {
+        message.error('测试失败，请重试');
+      },
     },
-    onError: () => {
-      message.error('测试失败，请重试');
-    },
-  });
+  );
 
   const handleTest = async () => {
     if (!record) return;
@@ -71,10 +83,12 @@ const TestModal: FC<TestModalProps> = (props) => {
           <div>
             <Text strong>当前规则：</Text>
             <Paragraph>
-              <Text code>{record.source_path}</Text> → <Text code>{record.target_path}</Text>
+              <Text code>{record.source_path}</Text> →{' '}
+              <Text code>{record.target_path}</Text>
             </Paragraph>
             <Text type="secondary">
-              云存储：{record.cloud_storage?.storage_name} ({record.cloud_storage?.storage_type})
+              云存储：{record.cloud_storage?.storage_name} (
+              {record.cloud_storage?.storage_type})
             </Text>
           </div>
 

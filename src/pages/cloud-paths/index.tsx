@@ -8,20 +8,35 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
-import { Drawer, message, Tag, Popconfirm, Tooltip, Button, Space, Modal, Form, Input, Upload, Select, Card } from 'antd';
-import React, { useRef, useState } from 'react';
 import {
-  getCloudPaths,
-  deleteCloudPath,
+  Button,
+  Card,
+  Drawer,
+  Form,
+  Input,
+  Modal,
+  message,
+  Popconfirm,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Upload,
+} from 'antd';
+import React, { useRef, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
+import {
   batchOperateCloudPaths,
-  replaceStrmContent,
+  deleteCloudPath,
+  generate115DirectoryTree,
+  getCloudPaths,
   // 新增：获取云存储列表与生成 STRM 接口
   getCloudStorageList,
-  generate115DirectoryTree,
+  replaceStrmContent,
 } from '@/services/film-fusion';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
+
 // 移除统计卡片组件
 // import StatisticsCards from './components/StatisticsCards';
 
@@ -43,10 +58,12 @@ const CloudPathList: React.FC = () => {
   const [genForm] = Form.useForm();
   const [worldFile, setWorldFile] = useState<File | undefined>();
   const [genModalOpen, setGenModalOpen] = useState<boolean>(false);
-  const [storageOptions, setStorageOptions] = useState<{ label: string; value: number }[]>([]);
+  const [storageOptions, setStorageOptions] = useState<
+    { label: string; value: number }[]
+  >([]);
 
   // 获取云存储列表
-  const { run: getStorageList, loading: cloudStorageLoading } = useRequest(
+  const { run: getStorageList, loading: cloudStorageLoading } = useApiRequest(
     async () => {
       const result = await getCloudStorageList({ current: 1, pageSize: 100 });
       if (result.code === 0 && result.data?.list) {
@@ -60,9 +77,9 @@ const CloudPathList: React.FC = () => {
     },
     {
       manual: true,
-    }
+    },
   );
-  const { run: delRun, loading: delLoading } = useRequest(deleteCloudPath, {
+  const { run: delRun, loading: delLoading } = useApiRequest(deleteCloudPath, {
     manual: true,
     onSuccess: () => {
       actionRef.current?.reload?.();
@@ -74,17 +91,20 @@ const CloudPathList: React.FC = () => {
   });
 
   // 批量操作
-  const { run: batchRun, loading: batchLoading } = useRequest(batchOperateCloudPaths, {
-    manual: true,
-    onSuccess: () => {
-      messageApi.success('批量操作完成');
-      actionRef.current?.reload?.();
-      setSelectedRowKeys([]);
+  const { run: batchRun, loading: batchLoading } = useApiRequest(
+    batchOperateCloudPaths,
+    {
+      manual: true,
+      onSuccess: () => {
+        messageApi.success('批量操作完成');
+        actionRef.current?.reload?.();
+        setSelectedRowKeys([]);
+      },
+      onError: () => {
+        messageApi.error('批量操作失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('批量操作失败，请重试');
-    },
-  });
+  );
 
   // 批量删除
   const handleBatchDelete = () => {
@@ -99,18 +119,21 @@ const CloudPathList: React.FC = () => {
   };
 
   // 替换 STRM 内容
-  const { run: replaceRun, loading: replaceLoading } = useRequest(replaceStrmContent as any, {
-    manual: true,
-    onSuccess: () => {
-      messageApi.success('替换成功');
-      setReplaceOpen(false);
-      replaceForm.resetFields();
-      actionRef.current?.reload?.();
+  const { run: replaceRun, loading: replaceLoading } = useApiRequest(
+    replaceStrmContent as any,
+    {
+      manual: true,
+      onSuccess: () => {
+        messageApi.success('替换成功');
+        setReplaceOpen(false);
+        replaceForm.resetFields();
+        actionRef.current?.reload?.();
+      },
+      onError: () => {
+        messageApi.error('替换失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('替换失败，请重试');
-    },
-  });
+  );
 
   const openReplaceModal = (record: API.CloudPath) => {
     setReplaceTargetId(record.id);
@@ -133,18 +156,21 @@ const CloudPathList: React.FC = () => {
   };
 
   // 新增：生成 STRM 提交
-  const { run: genRun, loading: genLoading } = useRequest(generate115DirectoryTree as any, {
-    manual: true,
-    onSuccess: () => {
-      messageApi.success('已提交生成任务');
-      genForm.resetFields();
-      setWorldFile(undefined);
-      setGenModalOpen(false);
+  const { run: genRun, loading: genLoading } = useApiRequest(
+    generate115DirectoryTree as any,
+    {
+      manual: true,
+      onSuccess: () => {
+        messageApi.success('已提交生成任务');
+        genForm.resetFields();
+        setWorldFile(undefined);
+        setGenModalOpen(false);
+      },
+      onError: (err: any) => {
+        messageApi.error(err?.message || '提交失败，请重试');
+      },
     },
-    onError: (err: any) => {
-      messageApi.error(err?.message || '提交失败，请重试');
-    },
-  });
+  );
 
   const handleGenSubmit = async () => {
     try {
@@ -156,7 +182,8 @@ const CloudPathList: React.FC = () => {
       const fd = new FormData();
       fd.append('world', worldFile);
       fd.append('cloud_storage_id', String(values.cloud_storage_id));
-      if (values.content_prefix) fd.append('content_prefix', values.content_prefix);
+      if (values.content_prefix)
+        fd.append('content_prefix', values.content_prefix);
       fd.append('save_local_path', values.save_local_path);
       fd.append('filter_rules', (values.filter_rules || '').trim());
       if (values.link_type) fd.append('link_type', values.link_type);
@@ -173,7 +200,8 @@ const CloudPathList: React.FC = () => {
     // 设置默认过滤规则和链接类型
     genForm.setFieldsValue({
       link_type: 'strm',
-      filter_rules: '{"include":[".mp4",".mkv",".avi",".m4v",".mov",".wmv",".flv",".mpg",".mpeg",".rm",".rmvb",".vob",".ts",".tp"],"download":["ass","srt"]}'
+      filter_rules:
+        '{"include":[".mp4",".mkv",".avi",".m4v",".mov",".wmv",".flv",".mpg",".mpeg",".rm",".rmvb",".vob",".ts",".tp"],"download":["ass","srt"]}',
     });
   };
 
@@ -187,7 +215,10 @@ const CloudPathList: React.FC = () => {
     const typeMap = {
       strm: { color: 'blue', text: 'STRM文件' },
     };
-    const config = typeMap[type as keyof typeof typeMap] || { color: 'default', text: type };
+    const config = typeMap[type as keyof typeof typeMap] || {
+      color: 'default',
+      text: type,
+    };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
@@ -197,7 +228,10 @@ const CloudPathList: React.FC = () => {
       clouddrive2: { color: 'cyan', text: 'CloudDrive2' },
       moviepilot2: { color: 'magenta', text: 'MoviePilot2' },
     };
-    const config = typeMap[type as keyof typeof typeMap] || { color: 'default', text: type };
+    const config = typeMap[type as keyof typeof typeMap] || {
+      color: 'default',
+      text: type,
+    };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
@@ -293,7 +327,10 @@ const CloudPathList: React.FC = () => {
           path: { color: 'orange', text: 'Path' },
           openlist: { color: 'purple', text: 'Openlist' },
         };
-        const config = typeMap[text as keyof typeof typeMap] || { color: 'default', text: text || '-' };
+        const config = typeMap[text as keyof typeof typeMap] || {
+          color: 'default',
+          text: text || '-',
+        };
         return <Tag color={config.color}>{config.text}</Tag>;
       },
       valueEnum: {
@@ -545,14 +582,28 @@ const CloudPathList: React.FC = () => {
                 setWorldFile(undefined);
                 genForm.setFieldsValue({ world: undefined });
               }}
-              fileList={worldFile ? [{ uid: 'world', name: worldFile.name, status: 'done' } as any] : []}
+              fileList={
+                worldFile
+                  ? [
+                      {
+                        uid: 'world',
+                        name: worldFile.name,
+                        status: 'done',
+                      } as any,
+                    ]
+                  : []
+              }
             >
               <p className="ant-upload-drag-icon">📄</p>
               <p className="ant-upload-text">点击或拖拽 .txt 文件到此处</p>
               <p className="ant-upload-hint">支持 UTF-8/UTF-16，最大 256MB</p>
             </Upload.Dragger>
           </Form.Item>
-          <Form.Item name="world" hidden rules={[{ required: true, message: '请上传 world 文本文件' }]}>
+          <Form.Item
+            name="world"
+            hidden
+            rules={[{ required: true, message: '请上传 world 文本文件' }]}
+          >
             <Input />
           </Form.Item>
 
@@ -567,7 +618,10 @@ const CloudPathList: React.FC = () => {
               loading={cloudStorageLoading}
               showSearch
               filterOption={(input, option) =>
-                (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                (option?.label ?? '')
+                  .toString()
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
               }
             />
           </Form.Item>
@@ -579,9 +633,7 @@ const CloudPathList: React.FC = () => {
           >
             <Select
               placeholder="请选择链接类型"
-              options={[
-                { label: 'STRM文件', value: 'strm' },
-              ]}
+              options={[{ label: 'STRM文件', value: 'strm' }]}
             />
           </Form.Item>
 
@@ -606,11 +658,18 @@ const CloudPathList: React.FC = () => {
                 validator: (_, value) => {
                   try {
                     const obj = JSON.parse((value || '').trim());
-                    if (!obj || typeof obj !== 'object') return Promise.reject(new Error('必须是 JSON 对象'));
-                    const include = Array.isArray(obj.include) ? obj.include.filter((s: any) => !!s) : [];
-                    const download = Array.isArray(obj.download) ? obj.download.filter((s: any) => !!s) : [];
+                    if (!obj || typeof obj !== 'object')
+                      return Promise.reject(new Error('必须是 JSON 对象'));
+                    const include = Array.isArray(obj.include)
+                      ? obj.include.filter((s: any) => !!s)
+                      : [];
+                    const download = Array.isArray(obj.download)
+                      ? obj.download.filter((s: any) => !!s)
+                      : [];
                     if (include.length === 0 && download.length === 0) {
-                      return Promise.reject(new Error('include 或 download 至少一个非空'));
+                      return Promise.reject(
+                        new Error('include 或 download 至少一个非空'),
+                      );
                     }
                     return Promise.resolve();
                   } catch {

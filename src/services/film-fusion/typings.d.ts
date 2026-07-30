@@ -1471,6 +1471,20 @@ declare namespace API {
         trusted_proxy_cidrs: string[];
       };
     };
+    site: {
+      login_title: string;
+      login_subtitle: string;
+      login_form_title: string;
+      login_form_subtitle: string;
+      login_background_url: string;
+      login_background_source: 'custom' | 'emby' | 'tmdb';
+      login_background_mode: 'latest' | 'popular';
+      login_background_interval: number;
+      login_background_limit: number;
+      footer_text: string;
+      icp_number: string;
+      police_number: string;
+    };
     webhook: {
       clouddrive2: {
         enabled: boolean;
@@ -1562,6 +1576,29 @@ declare namespace API {
       timeout_seconds: number;
     };
     file_watcher?: any;
+  };
+
+  /** 登录前可读取的公开站点配置 */
+  type PublicAppConfig = {
+    login_title: string;
+    login_subtitle: string;
+    login_form_title?: string;
+    login_form_subtitle?: string;
+    login_background_url?: string;
+    login_background_source?: 'custom' | 'emby' | 'tmdb';
+    login_background_mode?: 'latest' | 'popular';
+    login_background_interval?: number;
+    login_backgrounds?: string[];
+    footer_text?: string;
+    icp_number?: string;
+    police_number?: string;
+  };
+
+  type LoginBackgroundUploadResult = {
+    url: string;
+    width: number;
+    height: number;
+    size: number;
   };
 
   type EmbyImageProfileKey =

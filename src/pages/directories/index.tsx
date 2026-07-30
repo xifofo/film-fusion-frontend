@@ -8,9 +8,10 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { history, useRequest } from '@umijs/max';
 import { Button, Drawer, message, Popconfirm, Space, Tag, Tooltip } from 'antd';
 import React, { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   deleteCloudDirectory,
   getCloudDirectoryList,
@@ -20,6 +21,7 @@ import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
 
 const DirectoryList: React.FC = () => {
+  const navigate = useNavigate();
   const actionRef = useRef<ActionType | null>(null);
 
   const [showDetail, setShowDetail] = useState(false);
@@ -28,7 +30,7 @@ const DirectoryList: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
 
   const { data: cloudStorageData = [], loading: cloudStorageLoading } =
-    useRequest(() => getCloudStorageList({ current: 1, pageSize: 1000 }), {
+    useApiRequest(() => getCloudStorageList({ current: 1, pageSize: 1000 }), {
       formatResult: (res) => res.data?.list || [],
     });
 
@@ -41,7 +43,7 @@ const DirectoryList: React.FC = () => {
     [cloudStorageData],
   );
 
-  const { run: delRun, loading: delLoading } = useRequest(
+  const { run: delRun, loading: delLoading } = useApiRequest(
     deleteCloudDirectory,
     {
       manual: true,
@@ -224,7 +226,7 @@ const DirectoryList: React.FC = () => {
           <Button
             type="link"
             size="small"
-            onClick={() => history.push(`/directories/organize/${record.id}`)}
+            onClick={() => navigate(`/directories/organize/${record.id}`)}
           >
             整理
           </Button>

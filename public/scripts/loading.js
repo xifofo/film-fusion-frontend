@@ -1,202 +1,104 @@
 /**
- * loading 占位
- * 解决首次加载时白屏的问题
+ * React 启动前的轻量占位，与应用内的传统圆形 Loading 保持一致。
  */
 (function () {
-  const _root = document.querySelector('#root');
-  if (_root && _root.innerHTML === '') {
-    _root.innerHTML = `
-      <style>
-        html,
-        body,
-        #root {
-          height: 100%;
-          margin: 0;
-          padding: 0;
-        }
-        #root {
-          background-repeat: no-repeat;
-          background-size: 100% auto;
-        }
+  const root = document.querySelector('#root');
 
-        .loading-title {
-          font-size: 1.1rem;
-        }
+  if (!root || root.innerHTML !== '') {
+    return;
+  }
 
-        .loading-sub-title {
-          margin-top: 20px;
-          font-size: 1rem;
-          color: #888;
-        }
+  let theme = document.documentElement.dataset.theme;
+  try {
+    const savedTheme = localStorage.getItem('film-fusion-nav-theme');
+    if (savedTheme === 'realDark' || savedTheme === 'light') {
+      theme = savedTheme;
+    }
+  } catch {}
+  const searchParams = new URLSearchParams(window.location.search);
+  const debugTheme = searchParams.get('theme');
+  const isLoadingDebug =
+    window.location.pathname === '/debug/loading' ||
+    searchParams.get('debug-loading') === 'boot';
+  if (
+    isLoadingDebug &&
+    (debugTheme === 'dark' || debugTheme === 'light')
+  ) {
+    theme = debugTheme;
+  }
+  const themeClass =
+    theme === 'dark' || theme === 'realDark'
+      ? 'boot-loading--dark'
+      : 'boot-loading--light';
+  const defaultThemeColor =
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.getAttribute('content') || '#1890ff';
+  const debugColor = isLoadingDebug ? searchParams.get('color') : '';
+  const isValidThemeColor = (value) =>
+    /^#[\da-f]{3}([\da-f]{3})?$/i.test(value || '');
+  const themeColor = isValidThemeColor(debugColor)
+    ? debugColor
+    : isValidThemeColor(defaultThemeColor)
+      ? defaultThemeColor
+      : '#1890ff';
 
-        .page-loading-warp {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 26px;
-        }
-        .ant-spin {
-          position: absolute;
-          display: none;
-          -webkit-box-sizing: border-box;
-          box-sizing: border-box;
-          margin: 0;
-          padding: 0;
-          color: rgba(0, 0, 0, 0.65);
-          color: #1890ff;
-          font-size: 14px;
-          font-variant: tabular-nums;
-          line-height: 1.5;
-          text-align: center;
-          list-style: none;
-          opacity: 0;
-          -webkit-transition: -webkit-transform 0.3s
-            cubic-bezier(0.78, 0.14, 0.15, 0.86);
-          transition: -webkit-transform 0.3s
-            cubic-bezier(0.78, 0.14, 0.15, 0.86);
-          transition: transform 0.3s cubic-bezier(0.78, 0.14, 0.15, 0.86);
-          transition: transform 0.3s cubic-bezier(0.78, 0.14, 0.15, 0.86),
-            -webkit-transform 0.3s cubic-bezier(0.78, 0.14, 0.15, 0.86);
-          -webkit-font-feature-settings: "tnum";
-          font-feature-settings: "tnum";
-        }
+  root.innerHTML = `
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+      }
 
-        .ant-spin-spinning {
-          position: static;
-          display: inline-block;
-          opacity: 1;
-        }
+      .boot-loading {
+        --boot-primary: #1890ff;
+        --boot-background: #ffffff;
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        padding: 24px;
+        box-sizing: border-box;
+        background: var(--boot-background);
+      }
 
-        .ant-spin-dot {
-          position: relative;
-          display: inline-block;
-          width: 20px;
-          height: 20px;
-          font-size: 20px;
-        }
+      .boot-loading--dark {
+        --boot-background: #141414;
+      }
 
-        .ant-spin-dot-item {
-          position: absolute;
-          display: block;
-          width: 9px;
-          height: 9px;
-          background-color: #1890ff;
-          border-radius: 100%;
-          -webkit-transform: scale(0.75);
-          -ms-transform: scale(0.75);
-          transform: scale(0.75);
-          -webkit-transform-origin: 50% 50%;
-          -ms-transform-origin: 50% 50%;
-          transform-origin: 50% 50%;
-          opacity: 0.3;
-          -webkit-animation: antspinmove 1s infinite linear alternate;
-          animation: antSpinMove 1s infinite linear alternate;
-        }
+      .boot-loading__spinner {
+        width: 36px;
+        height: 36px;
+        box-sizing: border-box;
+        border: 3px solid color-mix(in srgb, var(--boot-primary) 20%, transparent);
+        border-top-color: var(--boot-primary);
+        border-radius: 50%;
+        animation: boot-loading-spin 0.8s linear infinite;
+      }
 
-        .ant-spin-dot-item:nth-child(1) {
-          top: 0;
-          left: 0;
+      @keyframes boot-loading-spin {
+        to {
+          transform: rotate(360deg);
         }
+      }
 
-        .ant-spin-dot-item:nth-child(2) {
-          top: 0;
-          right: 0;
-          -webkit-animation-delay: 0.4s;
-          animation-delay: 0.4s;
+      @media (prefers-reduced-motion: reduce) {
+        .boot-loading__spinner {
+          animation-duration: 1.6s;
         }
+      }
 
-        .ant-spin-dot-item:nth-child(3) {
-          right: 0;
-          bottom: 0;
-          -webkit-animation-delay: 0.8s;
-          animation-delay: 0.8s;
-        }
-
-        .ant-spin-dot-item:nth-child(4) {
-          bottom: 0;
-          left: 0;
-          -webkit-animation-delay: 1.2s;
-          animation-delay: 1.2s;
-        }
-
-        .ant-spin-dot-spin {
-          -webkit-transform: rotate(45deg);
-          -ms-transform: rotate(45deg);
-          transform: rotate(45deg);
-          -webkit-animation: antrotate 1.2s infinite linear;
-          animation: antRotate 1.2s infinite linear;
-        }
-
-        .ant-spin-lg .ant-spin-dot {
-          width: 32px;
-          height: 32px;
-          font-size: 32px;
-        }
-
-        .ant-spin-lg .ant-spin-dot i {
-          width: 14px;
-          height: 14px;
-        }
-
-        @media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
-          .ant-spin-blur {
-            background: #fff;
-            opacity: 0.5;
-          }
-        }
-
-        @-webkit-keyframes antSpinMove {
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes antSpinMove {
-          to {
-            opacity: 1;
-          }
-        }
-
-        @-webkit-keyframes antRotate {
-          to {
-            -webkit-transform: rotate(405deg);
-            transform: rotate(405deg);
-          }
-        }
-
-        @keyframes antRotate {
-          to {
-            -webkit-transform: rotate(405deg);
-            transform: rotate(405deg);
-          }
-        }
-      </style>
-
-      <div style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        min-height: 362px;
-      ">
-        <div class="page-loading-warp">
-          <div class="ant-spin ant-spin-lg ant-spin-spinning">
-            <span class="ant-spin-dot ant-spin-dot-spin">
-              <i class="ant-spin-dot-item"></i>
-              <i class="ant-spin-dot-item"></i>
-              <i class="ant-spin-dot-item"></i>
-              <i class="ant-spin-dot-item"></i>
-            </span>
-          </div>
-        </div>
-        <div class="loading-title">
-          正在加载资源
-        </div>
-        <div class="loading-sub-title">
-          初次加载资源可能需要较多时间 请耐心等待
-        </div>
-      </div>
-    `;
+    </style>
+    <output class="boot-loading ${themeClass}" aria-busy="true" aria-live="polite">
+      <span class="boot-loading__spinner" aria-hidden="true"></span>
+      <span style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;">页面加载中</span>
+    </output>
+  `;
+  const bootLoading = root.querySelector('.boot-loading');
+  if (bootLoading instanceof HTMLElement) {
+    bootLoading.style.setProperty('--boot-primary', themeColor);
   }
 })();

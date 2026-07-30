@@ -23,7 +23,6 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { history, useParams, useRequest } from '@umijs/max';
 import {
   Alert,
   Badge,
@@ -58,7 +57,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   assignOrganizePreviewTaskTMDB,
   clearOrganizePreviewTasks,
@@ -484,6 +485,7 @@ type OrganizePageProps = {
 };
 
 const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
+  const navigate = useNavigate();
   const params = useParams<{ id: string }>();
   const directoryId = Number(params.id);
   const filenameRegexStorageKey = episodeMode
@@ -585,7 +587,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     loading: directoryLoading,
     error: directoryError,
     refresh: refreshDirectory,
-  } = useRequest(
+  } = useApiRequest(
     () => {
       if (!Number.isFinite(directoryId) || directoryId <= 0) {
         return Promise.reject(new Error('目录配置 ID 无效'));
@@ -601,7 +603,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const cloudStorageId = directoryDetail?.cloud_storage_id;
 
   const { loading: categoryConfigLoading, refresh: refreshCategoryConfig } =
-    useRequest(getOrganizeCategoryConfig, {
+    useApiRequest(getOrganizeCategoryConfig, {
       onSuccess: (result) => {
         setCategoryConfig(
           unwrapResponseData<API.OrganizeCategoryConfigResult>(result),
@@ -649,7 +651,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     data: previewTasksData,
     loading: previewTasksLoading,
     refresh: refreshPreviewTasks,
-  } = useRequest(
+  } = useApiRequest(
     () =>
       getOrganizePreviewTasks({
         cloud_directory_id: directoryId,
@@ -957,7 +959,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     return filter(treeData);
   }, [keyword, treeData]);
 
-  const { run: runOrganize, loading: organizeLoading } = useRequest(
+  const { runAsync: runOrganize, loading: organizeLoading } = useApiRequest(
     organize115Cookie,
     {
       manual: true,
@@ -1095,7 +1097,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
 
   const { run: runCreatePreviewTasks, loading: createPreviewLoading } =
-    useRequest(createOrganizePreviewTasks, {
+    useApiRequest(createOrganizePreviewTasks, {
       manual: true,
       onSuccess: (result) => {
         const response = result as any;
@@ -1119,7 +1121,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     });
 
   const { run: runLoadPreviewTask, loading: loadPreviewTaskLoading } =
-    useRequest(getOrganizePreviewTask, {
+    useApiRequest(getOrganizePreviewTask, {
       manual: true,
       onSuccess: (result) => {
         const response = result as any;
@@ -1161,7 +1163,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     });
 
   const { run: runRequeuePreviewTask, loading: requeuePreviewLoading } =
-    useRequest(requeueOrganizePreviewTask, {
+    useApiRequest(requeueOrganizePreviewTask, {
       manual: true,
       onSuccess: () => {
         messageApi.success('已重新加入预整理队列');
@@ -1206,7 +1208,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   }, [assignTMDBID, assignTMDBTask, messageApi, refreshPreviewTasks]);
 
   const { run: runDeletePreviewTask, loading: deletePreviewLoading } =
-    useRequest(deleteOrganizePreviewTask, {
+    useApiRequest(deleteOrganizePreviewTask, {
       manual: true,
       onSuccess: (result) => {
         const response = result as any;
@@ -1243,7 +1245,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   );
 
   const { run: runClearPreviewTasks, loading: clearPreviewTasksLoading } =
-    useRequest(clearOrganizePreviewTasks, {
+    useApiRequest(clearOrganizePreviewTasks, {
       manual: true,
       onSuccess: (result) => {
         const response = result as any;
@@ -2384,7 +2386,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       <PageContainer
         header={{
           title: episodeMode ? '剧集预整理' : '整理目录',
-          onBack: () => history.push('/directories'),
+          onBack: () => navigate('/directories'),
         }}
       >
         <Result
@@ -2392,7 +2394,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           title="加载目录配置失败"
           subTitle={(directoryError as Error)?.message || '请返回列表重试'}
           extra={[
-            <Button key="back" onClick={() => history.push('/directories')}>
+            <Button key="back" onClick={() => navigate('/directories')}>
               返回列表
             </Button>,
             <Button
@@ -2451,7 +2453,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: `${episodeMode ? '剧集预整理' : '整理目录'}：${
           directoryDetail?.directory_name || ''
         }`,
-        onBack: () => history.push('/directories'),
+        onBack: () => navigate('/directories'),
         backIcon: <ArrowLeftOutlined />,
         extra: headerExtra,
         breadcrumb: {

@@ -1,13 +1,12 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 获取 MoviePilot 分类配置 */
-export async function getOrganizeCategoryConfig(options?: { [key: string]: any }) {
-  return request<API.Response<API.OrganizeCategoryConfigResult>>(
+export async function getOrganizeCategoryConfig(options?: {
+  [key: string]: any;
+}) {
+  return apiClient.get<API.Response<API.OrganizeCategoryConfigResult>>(
     '/api/organize/category-config',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
+    { ...(options || {}) },
   );
 }
 
@@ -16,11 +15,11 @@ export async function organize115Cookie(
   data: API.Organize115CookieParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.Organize115CookieResult>>('/api/organize/115-cookie', {
-    method: 'POST',
+  return apiClient.post<API.Response<API.Organize115CookieResult>>(
+    '/api/organize/115-cookie',
     data,
-    ...(options || {}),
-  });
+    { ...(options || {}) },
+  );
 }
 
 /** 加入后台预整理队列 */
@@ -28,13 +27,10 @@ export async function createOrganizePreviewTasks(
   data: API.CreateOrganizePreviewTasksParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.OrganizePreviewTaskListResult>>(
+  return apiClient.post<API.Response<API.OrganizePreviewTaskListResult>>(
     '/api/organize/preview-tasks',
-    {
-      method: 'POST',
-      data,
-      ...(options || {}),
-    },
+    data,
+    { ...(options || {}) },
   );
 }
 
@@ -43,13 +39,9 @@ export async function getOrganizePreviewTasks(
   params: API.OrganizePreviewTaskQueryParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.OrganizePreviewTaskListResult>>(
+  return apiClient.get<API.Response<API.OrganizePreviewTaskListResult>>(
     '/api/organize/preview-tasks',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -133,12 +125,9 @@ export async function getOrganizePreviewTask(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.OrganizePreviewTaskDetailResult>>(
+  return apiClient.get<API.Response<API.OrganizePreviewTaskDetailResult>>(
     `/api/organize/preview-tasks/${id}`,
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
+    { ...(options || {}) },
   );
 }
 
@@ -147,12 +136,10 @@ export async function requeueOrganizePreviewTask(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.OrganizePreviewTask>>(
+  return apiClient.post<API.Response<API.OrganizePreviewTask>>(
     `/api/organize/preview-tasks/${id}/requeue`,
-    {
-      method: 'POST',
-      ...(options || {}),
-    },
+    undefined,
+    { ...(options || {}) },
   );
 }
 
@@ -162,13 +149,10 @@ export async function assignOrganizePreviewTaskTMDB(
   data: API.AssignOrganizePreviewTaskTMDBParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.OrganizePreviewTask>>(
+  return apiClient.post<API.Response<API.OrganizePreviewTask>>(
     `/api/organize/preview-tasks/${id}/assign-tmdb`,
-    {
-      method: 'POST',
-      data,
-      ...(options || {}),
-    },
+    data,
+    { ...(options || {}) },
   );
 }
 
@@ -178,13 +162,9 @@ export async function deleteOrganizePreviewTask(
   params?: API.DeleteOrganizePreviewTaskParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.DeleteOrganizePreviewTaskResult>>(
+  return apiClient.delete<API.Response<API.DeleteOrganizePreviewTaskResult>>(
     `/api/organize/preview-tasks/${id}`,
-    {
-      method: 'DELETE',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -193,12 +173,8 @@ export async function clearOrganizePreviewTasks(
   params: API.ClearOrganizePreviewTasksParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.ClearOrganizePreviewTasksResult>>(
+  return apiClient.delete<API.Response<API.ClearOrganizePreviewTasksResult>>(
     '/api/organize/preview-tasks',
-    {
-      method: 'DELETE',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }

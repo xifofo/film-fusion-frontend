@@ -1,9 +1,8 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 获取运行日志文件列表（最新优先） */
 export async function getServerLogFiles(options?: { [key: string]: any }) {
-  return request<API.Response<API.ServerLogFile[]>>('/api/logs/files', {
-    method: 'GET',
+  return apiClient.get<API.Response<API.ServerLogFile[]>>('/api/logs/files', {
     ...(options || {}),
   });
 }
@@ -13,8 +12,7 @@ export async function getServerLogs(
   params?: API.ServerLogQueryParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.ServerLogResult>>('/api/logs', {
-    method: 'GET',
+  return apiClient.get<API.Response<API.ServerLogResult>>('/api/logs', {
     params,
     ...(options || {}),
   });

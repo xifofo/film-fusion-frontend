@@ -8,23 +8,34 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
-import { Button, Drawer, message, Popconfirm, Space, Switch, Tag, Typography } from 'antd';
-import React, { useRef, useState } from 'react';
 import {
-  getMatch302List,
-  deleteMatch302,
-  batchDeleteMatch302,
-  getMatch302Assignments,
-  updateMatch302BalanceEnabled,
-} from '@/services/film-fusion';
+  Button,
+  Drawer,
+  message,
+  Popconfirm,
+  Space,
+  Switch,
+  Tag,
+  Typography,
+} from 'antd';
+import React, { useRef, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import CreateForm from '@/pages/match302/components/CreateForm';
 import UpdateForm from '@/pages/match302/components/UpdateForm';
+import {
+  batchDeleteMatch302,
+  deleteMatch302,
+  getMatch302Assignments,
+  getMatch302List,
+  updateMatch302BalanceEnabled,
+} from '@/services/film-fusion';
 
 const { Text } = Typography;
 
-const balanceLimitModeLabel = (mode?: string) => mode === 'strict' ? '严格' : '宽松';
-const cleanupModeLabel = (mode?: string) => mode === 'hard_delete' ? '彻底删除' : '移动到回收站';
+const balanceLimitModeLabel = (mode?: string) =>
+  mode === 'strict' ? '严格' : '宽松';
+const cleanupModeLabel = (mode?: string) =>
+  mode === 'hard_delete' ? '彻底删除' : '移动到回收站';
 const assignmentStatusColor = (status?: string) => {
   if (status === 'ready') return 'green';
   if (status === 'pending') return 'gold';
@@ -39,11 +50,13 @@ const Match302List: React.FC = () => {
   const [showDetail, setShowDetail] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<API.Match302>();
   const [balanceTogglingID, setBalanceTogglingID] = useState<number>();
-  const [balanceEnabledOverrides, setBalanceEnabledOverrides] = useState<Record<number, boolean>>({});
+  const [balanceEnabledOverrides, setBalanceEnabledOverrides] = useState<
+    Record<number, boolean>
+  >({});
 
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run: delRun, loading: delLoading } = useRequest(deleteMatch302, {
+  const { run: delRun, loading: delLoading } = useApiRequest(deleteMatch302, {
     manual: true,
     onSuccess: () => {
       actionRef.current?.reloadAndRest?.();
@@ -54,18 +67,24 @@ const Match302List: React.FC = () => {
     },
   });
 
-  const { run: batchDelRun, loading: batchDelLoading } = useRequest(batchDeleteMatch302, {
-    manual: true,
-    onSuccess: () => {
-      actionRef.current?.reloadAndRest?.();
-      messageApi.success('批量删除成功');
+  const { run: batchDelRun, loading: batchDelLoading } = useApiRequest(
+    batchDeleteMatch302,
+    {
+      manual: true,
+      onSuccess: () => {
+        actionRef.current?.reloadAndRest?.();
+        messageApi.success('批量删除成功');
+      },
+      onError: () => {
+        messageApi.error('批量删除失败，请重试');
+      },
     },
-    onError: () => {
-      messageApi.error('批量删除失败，请重试');
-    },
-  });
+  );
 
-  const handleBalanceEnabledChange = async (record: API.Match302, checked: boolean) => {
+  const handleBalanceEnabledChange = async (
+    record: API.Match302,
+    checked: boolean,
+  ) => {
     setBalanceTogglingID(record.id);
     setBalanceEnabledOverrides((current) => ({
       ...current,
@@ -118,7 +137,8 @@ const Match302List: React.FC = () => {
       dataIndex: 'cloud_storage_id',
       render: (_, record) => (
         <Tag color="blue">
-          {record.cloud_storage?.storage_name || `ID: ${record.cloud_storage_id}`}
+          {record.cloud_storage?.storage_name ||
+            `ID: ${record.cloud_storage_id}`}
         </Tag>
       ),
       renderFormItem: () => {
@@ -132,7 +152,8 @@ const Match302List: React.FC = () => {
       width: 150,
       search: false,
       render: (_, record) => {
-        const balanceEnabled = balanceEnabledOverrides[record.id] ?? record.balance_enabled;
+        const balanceEnabled =
+          balanceEnabledOverrides[record.id] ?? record.balance_enabled;
         return (
           <Space size={4} wrap>
             <Switch
@@ -141,14 +162,22 @@ const Match302List: React.FC = () => {
               loading={balanceTogglingID === record.id}
               checkedChildren="开"
               unCheckedChildren="关"
-              onChange={(checked) => handleBalanceEnabledChange(record, checked)}
+              onChange={(checked) =>
+                handleBalanceEnabledChange(record, checked)
+              }
             />
             {balanceEnabled && (
               <>
-                <Tag color={record.balance_limit_mode === 'strict' ? 'red' : 'blue'}>
+                <Tag
+                  color={
+                    record.balance_limit_mode === 'strict' ? 'red' : 'blue'
+                  }
+                >
                   {balanceLimitModeLabel(record.balance_limit_mode)}
                 </Tag>
-                <Tag color="blue">{record.pool_members?.length || 0} 子账号</Tag>
+                <Tag color="blue">
+                  {record.pool_members?.length || 0} 子账号
+                </Tag>
               </>
             )}
           </Space>
@@ -224,7 +253,7 @@ const Match302List: React.FC = () => {
       },
       {
         title: '负载均衡',
-        render: () => record.balance_enabled ? '已启用' : '未启用',
+        render: () => (record.balance_enabled ? '已启用' : '未启用'),
       },
       {
         title: '策略',
@@ -240,9 +269,10 @@ const Match302List: React.FC = () => {
       },
       {
         title: '清理策略',
-        render: () => record.cleanup_enabled
-          ? `${record.retention_hours || 72} 小时后 ${cleanupModeLabel(record.cleanup_mode)}`
-          : '未启用',
+        render: () =>
+          record.cleanup_enabled
+            ? `${record.retention_hours || 72} 小时后 ${cleanupModeLabel(record.cleanup_mode)}`
+            : '未启用',
       },
       {
         title: '子账号池',
@@ -253,12 +283,15 @@ const Match302List: React.FC = () => {
             <Space direction="vertical" size={2}>
               {members.map((member) => (
                 <Text key={`${member.cloud_storage_id}-${member.id || ''}`}>
-                  {member.cloud_storage?.storage_name || `ID: ${member.cloud_storage_id}`}
+                  {member.cloud_storage?.storage_name ||
+                    `ID: ${member.cloud_storage_id}`}
                   {' / '}
                   权重 {member.weight || 1}
                   {' / '}
                   {member.enabled ? '启用' : '停用'}
-                  {member.target_root_path ? ` / 缓存目录 ${member.target_root_path}` : ''}
+                  {member.target_root_path
+                    ? ` / 缓存目录 ${member.target_root_path}`
+                    : ''}
                 </Text>
               ))}
             </Space>
@@ -298,9 +331,15 @@ const Match302List: React.FC = () => {
     {
       title: '缓存账号',
       width: 160,
-      render: (_, record) => record.is_source_playback
-        ? <Tag color="green">源账号</Tag>
-        : <Tag color="blue">{record.playback_storage?.storage_name || `ID: ${record.playback_storage_id}`}</Tag>,
+      render: (_, record) =>
+        record.is_source_playback ? (
+          <Tag color="green">源账号</Tag>
+        ) : (
+          <Tag color="blue">
+            {record.playback_storage?.storage_name ||
+              `ID: ${record.playback_storage_id}`}
+          </Tag>
+        ),
     },
     {
       title: '状态',
@@ -308,7 +347,9 @@ const Match302List: React.FC = () => {
       width: 130,
       render: (_, record) => (
         <Space size={4} wrap>
-          <Tag color={assignmentStatusColor(record.status)}>{record.status}</Tag>
+          <Tag color={assignmentStatusColor(record.status)}>
+            {record.status}
+          </Tag>
           {record.cleanup_status && record.cleanup_status !== 'none' && (
             <Tag>{record.cleanup_status}</Tag>
           )}
@@ -403,7 +444,8 @@ const Match302List: React.FC = () => {
         tableAlertRender={({ selectedRowKeys, onCleanSelected }) => (
           <Space size={24}>
             <span>
-              已选择 <a style={{ fontWeight: 600 }}>{selectedRowKeys.length}</a> 项
+              已选择 <a style={{ fontWeight: 600 }}>{selectedRowKeys.length}</a>{' '}
+              项
               <a style={{ marginLeft: 8 }} onClick={onCleanSelected}>
                 取消选择
               </a>
@@ -471,7 +513,6 @@ const Match302List: React.FC = () => {
           </Space>
         )}
       </Drawer>
-
     </PageContainer>
   );
 };

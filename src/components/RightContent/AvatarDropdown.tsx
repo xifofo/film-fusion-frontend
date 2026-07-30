@@ -3,12 +3,12 @@ import {
   SettingOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { history, useModel } from '@umijs/max';
 import type { MenuProps } from 'antd';
 import { Spin } from 'antd';
 import { createStyles } from 'antd-style';
 import React from 'react';
-import { flushSync } from 'react-dom';
+import { useNavigate } from 'react-router';
+import { useAppState } from '@/contexts/app-state';
 import { logout } from '@/services/film-fusion';
 import HeaderDropdown from '../HeaderDropdown';
 
@@ -18,8 +18,7 @@ export type GlobalHeaderRightProps = {
 };
 
 export const AvatarName = () => {
-  const { initialState } = useModel('@@initialState');
-  const { currentUser } = initialState || {};
+  const { currentUser } = useAppState();
   return <span className="anticon">{currentUser?.username}</span>;
 };
 
@@ -45,6 +44,10 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
   menu,
   children,
 }) => {
+  const navigate = useNavigate();
+  const { currentUser, setCurrentUser } = useAppState();
+  const { styles } = useStyles();
+
   /**
    * 退出登录，并且将当前的 url 保存
    */
@@ -56,12 +59,7 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
       console.log('Logout error:', error);
     }
 
-    // 清除用户状态
-    flushSync(() => {
-      setInitialState((s) => ({ ...s, currentUser: undefined }));
-    });
-
-    // 清除本地存储的 token
+    setCurrentUser(undefined);
     localStorage.removeItem('token');
 
     const { search, pathname } = window.location;
@@ -71,28 +69,18 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
     });
     /** 此方法会跳转到 redirect 参数所在的位置 */
     const redirect = urlParams.get('redirect');
-    // Note: There may be security issues, please note
     if (window.location.pathname !== '/user/login' && !redirect) {
-      history.replace({
-        pathname: '/user/login',
-        search: searchParams.toString(),
-      });
+      navigate(`/user/login?${searchParams}`, { replace: true });
     }
   };
-  const { styles } = useStyles();
-
-  const { initialState, setInitialState } = useModel('@@initialState');
 
   const onMenuClick: MenuProps['onClick'] = (event) => {
     const { key } = event;
     if (key === 'logout') {
-      flushSync(() => {
-        setInitialState((s) => ({ ...s, currentUser: undefined }));
-      });
-      loginOut();
+      void loginOut();
       return;
     }
-    history.push(`/account/${key}`);
+    navigate(`/account/${key}`);
   };
 
   const loading = (
@@ -106,12 +94,6 @@ export const AvatarDropdown: React.FC<GlobalHeaderRightProps> = ({
       />
     </span>
   );
-
-  if (!initialState) {
-    return loading;
-  }
-
-  const { currentUser } = initialState;
 
   if (!currentUser || !currentUser.username) {
     return loading;

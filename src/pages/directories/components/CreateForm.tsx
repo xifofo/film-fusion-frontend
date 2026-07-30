@@ -7,9 +7,9 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import { Button, message, Tabs } from 'antd';
 import React, { useMemo, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { createCloudDirectory } from '@/services/film-fusion';
 import DirectoryStrmPreview from './DirectoryStrmPreview';
 
@@ -49,7 +49,7 @@ const CreateForm: React.FC<CreateFormProps> = ({
   const [activeTab, setActiveTab] = useState('basic');
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run, loading } = useRequest(createCloudDirectory, {
+  const { runAsync: run, loading } = useApiRequest(createCloudDirectory, {
     manual: true,
     onSuccess: () => {
       messageApi.success('创建成功');

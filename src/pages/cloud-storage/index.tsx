@@ -8,18 +8,18 @@ import {
   ProDescriptions,
   ProTable,
 } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
-import { Drawer, message, Tag, Popconfirm, Space, Tooltip } from 'antd';
-import React, { useRef, useState, useEffect } from 'react';
+import { Drawer, message, Popconfirm, Space, Tag, Tooltip } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import {
-  getCloudStorageList,
   deleteCloudStorage,
+  getCloudStorageList,
   getWeb115KeepaliveStatus,
 } from '@/services/film-fusion';
-import CreateForm from './components/CreateForm';
-import UpdateForm from './components/UpdateForm';
-import ReloginModal from './components/ReloginModal';
 import CookieKeepAlive from './components/CookieKeepAlive';
+import CreateForm from './components/CreateForm';
+import ReloginModal from './components/ReloginModal';
+import UpdateForm from './components/UpdateForm';
 
 const CloudStorageList: React.FC = () => {
   const actionRef = useRef<ActionType | null>(null);
@@ -54,7 +54,7 @@ const CloudStorageList: React.FC = () => {
     loadCookieStatus();
   }, []);
 
-  const { run: delRun } = useRequest(deleteCloudStorage, {
+  const { run: delRun } = useApiRequest(deleteCloudStorage, {
     manual: true,
     onSuccess: () => {
       actionRef.current?.reloadAndRest?.();
@@ -68,11 +68,11 @@ const CloudStorageList: React.FC = () => {
   const getStorageTypeLabel = (type: string) => {
     const typeMap: Record<string, string> = {
       '115open': '115网盘 OpenAPI',
-      'baidu': '百度网盘',
-      'aliyun': '阿里云盘',
-      'tencent': '腾讯云',
-      'tianyi': '天翼云盘',
-      'quark': '夸克网盘',
+      baidu: '百度网盘',
+      aliyun: '阿里云盘',
+      tencent: '腾讯云',
+      tianyi: '天翼云盘',
+      quark: '夸克网盘',
     };
     return typeMap[type] || type;
   };
@@ -83,11 +83,15 @@ const CloudStorageList: React.FC = () => {
       disabled: { color: 'gray', text: '禁用' },
       error: { color: 'red', text: '错误' },
     };
-    const config = statusMap[status as keyof typeof statusMap] || { color: 'default', text: status };
+    const config = statusMap[status as keyof typeof statusMap] || {
+      color: 'default',
+      text: status,
+    };
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
-  const limitText = (value?: number) => value && value > 0 ? `${value}` : '不限';
+  const limitText = (value?: number) =>
+    value && value > 0 ? `${value}` : '不限';
 
   const columns: ProColumns<API.CloudStorage>[] = [
     {
@@ -120,11 +124,11 @@ const CloudStorageList: React.FC = () => {
       render: (_, record) => getStorageTypeLabel(record.storage_type),
       valueEnum: {
         '115open': { text: '115网盘 OpenAPI' },
-        'baidu': { text: '百度网盘' },
-        'aliyun': { text: '阿里云盘' },
-        'tencent': { text: '腾讯云' },
-        'tianyi': { text: '天翼云盘' },
-        'quark': { text: '夸克网盘' },
+        baidu: { text: '百度网盘' },
+        aliyun: { text: '阿里云盘' },
+        tencent: { text: '腾讯云' },
+        tianyi: { text: '天翼云盘' },
+        quark: { text: '夸克网盘' },
       },
     },
     {
@@ -148,7 +152,7 @@ const CloudStorageList: React.FC = () => {
       width: 150,
       ellipsis: true,
       hideInSearch: true,
-      render: (_, record) => record.app_secret ? '***已配置***' : '未配置',
+      render: (_, record) => (record.app_secret ? '***已配置***' : '未配置'),
     },
     {
       title: '访问令牌',
@@ -156,7 +160,10 @@ const CloudStorageList: React.FC = () => {
       width: 150,
       ellipsis: true,
       hideInSearch: true,
-      render: (_, record) => record.access_token ? `${record.access_token.substring(0, 10)}...` : '未配置',
+      render: (_, record) =>
+        record.access_token
+          ? `${record.access_token.substring(0, 10)}...`
+          : '未配置',
     },
     {
       title: '刷新令牌',
@@ -164,7 +171,10 @@ const CloudStorageList: React.FC = () => {
       width: 150,
       ellipsis: true,
       hideInSearch: true,
-      render: (_, record) => record.refresh_token ? `${record.refresh_token.substring(0, 10)}...` : '未配置',
+      render: (_, record) =>
+        record.refresh_token
+          ? `${record.refresh_token.substring(0, 10)}...`
+          : '未配置',
     },
     {
       title: '令牌过期时间',

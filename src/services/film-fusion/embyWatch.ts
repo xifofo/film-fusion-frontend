@@ -1,7 +1,9 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 后端通过 ?token= 鉴权的图片/下载场景拼 token */
-function withToken(params: Record<string, string | number | undefined>): string {
+function withToken(
+  params: Record<string, string | number | undefined>,
+): string {
   const token = localStorage.getItem('token') || '';
   const usp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -22,7 +24,10 @@ export function embyWatchImageUrl(itemId?: string, maxWidth = 200): string {
 }
 
 /** 年度报告分享图 URL（PNG，自动带 JWT token） */
-export function embyWatchShareImageUrl(embyUserId: string, year: number): string {
+export function embyWatchShareImageUrl(
+  embyUserId: string,
+  year: number,
+): string {
   return `/api/emby-watch/annual-report/share-image?${withToken({
     emby_user_id: embyUserId,
     year,
@@ -31,12 +36,9 @@ export function embyWatchShareImageUrl(embyUserId: string, year: number): string
 
 /** 列出 Emby 用户 + 被统计/回填状态 */
 export async function getEmbyWatchUsers(options?: { [key: string]: any }) {
-  return request<API.Response<API.EmbyWatchUserView[]>>(
+  return apiClient.get<API.Response<API.EmbyWatchUserView[]>>(
     '/api/emby-watch/users',
-    {
-      method: 'GET',
-      ...(options || {}),
-    },
+    { ...(options || {}) },
   );
 }
 
@@ -45,11 +47,11 @@ export async function saveEmbyWatchUsers(
   embyUserIds: string[],
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<null>>('/api/emby-watch/users', {
-    method: 'PUT',
-    data: { emby_user_ids: embyUserIds },
-    ...(options || {}),
-  });
+  return apiClient.put<API.Response<null>>(
+    '/api/emby-watch/users',
+    { emby_user_ids: embyUserIds },
+    { ...(options || {}) },
+  );
 }
 
 /** 触发某用户历史回填(异步) */
@@ -57,11 +59,11 @@ export async function backfillEmbyWatch(
   embyUserId: string,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<null>>('/api/emby-watch/backfill', {
-    method: 'POST',
-    data: { emby_user_id: embyUserId },
-    ...(options || {}),
-  });
+  return apiClient.post<API.Response<null>>(
+    '/api/emby-watch/backfill',
+    { emby_user_id: embyUserId },
+    { ...(options || {}) },
+  );
 }
 
 /** 查询某用户回填进度 */
@@ -69,22 +71,18 @@ export async function getEmbyWatchBackfillStatus(
   embyUserId: string,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchBackfillStatus>>(
+  return apiClient.get<API.Response<API.EmbyWatchBackfillStatus>>(
     '/api/emby-watch/backfill/status',
-    {
-      method: 'GET',
-      params: { emby_user_id: embyUserId },
-      ...(options || {}),
-    },
+    { params: { emby_user_id: embyUserId }, ...(options || {}) },
   );
 }
 
 /** 获取采集规则设置 */
 export async function getEmbyWatchSetting(options?: { [key: string]: any }) {
-  return request<API.Response<API.EmbyWatchSetting>>('/api/emby-watch/setting', {
-    method: 'GET',
-    ...(options || {}),
-  });
+  return apiClient.get<API.Response<API.EmbyWatchSetting>>(
+    '/api/emby-watch/setting',
+    { ...(options || {}) },
+  );
 }
 
 /** 保存采集规则设置 */
@@ -92,11 +90,11 @@ export async function saveEmbyWatchSetting(
   data: API.EmbyWatchSetting,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchSetting>>('/api/emby-watch/setting', {
-    method: 'PUT',
+  return apiClient.put<API.Response<API.EmbyWatchSetting>>(
+    '/api/emby-watch/setting',
     data,
-    ...(options || {}),
-  });
+    { ...(options || {}) },
+  );
 }
 
 /** 删除单条观看记录 */
@@ -105,13 +103,9 @@ export async function deleteEmbyWatchRecord(
   embyUserId: string,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<{ deleted: number }>>(
+  return apiClient.delete<API.Response<{ deleted: number }>>(
     `/api/emby-watch/records/${id}`,
-    {
-      method: 'DELETE',
-      params: { emby_user_id: embyUserId },
-      ...(options || {}),
-    },
+    { params: { emby_user_id: embyUserId }, ...(options || {}) },
   );
 }
 
@@ -120,11 +114,10 @@ export async function clearEmbyWatchRecords(
   embyUserId: string,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<{ deleted: number }>>('/api/emby-watch/records', {
-    method: 'DELETE',
-    params: { emby_user_id: embyUserId },
-    ...(options || {}),
-  });
+  return apiClient.delete<API.Response<{ deleted: number }>>(
+    '/api/emby-watch/records',
+    { params: { emby_user_id: embyUserId }, ...(options || {}) },
+  );
 }
 
 /** 分页观看记录 */
@@ -132,13 +125,9 @@ export async function getEmbyWatchRecords(
   params: API.EmbyWatchRecordParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchRecordList>>(
+  return apiClient.get<API.Response<API.EmbyWatchRecordList>>(
     '/api/emby-watch/records',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -147,13 +136,9 @@ export async function getEmbyWatchGallery(
   params: API.EmbyWatchGalleryParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchGalleryResult>>(
+  return apiClient.get<API.Response<API.EmbyWatchGalleryResult>>(
     '/api/emby-watch/gallery',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -162,13 +147,9 @@ export async function getEmbyWatchCalendar(
   params: { emby_user_id: string; year: number; month: number },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchCalendarDay[]>>(
+  return apiClient.get<API.Response<API.EmbyWatchCalendarDay[]>>(
     '/api/emby-watch/calendar',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -177,13 +158,9 @@ export async function getEmbyWatchSummary(
   params: { emby_user_id: string; year?: number },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchSummary>>(
+  return apiClient.get<API.Response<API.EmbyWatchSummary>>(
     '/api/emby-watch/summary',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }
 
@@ -192,12 +169,8 @@ export async function getEmbyWatchAnnualReport(
   params: { emby_user_id: string; year: number },
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.EmbyWatchAnnualReport>>(
+  return apiClient.get<API.Response<API.EmbyWatchAnnualReport>>(
     '/api/emby-watch/annual-report',
-    {
-      method: 'GET',
-      params,
-      ...(options || {}),
-    },
+    { params, ...(options || {}) },
   );
 }

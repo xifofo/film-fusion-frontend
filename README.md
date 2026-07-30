@@ -1,57 +1,51 @@
-# Ant Design Pro
+# Film Fusion Frontend
 
-This project is initialized with [Ant Design Pro](https://pro.ant.design). Follow is the quick guide for how to use.
+Film Fusion 的 Web 管理后台。
 
-## Environment Prepare
+## 技术栈
 
-Install `node_modules`:
+- Vite 8
+- React 19
+- React Router 8
+- Ant Design / Pro Components
+- Tailwind CSS 4 / shadcn
+- Canvas UI
+- Liquid Glass React
+- Axios
+- TanStack Query 5
+- React Intl
+- TypeScript
 
-```bash
-npm install
-```
+## 本地开发
 
-or
-
-```bash
-yarn
-```
-
-## Provided Scripts
-
-Ant Design Pro provides some useful script to help you quick start and build with web project, code style check and test.
-
-Scripts provided in `package.json`. It's safe to modify or add additional script:
-
-### Start project
+要求 Node.js 20.19+ 或 22.12+，并使用 pnpm 安装依赖：
 
 ```bash
-npm start
+pnpm install
+pnpm dev
 ```
 
-### Build project
+开发服务器默认运行在 `http://localhost:8000`，`/api` 和 `/webhook`
+会代理到 `VITE_API_TARGET`，未设置时使用 `http://localhost:9000`。
+
+## 常用命令
 
 ```bash
-npm run build
+pnpm tsc
+pnpm test
+pnpm lint
+pnpm build
+pnpm preview
 ```
 
-### Check code style
+添加新的 shadcn 组件：
 
 ```bash
-npm run lint
+pnpm shadcn add card
 ```
 
-You can also use script to auto fix some lint error:
+shadcn 组件位于 `src/components/ui/`。Tailwind Preflight 已关闭，因此可以和
+现有 Ant Design 页面渐进式共存。
 
-```bash
-npm run lint:fix
-```
-
-### Test code
-
-```bash
-npm test
-```
-
-## More
-
-You can view full document on our [official website](https://pro.ant.design). And welcome any feedback in our [github](https://github.com/ant-design/ant-design-pro).
+生产构建产物位于 `dist/`。部署时需要让服务端把未知的无扩展名路径回退到
+`dist/index.html`，以支持 React Router 的浏览器历史路由。

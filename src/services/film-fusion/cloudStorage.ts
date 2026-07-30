@@ -1,4 +1,4 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 获取云存储列表 */
 export async function getCloudStorageList(
@@ -7,15 +7,17 @@ export async function getCloudStorageList(
 ) {
   const { current, pageSize, ...rest } = params || {};
 
-  return request<API.Response<API.PageResult<API.CloudStorage>>>('/api/cloud-storage', {
-    method: 'GET',
-    params: {
-      ...rest,
-      page: current,
-      page_size: pageSize,
+  return apiClient.get<API.Response<API.PageResult<API.CloudStorage>>>(
+    '/api/cloud-storage',
+    {
+      params: {
+        ...rest,
+        page: current,
+        page_size: pageSize,
+      },
+      ...(options || {}),
     },
-    ...(options || {}),
-  });
+  );
 }
 
 /** 创建云存储 */
@@ -23,11 +25,11 @@ export async function createCloudStorage(
   data: API.CreateCloudStorageParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.CloudStorage>>('/api/cloud-storage', {
-    method: 'POST',
+  return apiClient.post<API.Response<API.CloudStorage>>(
+    '/api/cloud-storage',
     data,
-    ...(options || {}),
-  });
+    { ...(options || {}) },
+  );
 }
 
 /** 更新云存储 */
@@ -35,11 +37,11 @@ export async function updateCloudStorage(
   data: API.UpdateCloudStorageParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.CloudStorage>>(`/api/cloud-storage/${data.id}`, {
-    method: 'PUT',
+  return apiClient.put<API.Response<API.CloudStorage>>(
+    `/api/cloud-storage/${data.id}`,
     data,
-    ...(options || {}),
-  });
+    { ...(options || {}) },
+  );
 }
 
 /** 删除云存储 */
@@ -47,8 +49,7 @@ export async function deleteCloudStorage(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<boolean>>(`/api/cloud-storage/${id}`, {
-    method: 'DELETE',
+  return apiClient.delete<API.Response<boolean>>(`/api/cloud-storage/${id}`, {
     ...(options || {}),
   });
 }
@@ -58,10 +59,10 @@ export async function getCloudStorageDetail(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.CloudStorage>>(`/api/cloud-storage/${id}`, {
-    method: 'GET',
-    ...(options || {}),
-  });
+  return apiClient.get<API.Response<API.CloudStorage>>(
+    `/api/cloud-storage/${id}`,
+    { ...(options || {}) },
+  );
 }
 
 /** 刷新云存储令牌 */
@@ -69,10 +70,11 @@ export async function refreshCloudStorageToken(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<API.CloudStorage>>(`/api/cloud-storage/${id}/refresh-token`, {
-    method: 'POST',
-    ...(options || {}),
-  });
+  return apiClient.post<API.Response<API.CloudStorage>>(
+    `/api/cloud-storage/${id}/refresh-token`,
+    undefined,
+    { ...(options || {}) },
+  );
 }
 
 /** 测试云存储连接 */
@@ -80,8 +82,9 @@ export async function testCloudStorageConnection(
   id: number,
   options?: { [key: string]: any },
 ) {
-  return request<API.Response<{ connected: boolean; message?: string }>>(`/api/cloud-storage/${id}/test`, {
-    method: 'POST',
-    ...(options || {}),
-  });
+  return apiClient.post<API.Response<{ connected: boolean; message?: string }>>(
+    `/api/cloud-storage/${id}/test`,
+    undefined,
+    { ...(options || {}) },
+  );
 }

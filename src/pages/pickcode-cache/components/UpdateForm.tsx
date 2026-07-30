@@ -1,7 +1,11 @@
-import { ModalForm, ProFormText, ProFormDigit } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
+import {
+  ModalForm,
+  ProFormDigit,
+  ProFormText,
+} from '@ant-design/pro-components';
 import { message } from 'antd';
 import React, { useEffect } from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
 import { updatePickcodeCache } from '@/services/film-fusion';
 
 interface UpdateFormProps {
@@ -11,10 +15,15 @@ interface UpdateFormProps {
   values?: API.PickcodeCache;
 }
 
-const UpdateForm: React.FC<UpdateFormProps> = ({ open, onClose, onSuccess, values }) => {
+const UpdateForm: React.FC<UpdateFormProps> = ({
+  open,
+  onClose,
+  onSuccess,
+  values,
+}) => {
   const [messageApi, contextHolder] = message.useMessage();
 
-  const { run: updateRun, loading } = useRequest(updatePickcodeCache, {
+  const { run: updateRun, loading } = useApiRequest(updatePickcodeCache, {
     manual: true,
     onSuccess: () => {
       messageApi.success('更新成功');

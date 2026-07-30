@@ -1,10 +1,9 @@
-import { request } from '@umijs/max';
+import { apiClient } from '@/lib/api-client';
 
 /** 查询 SortName backfill 当前/最近任务的状态快照 */
 export async function getEmbySortNameStatus() {
-  return request<API.Response<API.EmbySortNameStatus>>(
+  return apiClient.get<API.Response<API.EmbySortNameStatus>>(
     '/api/emby-sortname/status',
-    { method: 'GET' },
   );
 }
 
@@ -16,20 +15,21 @@ export async function getEmbySortNameStatus() {
  * @param libraryIds 留空表示扫全库
  * @param force      true 忽略 LockedFields 锁定状态强制覆盖（含已被刮削工具/手动锁定的）
  */
-export async function backfillEmbySortName(libraryIds?: string[], force = false) {
-  return request<API.Response<API.EmbySortNameJob>>(
+export async function backfillEmbySortName(
+  libraryIds?: string[],
+  force = false,
+) {
+  return apiClient.post<API.Response<API.EmbySortNameJob>>(
     '/api/emby-sortname/backfill',
-    {
-      method: 'POST',
-      data: { library_ids: libraryIds || [], force },
-    },
+    { library_ids: libraryIds || [], force },
   );
 }
 
 /** 单 Item 触发处理（调试用） */
 export async function processEmbySortNameItem(itemId: string) {
-  return request<API.Response<API.EmbySortNameItemResult>>(
+  return apiClient.post<API.Response<API.EmbySortNameItemResult>>(
     `/api/emby-sortname/items/${itemId}`,
-    { method: 'POST', timeout: 60000 },
+    undefined,
+    { timeout: 60000 },
   );
 }

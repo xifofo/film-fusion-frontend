@@ -1,11 +1,4 @@
 import {
-  backfillEmbySortName,
-  batchGenerateEmbyCovers,
-  getEmbySortNameStatus,
-  listEmbyCoverLibraries,
-  listEmbyCoverTemplates,
-} from '@/services/film-fusion';
-import {
   CloudUploadOutlined,
   EditOutlined,
   EyeOutlined,
@@ -14,19 +7,32 @@ import {
 } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
-import { useRequest } from '@umijs/max';
 import {
   Alert,
   Button,
   Modal,
+  message,
   Popconfirm,
   Space,
   Tag,
   Tooltip,
   Typography,
-  message,
 } from 'antd';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useApiRequest } from '@/hooks/useApiRequest';
+import {
+  backfillEmbySortName,
+  batchGenerateEmbyCovers,
+  getEmbySortNameStatus,
+  listEmbyCoverLibraries,
+  listEmbyCoverTemplates,
+} from '@/services/film-fusion';
 import EditConfigForm from './components/EditConfigForm';
 import PreviewModal from './components/PreviewModal';
 
@@ -51,7 +57,8 @@ const SortNameJobAlert: React.FC<{ job: API.EmbySortNameJob }> = ({ job }) => {
         description={
           <Text type="secondary">
             已处理 <Text strong>{job.total}</Text>，更新 {job.updated}，跳过{' '}
-            {job.skipped}，错误 {job.errors}，已耗时 {seconds}s。后端后台运行，刷新页面不影响。
+            {job.skipped}，错误 {job.errors}，已耗时 {seconds}
+            s。后端后台运行，刷新页面不影响。
           </Text>
         }
       />
@@ -115,18 +122,22 @@ const EmbyCoverPage: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<API.EmbyCoverLibraryView>();
   // SortName backfill 全局状态（后端同时只跑一个任务）
-  const [sortNameJob, setSortNameJob] = useState<API.EmbySortNameJob | null>(null);
+  const [sortNameJob, setSortNameJob] = useState<API.EmbySortNameJob | null>(
+    null,
+  );
   // 正在启动哪一行的 backfill（仅启动瞬间，为”按下后立即返回“提供视觉反馈）
   const [sortNameStarting, setSortNameStarting] = useState<string | null>(null);
 
   // 模板列表（全局拉一次）
-  const { data: templates = [] } = useRequest(listEmbyCoverTemplates, {
+  const { data: templates = [] } = useApiRequest(listEmbyCoverTemplates, {
     formatResult: (res) => res?.data || [],
   });
 
   const templateMap = useMemo(() => {
     const m: Record<string, string> = {};
-    templates.forEach((t) => (m[t.id] = t.name));
+    for (const template of templates) {
+      m[template.id] = template.name;
+    }
     return m;
   }, [templates]);
 
@@ -178,52 +189,54 @@ const EmbyCoverPage: React.FC = () => {
   const sortNameRunning = !!sortNameJob?.running;
 
   // 批量生成
-  const { run: batchRun, loading: batchLoading } = useRequest(batchGenerateEmbyCovers, {
-    manual: true,
-    onSuccess: (res) => {
-      // umi useRequest 默认已解到内层 data（{ success, failed, errors }）
-      if (!res) {
-        message.success('批量任务完成');
-      } else {
-        const { success, failed, errors } = res as {
-          success: number;
-          failed: number;
-          errors: string[];
-        };
-        if (failed === 0) {
-          message.success(`批量生成完成：成功 ${success}`);
+  const { run: batchRun, loading: batchLoading } = useApiRequest(
+    batchGenerateEmbyCovers,
+    {
+      manual: true,
+      onSuccess: (res) => {
+        // useApiRequest 默认已解到内层 data（{ success, failed, errors }）
+        if (!res) {
+          message.success('批量任务完成');
         } else {
-          Modal.warning({
-            title: `批量生成完成（成功 ${success} / 失败 ${failed}）`,
-            width: 640,
-            content: (
-              <div style={{ maxHeight: 320, overflow: 'auto' }}>
-                {errors?.length ? (
-                  errors.map((e: string, i: number) => (
-                    <div key={i} style={{ marginBottom: 4 }}>
-                      <Text type="danger">· {e}</Text>
-                    </div>
-                  ))
-                ) : (
-                  <Text type="secondary">无详细错误信息</Text>
-                )}
-              </div>
-            ),
-          });
+          const { success, failed, errors } = res as {
+            success: number;
+            failed: number;
+            errors: string[];
+          };
+          if (failed === 0) {
+            message.success(`批量生成完成：成功 ${success}`);
+          } else {
+            Modal.warning({
+              title: `批量生成完成（成功 ${success} / 失败 ${failed}）`,
+              width: 640,
+              content: (
+                <div style={{ maxHeight: 320, overflow: 'auto' }}>
+                  {errors?.length ? (
+                    errors.map((e: string) => (
+                      <div key={e} style={{ marginBottom: 4 }}>
+                        <Text type="danger">· {e}</Text>
+                      </div>
+                    ))
+                  ) : (
+                    <Text type="secondary">无详细错误信息</Text>
+                  )}
+                </div>
+              ),
+            });
+          }
         }
-      }
-      actionRef.current?.reload?.();
+        actionRef.current?.reload?.();
+      },
+      onError: (e) => {
+        message.error(e?.message || '批量生成失败');
+      },
     },
-    onError: (e) => {
-      message.error(e?.message || '批量生成失败');
-    },
-  });
+  );
 
   const openPreview = (row: API.EmbyCoverLibraryView) => {
     setPreviewRow(row);
     setPreviewOpen(true);
   };
-
 
   const columns: ProColumns<API.EmbyCoverLibraryView>[] = [
     {
@@ -268,7 +281,9 @@ const EmbyCoverPage: React.FC = () => {
       dataIndex: 'template_id',
       width: 180,
       render: (_, r) => (
-        <Tag color="geekblue">{templateMap[r.template_id] || r.template_id}</Tag>
+        <Tag color="geekblue">
+          {templateMap[r.template_id] || r.template_id}
+        </Tag>
       ),
     },
     {
@@ -276,7 +291,11 @@ const EmbyCoverPage: React.FC = () => {
       dataIndex: 'enabled',
       width: 80,
       render: (_, r) =>
-        r.enabled ? <Tag color="green">启用</Tag> : <Tag color="default">禁用</Tag>,
+        r.enabled ? (
+          <Tag color="green">启用</Tag>
+        ) : (
+          <Tag color="default">禁用</Tag>
+        ),
     },
     {
       title: '上次生成',
@@ -364,7 +383,8 @@ const EmbyCoverPage: React.FC = () => {
           title={`强制覆盖「${record.emby_name}」的 SortName？`}
           description={
             <div style={{ maxWidth: 320 }}>
-              <Text type="warning">忽略锁定状态</Text>，包括被其它工具锁定的条目也会被覆写。
+              <Text type="warning">忽略锁定状态</Text>
+              ，包括被其它工具锁定的条目也会被覆写。
             </div>
           }
           okText="强制覆盖"
@@ -397,7 +417,8 @@ const EmbyCoverPage: React.FC = () => {
     <PageContainer
       header={{
         title: 'Emby 媒体库封面生成',
-        subTitle: '根据媒体库内的最新海报，自动合成带中英文标题的封面图并上传到 Emby',
+        subTitle:
+          '根据媒体库内的最新海报，自动合成带中英文标题的封面图并上传到 Emby',
       }}
     >
       {sortNameJob && <SortNameJobAlert job={sortNameJob} />}
@@ -410,12 +431,22 @@ const EmbyCoverPage: React.FC = () => {
         message="使用说明"
         description={
           <div>
-            <div>1. 列表展示 Emby 后台所有媒体库；点「编辑」配置中英文标题和模板。</div>
-            <div>2. 点「预览」会用最新海报合成一张大图但不上传；确认效果好后在预览页点「上传到 Emby」。</div>
             <div>
-              3. 点右上「批量生成」会为所有<Text code>启用</Text>的媒体库生成并上传封面，用于一次更新全部。
+              1. 列表展示 Emby 后台所有媒体库；点「编辑」配置中英文标题和模板。
             </div>
-            <div>4. 可在后端 <Text code>emby.cover.cron</Text> 配置定时任务自动执行批量生成。</div>
+            <div>
+              2.
+              点「预览」会用最新海报合成一张大图但不上传；确认效果好后在预览页点「上传到
+              Emby」。
+            </div>
+            <div>
+              3. 点右上「批量生成」会为所有<Text code>启用</Text>
+              的媒体库生成并上传封面，用于一次更新全部。
+            </div>
+            <div>
+              4. 可在后端 <Text code>emby.cover.cron</Text>{' '}
+              配置定时任务自动执行批量生成。
+            </div>
           </div>
         }
       />
@@ -438,7 +469,9 @@ const EmbyCoverPage: React.FC = () => {
             title="按拼音首字母回填所有媒体的 SortName？"
             description={
               <div style={{ maxWidth: 360 }}>
-                将扫描 Emby 所有 Movie/Series/BoxSet，对未锁定的条目写入拼音首字母。已锁定 SortName 的条目会被跳过。后端后台执行，可关闭页面或刷新。
+                将扫描 Emby 所有
+                Movie/Series/BoxSet，对未锁定的条目写入拼音首字母。已锁定
+                SortName 的条目会被跳过。后端后台执行，可关闭页面或刷新。
               </div>
             }
             okText="启动"
@@ -459,13 +492,17 @@ const EmbyCoverPage: React.FC = () => {
             title="强制覆盖所有媒体的 SortName？"
             description={
               <div style={{ maxWidth: 360 }}>
-                <Text type="warning">忽略锁定状态</Text>，对所有 Movie/Series/BoxSet 强制写入拼音首字母。包括被别的工具（如 MoviePilot）锁定过的条目也会被覆写。适合首次统一设置场景。
+                <Text type="warning">忽略锁定状态</Text>，对所有
+                Movie/Series/BoxSet 强制写入拼音首字母。包括被别的工具（如
+                MoviePilot）锁定过的条目也会被覆写。适合首次统一设置场景。
               </div>
             }
             okText="强制覆盖"
             okButtonProps={{ danger: true }}
             cancelText="取消"
-            onConfirm={() => startSortNameBackfill(undefined, 'all-force', true)}
+            onConfirm={() =>
+              startSortNameBackfill(undefined, 'all-force', true)
+            }
             disabled={sortNameRunning}
           >
             <Button
