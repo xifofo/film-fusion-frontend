@@ -247,12 +247,6 @@ function buildTmdbUrl(tmdbId?: string, mediaType?: string): string | undefined {
   return `https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${id}`;
 }
 
-function buildTMDBFolderName(folderName: string, tmdbId: string): string {
-  const baseName = folderName.replace(/\s*\{tmdb(?:id)?-\d+\}/gi, '').trim();
-  const marker = `{tmdb-${tmdbId.trim()}}`;
-  return baseName ? `${baseName} ${marker}` : marker;
-}
-
 function updateTreeData(
   list: DataNode[],
   key: string,
@@ -1196,7 +1190,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       await assignOrganizePreviewTaskTMDB(assignTMDBTask.id, {
         tmdb_id: tmdbID,
       });
-      messageApi.success('源文件夹已重命名，并重新加入预整理队列');
+      messageApi.success('已为文件夹内全部文件指定 TMDB，并重新加入预整理队列');
       setAssignTMDBTask(undefined);
       setAssignTMDBID('');
       refreshPreviewTasks();
@@ -3069,7 +3063,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         onCancel={closeAssignTMDB}
         onOk={confirmAssignTMDB}
         confirmLoading={assignTMDBLoading}
-        okText="重命名并重跑"
+        okText="批量重命名并重跑"
         cancelText="取消"
         okButtonProps={{
           disabled: !/^[1-9]\d{0,19}$/.test(assignTMDBID.trim()),
@@ -3080,8 +3074,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           <Alert
             type="info"
             showIcon
-            message="确认后会重命名 115 源文件夹，并重新运行预整理"
-            description="只需填写数字 ID；系统会自动添加 {tmdb-ID} 标记。已有 TMDB 标记时会替换，不会重复追加。"
+            message="确认后会批量重命名该文件夹内的全部文件，并重新运行预整理"
+            description="只需填写数字 ID；系统会在每个文件的扩展名前添加 {tmdb-ID} 标记。已有 TMDB 标记时会替换，文件夹名称不会改变。"
           />
           <div>
             <Typography.Text type="secondary">TMDB ID</Typography.Text>
@@ -3104,18 +3098,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             />
           </div>
           <div>
-            <Typography.Text type="secondary">重命名预览</Typography.Text>
+            <Typography.Text type="secondary">文件名规则预览</Typography.Text>
             <Typography.Paragraph
               code
               copyable={!!assignTMDBID}
               style={{ marginTop: 6, marginBottom: 0 }}
             >
-              {assignTMDBTask
-                ? buildTMDBFolderName(
-                    assignTMDBTask.folder_name || assignTMDBTask.folder_id,
-                    assignTMDBID || 'ID',
-                  )
-                : '-'}
+              {`原文件名.{tmdb-${assignTMDBID || 'ID'}}.扩展名`}
             </Typography.Paragraph>
           </div>
         </Space>

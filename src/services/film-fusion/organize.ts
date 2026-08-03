@@ -143,7 +143,7 @@ export async function requeueOrganizePreviewTask(
   );
 }
 
-/** 为源文件夹指定 TMDB ID，重命名后重新加入后台预整理队列 */
+/** 为源文件夹内的全部文件指定 TMDB ID，批量重命名后重新加入后台预整理队列 */
 export async function assignOrganizePreviewTaskTMDB(
   id: number,
   data: API.AssignOrganizePreviewTaskTMDBParams,
