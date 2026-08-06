@@ -433,11 +433,10 @@ const CloudPathList: React.FC = () => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer header={{ title: '云路径映射管理' }}>
       {contextHolder}
 
       <ProTable<API.CloudPath, API.CloudPathQueryParams>
-        headerTitle="云路径映射管理"
         actionRef={actionRef}
         rowKey="id"
         search={{

@@ -326,10 +326,9 @@ const CloudStorageList: React.FC = () => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer header={{ title: '云存储管理' }}>
       {contextHolder}
       <ProTable<API.CloudStorage, API.CloudStorageQueryParams>
-        headerTitle="云存储管理"
         actionRef={actionRef}
         rowKey="id"
         search={{

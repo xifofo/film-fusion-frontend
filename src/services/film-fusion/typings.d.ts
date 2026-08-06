@@ -190,6 +190,12 @@ declare namespace API {
     collection_type: string;
     movie_count: number;
     series_count: number;
+    /** 当前媒体库语义下的内容总数；合集为 BoxSet 数量，其余非影视库来自 Emby ChildCount */
+    content_count: number;
+    /** 媒体库可用封面类型：Primary / Backdrop */
+    image_type?: string;
+    /** 图片版本标签，用于判断可用性和刷新浏览器缓存 */
+    image_tag?: string;
   };
 
   /** Emby 媒体库电影 / 电视剧统计快照 */
@@ -1240,6 +1246,47 @@ declare namespace API {
     action?: string;
     before_days?: number;
     confirm_all?: boolean;
+  };
+
+  type DownloadQueueStatus = 'pending' | 'downloading' | 'failed';
+
+  /** 115Open 下载队列任务 */
+  type DownloadQueueTask = {
+    id: number;
+    cloud_storage_id: number;
+    pick_code: string;
+    save_path: string;
+    retry_count: number;
+    max_retry_count: number;
+    last_error?: string;
+    status: DownloadQueueStatus;
+    created_at: string;
+    cloud_storage?: {
+      id: number;
+      storage_name: string;
+      storage_type: string;
+    };
+  };
+
+  type DownloadQueueStats = {
+    total: number;
+    pending: number;
+    downloading: number;
+    failed: number;
+  };
+
+  type DownloadQueueListResult = {
+    list: DownloadQueueTask[];
+    total: number;
+    page: number;
+    size: number;
+    stats: DownloadQueueStats;
+  };
+
+  type DownloadQueueQueryParams = PageParams & {
+    status?: DownloadQueueStatus;
+    search?: string;
+    created_at_order?: 'asc' | 'desc';
   };
 
   /** Emby 用户(用于绑定下拉选择) */

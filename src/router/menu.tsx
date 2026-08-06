@@ -1,122 +1,168 @@
+import type { LucideIcon } from 'lucide-react';
 import {
-  BarChartOutlined,
-  BranchesOutlined,
-  CalendarOutlined,
-  CloudOutlined,
-  DatabaseOutlined,
-  FileTextOutlined,
-  FolderOutlined,
-  LinkOutlined,
-  PictureOutlined,
-  PlaySquareOutlined,
-  ProfileOutlined,
-  RadarChartOutlined,
-  SearchOutlined,
-  SettingOutlined,
-  SwapOutlined,
-  ThunderboltOutlined,
-  UserSwitchOutlined,
-} from '@ant-design/icons';
-import type { MenuDataItem } from '@ant-design/pro-components';
+  ArrowLeftRight,
+  ChartNoAxesCombined,
+  Clapperboard,
+  Cloud,
+  Database,
+  Download,
+  FileText,
+  Folder,
+  GitBranch,
+  Images,
+  Link2,
+  ListRestart,
+  RadioTower,
+  ScanSearch,
+  Settings,
+  SquareTerminal,
+  UserRoundCog,
+  Zap,
+} from 'lucide-react';
 
-export const menuItems: MenuDataItem[] = [
+export type AppMenuItem = {
+  name: string;
+  icon: LucideIcon;
+  path: string;
+  children?: AppMenuItem[];
+};
+
+export const menuItems: AppMenuItem[] = [
   {
     name: '云存储管理',
-    icon: <CloudOutlined />,
+    icon: Cloud,
     path: '/cloud-storage',
   },
   {
     name: '云路径映射',
-    icon: <LinkOutlined />,
+    icon: Link2,
     path: '/cloud-paths',
   },
   {
     name: '目录配置',
-    icon: <FolderOutlined />,
+    icon: Folder,
     path: '/directories',
   },
   {
-    name: 'Match302重定向',
-    icon: <SwapOutlined />,
+    name: '下载队列',
+    icon: Download,
+    path: '/download-queue',
+  },
+  {
+    name: 'Match302 重定向',
+    icon: ArrowLeftRight,
     path: '/match302',
   },
   {
-    name: 'Pickcode缓存管理',
-    icon: <DatabaseOutlined />,
+    name: 'Pickcode 缓存管理',
+    icon: Database,
     path: '/pickcode-cache',
   },
   {
     name: 'Emby',
-    icon: <PlaySquareOutlined />,
+    icon: Clapperboard,
     path: '/emby',
     children: [
       {
         name: '封面生成',
-        icon: <PictureOutlined />,
+        icon: Images,
         path: '/emby/cover',
       },
       {
         name: '媒体统计',
-        icon: <BarChartOutlined />,
+        icon: ChartNoAxesCombined,
         path: '/emby/stats',
       },
       {
         name: '图片优化',
-        icon: <PictureOutlined />,
+        icon: Images,
         path: '/emby/image-optimization',
       },
       {
         name: '缺集扫描',
-        icon: <SearchOutlined />,
+        icon: ScanSearch,
         path: '/emby/missing',
       },
       {
         name: '多版本检查',
-        icon: <BranchesOutlined />,
+        icon: GitBranch,
         path: '/emby/version-check',
       },
       {
         name: '账号绑定',
-        icon: <UserSwitchOutlined />,
+        icon: UserRoundCog,
         path: '/emby/bindings',
       },
     ],
   },
   {
     name: '日志中心',
-    icon: <FileTextOutlined />,
+    icon: FileText,
     path: '/logs',
     children: [
       {
         name: '代理日志',
-        icon: <ThunderboltOutlined />,
+        icon: Zap,
         path: '/emby/proxy-log',
       },
       {
         name: '观看记录',
-        icon: <CalendarOutlined />,
+        icon: Clapperboard,
         path: '/emby-watch',
       },
       {
         name: '整理日志',
-        icon: <FileTextOutlined />,
+        icon: ListRestart,
         path: '/organize-logs',
       },
       {
         name: '运行日志',
-        icon: <ProfileOutlined />,
+        icon: SquareTerminal,
         path: '/server-logs',
       },
     ],
   },
   {
-    name: 'RSS监控',
-    icon: <RadarChartOutlined />,
+    name: 'RSS 监控',
+    icon: RadioTower,
     path: '/rss-monitor',
   },
   {
     name: '系统设置',
-    icon: <SettingOutlined />,
+    icon: Settings,
     path: '/system-settings',
   },
 ];
+
+export const menuPathMatches = (pathname: string, itemPath: string) =>
+  pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+
+export const findMenuTrail = (
+  pathname: string,
+  items: AppMenuItem[] = menuItems,
+): AppMenuItem[] => {
+  let bestMatch: AppMenuItem[] = [];
+
+  for (const item of items) {
+    const childTrail = item.children
+      ? findMenuTrail(pathname, item.children)
+      : [];
+    const candidate =
+      childTrail.length > 0
+        ? [item, ...childTrail]
+        : menuPathMatches(pathname, item.path)
+          ? [item]
+          : [];
+
+    if (
+      candidate.length > 0 &&
+      (bestMatch.length === 0 ||
+        (candidate.at(-1)?.path.length ?? 0) >
+          (bestMatch.at(-1)?.path.length ?? 0))
+    ) {
+      bestMatch = candidate;
+    }
+  }
+
+  return bestMatch;
+};

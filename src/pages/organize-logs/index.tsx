@@ -270,7 +270,7 @@ const OrganizeLogList: React.FC = () => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer header={{ title: '整理日志' }}>
       {contextHolder}
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -309,7 +309,6 @@ const OrganizeLogList: React.FC = () => {
       </Row>
 
       <ProTable<API.OrganizeLog, API.OrganizeLogQueryParams>
-        headerTitle="整理日志"
         actionRef={actionRef}
         rowKey="id"
         search={{ labelWidth: 100 }}

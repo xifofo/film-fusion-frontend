@@ -10,15 +10,5 @@ import {
   PageLoadingBoundary,
   PageLoadingIndicator,
 } from './PageLoadingBoundary';
-import { Question, SelectLang } from './RightContent';
-import { AvatarDropdown, AvatarName } from './RightContent/AvatarDropdown';
 
-export {
-  AvatarDropdown,
-  AvatarName,
-  Footer,
-  PageLoadingBoundary,
-  PageLoadingIndicator,
-  Question,
-  SelectLang,
-};
+export { Footer, PageLoadingBoundary, PageLoadingIndicator };

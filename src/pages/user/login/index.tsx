@@ -19,6 +19,7 @@ import {
 import { useIntl } from 'react-intl';
 import { useNavigate } from 'react-router';
 import { FilingFooter } from '@/components/FilingFooter';
+import { OpticalLogo } from '@/components/OpticalLogo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -246,11 +247,7 @@ export default function Login() {
       </div>
 
       <header className="login-header-motion absolute top-6 left-6 z-20 flex max-w-[calc(100%-7rem)] items-center gap-3 sm:top-8 sm:left-10">
-        <img
-          className="size-11 rounded-[14px] border border-white/15 shadow-[0_14px_40px_rgba(0,0,0,0.16)]"
-          alt=""
-          src="/logo.svg"
-        />
+        <OpticalLogo className="size-12 shadow-[0_16px_46px_rgba(0,0,0,0.26)]" />
         <div className="min-w-0">
           <p className="m-0 truncate text-sm font-semibold tracking-[0.12em] text-white">
             {site.login_title}

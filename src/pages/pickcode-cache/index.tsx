@@ -255,7 +255,7 @@ const PickcodeCacheList: React.FC = () => {
   ];
 
   return (
-    <PageContainer>
+    <PageContainer header={{ title: 'Pickcode 缓存管理' }}>
       {contextHolder}
 
       {/* 统计信息卡片 */}
@@ -274,7 +274,6 @@ const PickcodeCacheList: React.FC = () => {
       )}
 
       <ProTable<API.PickcodeCache, API.PickcodeCacheQueryParams>
-        headerTitle="Pickcode 缓存管理"
         actionRef={actionRef}
         rowKey="id"
         search={{

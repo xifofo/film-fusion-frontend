@@ -27,6 +27,7 @@ import {
   useState,
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { OpticalLogo } from '@/components/OpticalLogo';
 import { useAppState } from '@/contexts/app-state';
 import {
   embyWatchImageUrl,
@@ -695,7 +696,7 @@ export default function WatchCalendarPage() {
             onClick={() => navigate('/')}
             type="button"
           >
-            <img alt="" src="/logo.svg" />
+            <OpticalLogo />
           </button>
 
           <div
@@ -771,7 +772,7 @@ export default function WatchCalendarPage() {
                   onClick={() => navigate('/')}
                   type="button"
                 >
-                  <img alt="" src="/logo.svg" />
+                  <OpticalLogo />
                   <span>
                     <strong>{site.login_title || 'Film Fusion'}</strong>
                     <small>

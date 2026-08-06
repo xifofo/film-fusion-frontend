@@ -14,6 +14,8 @@ export * from './cookie115';
 
 // 目录配置相关API
 export * from './directory';
+// 115Open 下载队列
+export * from './downloadQueue';
 // Emby 账号 -> 115 存储 绑定
 export * from './embyBinding';
 // Emby 媒体库封面生成相关 API

@@ -1,409 +1,426 @@
-import {
-  AppstoreOutlined,
-  ClockCircleOutlined,
-  DesktopOutlined,
-  ReloadOutlined,
-  VideoCameraOutlined,
-} from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
+import { Alert } from 'antd';
 import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Empty,
-  Progress,
-  Row,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
-import React, { useMemo } from 'react';
+  Clapperboard,
+  Clock3,
+  Film,
+  Layers,
+  Library,
+  type LucideIcon,
+  Music,
+  RefreshCw,
+  Tv,
+  Video,
+} from 'lucide-react';
+import React, { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useApiRequest } from '@/hooks/useApiRequest';
-import { getEmbyStats } from '@/services/film-fusion';
+import { embyStatsLibraryImageUrl, getEmbyStats } from '@/services/film-fusion';
+import styles from './index.module.less';
 
-const { Text, Title } = Typography;
+type LibraryKind =
+  | 'movies'
+  | 'tvshows'
+  | 'mixed'
+  | 'boxsets'
+  | 'music'
+  | 'homevideos'
+  | 'other';
 
-/** 媒体库类型 → 中文标签 + 颜色 */
-const collectionTypeMeta = (t: string): { color: string; label: string } => {
-  const map: Record<string, { color: string; label: string }> = {
-    movies: { color: 'blue', label: '电影' },
-    tvshows: { color: 'purple', label: '剧集' },
-    mixed: { color: 'geekblue', label: '混合' },
-    homevideos: { color: 'gold', label: '家庭视频' },
-    boxsets: { color: 'cyan', label: '合集' },
-    music: { color: 'magenta', label: '音乐' },
-  };
-  return map[t] || { color: 'default', label: t || '未知' };
+type CollectionMeta = {
+  icon: LucideIcon;
+  kind: LibraryKind;
+  label: string;
+  unit: string;
 };
 
-/** 顶部大数字概览卡 —— 渐变背景 + 大号数字 */
-const SummaryCard: React.FC<{
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  /** 渐变起始 / 结束色 */
-  gradient: [string, string];
-  suffix?: string;
-}> = ({ title, value, icon, gradient, suffix }) => {
+const COLLECTION_META: Record<LibraryKind, CollectionMeta> = {
+  movies: { icon: Film, kind: 'movies', label: '电影', unit: '部电影' },
+  tvshows: { icon: Tv, kind: 'tvshows', label: '剧集', unit: '部剧集' },
+  mixed: { icon: Layers, kind: 'mixed', label: '混合', unit: '项影视内容' },
+  boxsets: { icon: Layers, kind: 'boxsets', label: '合集', unit: '个合集' },
+  music: { icon: Music, kind: 'music', label: '音乐', unit: '项音乐内容' },
+  homevideos: {
+    icon: Video,
+    kind: 'homevideos',
+    label: '家庭视频',
+    unit: '段视频',
+  },
+  other: { icon: Library, kind: 'other', label: '其他', unit: '项内容' },
+};
+
+const collectionMeta = (collectionType: string): CollectionMeta => {
+  const normalized = collectionType.trim().toLowerCase() as LibraryKind;
+  return COLLECTION_META[normalized] || COLLECTION_META.other;
+};
+
+const formatCount = (value: number) => value.toLocaleString('zh-CN');
+const SKELETON_CARDS = [
+  'skeleton-a',
+  'skeleton-b',
+  'skeleton-c',
+  'skeleton-d',
+  'skeleton-e',
+  'skeleton-f',
+];
+
+const libraryContentCount = (stat: API.EmbyLibraryStat) => {
+  if (Number.isFinite(stat.content_count)) return stat.content_count;
+  return (stat.movie_count || 0) + (stat.series_count || 0);
+};
+
+const libraryPrimaryMetric = (stat: API.EmbyLibraryStat) => {
+  const meta = collectionMeta(stat.collection_type);
+  if (meta.kind === 'movies') return stat.movie_count || 0;
+  if (meta.kind === 'tvshows') return stat.series_count || 0;
+  return libraryContentCount(stat);
+};
+
+const LibraryCover: React.FC<{
+  eager: boolean;
+  meta: CollectionMeta;
+  stat: API.EmbyLibraryStat;
+}> = ({ eager, meta, stat }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageURL = embyStatsLibraryImageUrl(stat);
+  const Icon = meta.icon;
+
+  useEffect(() => setImageFailed(false), [imageURL]);
+
   return (
-    <Card
-      variant="borderless"
-      style={{
-        borderRadius: 16,
-        overflow: 'hidden',
-        background: `linear-gradient(135deg, ${gradient[0]} 0%, ${gradient[1]} 100%)`,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-      }}
-      styles={{
-        body: {
-          padding: '24px 28px',
-          color: '#fff',
-          position: 'relative',
-          minHeight: 132,
-        },
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          right: -20,
-          top: -20,
-          width: 140,
-          height: 140,
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.12)',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          right: 22,
-          top: 22,
-          fontSize: 56,
-          color: 'rgba(255,255,255,0.85)',
-        }}
-      >
-        {icon}
-      </div>
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div
-          style={{
-            fontSize: 14,
-            opacity: 0.92,
-            letterSpacing: 1,
-            marginBottom: 12,
-          }}
-        >
-          {title}
+    <div className={styles.coverFrame}>
+      {imageURL && !imageFailed ? (
+        <img
+          alt={`${stat.emby_name} 媒体库封面`}
+          className={styles.coverImage}
+          decoding="async"
+          loading={eager ? 'eager' : 'lazy'}
+          onError={() => setImageFailed(true)}
+          src={imageURL}
+        />
+      ) : (
+        <div className={styles.coverFallback}>
+          <Icon aria-hidden="true" />
         </div>
-        <div
-          style={{
-            fontSize: 44,
-            fontWeight: 700,
-            lineHeight: 1.1,
-            fontVariantNumeric: 'tabular-nums',
-            textShadow: '0 2px 8px rgba(0,0,0,0.12)',
-          }}
-        >
-          {value.toLocaleString()}
-          {suffix && (
-            <span
-              style={{
-                fontSize: 16,
-                fontWeight: 400,
-                marginLeft: 6,
-                opacity: 0.85,
-              }}
-            >
-              {suffix}
-            </span>
-          )}
-        </div>
-      </div>
-    </Card>
+      )}
+      <div aria-hidden="true" className={styles.coverScrim} />
+    </div>
   );
 };
 
-/** 单个媒体库的明细卡 */
 const LibraryCard: React.FC<{
+  index: number;
   stat: API.EmbyLibraryStat;
   totalMovies: number;
   totalSeries: number;
-}> = ({ stat, totalMovies, totalSeries }) => {
-  const meta = collectionTypeMeta(stat.collection_type);
-  const total = stat.movie_count + stat.series_count;
-  const moviePct = totalMovies > 0 ? (stat.movie_count / totalMovies) * 100 : 0;
-  const seriesPct =
-    totalSeries > 0 ? (stat.series_count / totalSeries) * 100 : 0;
+}> = ({ index, stat, totalMovies, totalSeries }) => {
+  const meta = collectionMeta(stat.collection_type);
+  const primaryCount = libraryPrimaryMetric(stat);
+  const relevantTotal =
+    meta.kind === 'movies'
+      ? totalMovies
+      : meta.kind === 'tvshows'
+        ? totalSeries
+        : meta.kind === 'mixed'
+          ? totalMovies + totalSeries
+          : 0;
+  const share = relevantTotal > 0 ? (primaryCount / relevantTotal) * 100 : 0;
+  const typeClass =
+    styles[`type${meta.kind[0].toUpperCase()}${meta.kind.slice(1)}`];
+  const Icon = meta.icon;
 
   return (
-    <Card
-      hoverable
-      variant="borderless"
-      style={{
-        borderRadius: 14,
-        boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
-        height: '100%',
-      }}
-      styles={{ body: { padding: 20 } }}
+    <article
+      className={`${styles.libraryCard} ${typeClass}`}
+      style={{ '--library-index': index } as CSSProperties}
     >
-      <Space
-        direction="horizontal"
-        align="start"
-        style={{ width: '100%', justifyContent: 'space-between' }}
-      >
-        <Space direction="vertical" size={4} style={{ minWidth: 0 }}>
-          <Tooltip title={stat.emby_name}>
-            <Title level={5} style={{ margin: 0 }} ellipsis>
-              {stat.emby_name}
-            </Title>
-          </Tooltip>
-          <Space size={6}>
-            <Tag color={meta.color} style={{ marginRight: 0 }}>
-              {meta.label}
-            </Tag>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              ID {stat.emby_library_id}
-            </Text>
-          </Space>
-        </Space>
-        <div
-          style={{
-            fontSize: 13,
-            color: '#8c8c8c',
-            textAlign: 'right',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          合计 <Text strong>{total.toLocaleString()}</Text>
-        </div>
-      </Space>
+      <LibraryCover eager={index < 4} meta={meta} stat={stat} />
 
-      <Row gutter={12} style={{ marginTop: 16 }}>
-        <Col span={12}>
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, #e6f0ff 0%, #f5faff 100%)',
-              border: '1px solid #d6e4ff',
-            }}
-          >
-            <Space size={6} style={{ color: '#1d39c4', fontSize: 12 }}>
-              <VideoCameraOutlined />
-              <span>电影</span>
-            </Space>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 700,
-                color: '#1d39c4',
-                lineHeight: 1.2,
-                fontVariantNumeric: 'tabular-nums',
-                marginTop: 4,
-              }}
-            >
-              {stat.movie_count.toLocaleString()}
-            </div>
-            <Progress
-              percent={Number(moviePct.toFixed(1))}
-              size="small"
-              strokeColor="#1d39c4"
-              showInfo={false}
-              style={{ marginTop: 4, marginBottom: 0 }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              占总电影 {moviePct.toFixed(1)}%
-            </Text>
+      <div className={styles.cardOverlay}>
+        <div className={styles.cardTopline}>
+          <span className={styles.typeBadge}>
+            <Icon aria-hidden="true" />
+            {meta.label}
+          </span>
+          <span className={styles.rankBadge} title={`排序第 ${index + 1} 位`}>
+            {String(index + 1).padStart(2, '0')}
+          </span>
+        </div>
+
+        <div className={styles.cardBody}>
+          <div className={styles.cardHeading}>
+            <h3 title={stat.emby_name}>{stat.emby_name}</h3>
           </div>
-        </Col>
-        <Col span={12}>
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, #f5e8ff 0%, #fbf5ff 100%)',
-              border: '1px solid #efdbff',
-            }}
-          >
-            <Space size={6} style={{ color: '#722ed1', fontSize: 12 }}>
-              <DesktopOutlined />
-              <span>电视剧</span>
-            </Space>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 700,
-                color: '#722ed1',
-                lineHeight: 1.2,
-                fontVariantNumeric: 'tabular-nums',
-                marginTop: 4,
-              }}
-            >
-              {stat.series_count.toLocaleString()}
-            </div>
-            <Progress
-              percent={Number(seriesPct.toFixed(1))}
-              size="small"
-              strokeColor="#722ed1"
-              showInfo={false}
-              style={{ marginTop: 4, marginBottom: 0 }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              占总剧集 {seriesPct.toFixed(1)}%
-            </Text>
+
+          <div className={styles.primaryMetric}>
+            <strong>{formatCount(primaryCount)}</strong>
+            <span>{meta.unit}</span>
           </div>
-        </Col>
-      </Row>
-    </Card>
+
+          {meta.kind === 'mixed' ? (
+            <div className={styles.splitMetrics}>
+              <span>
+                <Film aria-hidden="true" />
+                电影 <strong>{formatCount(stat.movie_count || 0)}</strong>
+              </span>
+              <span>
+                <Tv aria-hidden="true" />
+                剧集 <strong>{formatCount(stat.series_count || 0)}</strong>
+              </span>
+            </div>
+          ) : relevantTotal > 0 ? (
+            <div className={styles.shareBlock}>
+              <div className={styles.shareLabel}>
+                <span>占全部{meta.label}</span>
+                <strong>{share.toFixed(1)}%</strong>
+              </div>
+              <div aria-hidden="true" className={styles.shareTrack}>
+                <span style={{ width: `${Math.min(100, share)}%` }} />
+              </div>
+            </div>
+          ) : (
+            <p className={styles.directCount}>
+              {meta.kind === 'boxsets'
+                ? '按 Emby 合集条目统计'
+                : 'Emby 原始统计'}
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 };
+
+const StatsSkeleton = () => (
+  <div aria-live="polite">
+    <span className={styles.srOnly}>正在加载媒体库</span>
+    <div className={`${styles.hero} ${styles.heroSkeleton}`} />
+    <div className={styles.skeletonHeading} />
+    <div className={styles.libraryGrid}>
+      {SKELETON_CARDS.map((key) => (
+        <div className={styles.cardSkeleton} key={key} />
+      ))}
+    </div>
+  </div>
+);
 
 const EmbyStatsPage: React.FC = () => {
   const { data, loading, refresh, error } = useApiRequest(getEmbyStats, {
     formatResult: (res) => res?.data,
   });
-
   const stats = data as API.EmbyStats | undefined;
 
   const generatedText = useMemo(() => {
     if (!stats?.generated_at) return '';
     try {
-      return new Date(stats.generated_at).toLocaleString();
+      return new Date(stats.generated_at).toLocaleString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
     } catch {
       return stats.generated_at;
     }
   }, [stats?.generated_at]);
 
+  const librarySummary = useMemo(() => {
+    const summary = {
+      movies: 0,
+      tvshows: 0,
+      mixed: 0,
+      other: 0,
+    };
+    for (const library of stats?.libraries || []) {
+      const kind = collectionMeta(library.collection_type).kind;
+      if (kind === 'movies' || kind === 'tvshows' || kind === 'mixed') {
+        summary[kind] += 1;
+      } else {
+        summary.other += 1;
+      }
+    }
+    return summary;
+  }, [stats?.libraries]);
+
+  const totalContent = (stats?.total_movies || 0) + (stats?.total_series || 0);
+  const heroLibrary = stats?.libraries?.find(
+    (library) => library.image_type && library.image_tag,
+  );
+  const heroImageSmall = heroLibrary
+    ? embyStatsLibraryImageUrl(heroLibrary, 720)
+    : '';
+  const heroImageLarge = heroLibrary
+    ? embyStatsLibraryImageUrl(heroLibrary, 1440)
+    : '';
+
   return (
     <PageContainer
+      className={styles.pageContainer}
       header={{
         title: 'Emby 媒体统计',
-        subTitle: '按媒体库统计电影与电视剧数量',
         extra: [
-          <Space key="meta" size={12} align="center">
+          <div className={styles.headerMeta} key="stats-actions">
             {generatedText && (
-              <Tooltip title="服务器实时拉取 Emby 计数">
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  <ClockCircleOutlined style={{ marginRight: 4 }} />
-                  {generatedText}
-                </Text>
-              </Tooltip>
+              <span className={styles.generatedTime} title="服务器实时统计时间">
+                <Clock3 aria-hidden="true" />
+                {generatedText}
+              </span>
             )}
             <Button
-              key="refresh"
-              type="primary"
-              icon={<ReloadOutlined />}
-              loading={loading}
+              className={styles.refreshButton}
+              disabled={loading}
               onClick={refresh}
+              type="button"
+              variant="outline"
             >
-              刷新
+              <RefreshCw
+                aria-hidden="true"
+                className={loading ? styles.refreshing : undefined}
+              />
+              刷新数据
             </Button>
-          </Space>,
+          </div>,
         ],
       }}
     >
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="拉取统计失败"
-          description={(error as Error)?.message || '请检查 Emby 服务连通性'}
-        />
-      )}
+      <div className={styles.page}>
+        {error && (
+          <Alert
+            className={styles.notice}
+            description={(error as Error)?.message || '请检查 Emby 服务连通性'}
+            message="媒体库数据读取失败"
+            showIcon
+            type="error"
+          />
+        )}
 
-      {stats?.partial_errors && stats.partial_errors.length > 0 && (
-        <Alert
-          type="warning"
-          showIcon
-          closable
-          style={{ marginBottom: 16 }}
-          message={`部分媒体库统计失败（${stats.partial_errors.length} 项）`}
-          description={
-            <div style={{ maxHeight: 160, overflow: 'auto' }}>
-              {stats.partial_errors.map((e) => (
-                <div key={e} style={{ marginBottom: 2 }}>
-                  <Text type="warning">· {e}</Text>
+        {stats?.partial_errors && stats.partial_errors.length > 0 && (
+          <Alert
+            className={styles.notice}
+            closable
+            description={stats.partial_errors.join('；')}
+            message={`有 ${stats.partial_errors.length} 个统计请求未完成，其余数据仍可正常查看`}
+            showIcon
+            type="warning"
+          />
+        )}
+
+        {loading && !stats ? (
+          <StatsSkeleton />
+        ) : stats ? (
+          <>
+            <section className={styles.hero}>
+              {heroImageLarge && (
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className={styles.heroBackdrop}
+                  decoding="async"
+                  key={heroImageLarge}
+                  loading="eager"
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                  sizes="(max-width: 640px) 100vw, calc(100vw - 320px)"
+                  src={heroImageLarge}
+                  srcSet={`${heroImageSmall} 720w, ${heroImageLarge} 1440w`}
+                />
+              )}
+              <div aria-hidden="true" className={styles.heroScrim} />
+              <Clapperboard aria-hidden="true" className={styles.heroMark} />
+              <div className={styles.heroCopy}>
+                <p className={styles.eyebrow}>
+                  <span aria-hidden="true" />
+                  MEDIA OVERVIEW
+                </p>
+                <h2>
+                  <strong>{formatCount(stats.total_libraries || 0)}</strong>
+                  <span>个媒体库</span>
+                </h2>
+                <ul aria-label="媒体库类型构成" className={styles.typeSummary}>
+                  {librarySummary.movies > 0 && (
+                    <li>
+                      <strong>{librarySummary.movies}</strong> 电影库
+                    </li>
+                  )}
+                  {librarySummary.tvshows > 0 && (
+                    <li>
+                      <strong>{librarySummary.tvshows}</strong> 剧集库
+                    </li>
+                  )}
+                  {librarySummary.mixed > 0 && (
+                    <li>
+                      <strong>{librarySummary.mixed}</strong> 混合库
+                    </li>
+                  )}
+                  {librarySummary.other > 0 && (
+                    <li>
+                      <strong>{librarySummary.other}</strong> 其他
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              <dl className={styles.heroMetrics}>
+                <div className={styles.totalMetric}>
+                  <dt>影视总量</dt>
+                  <dd>{formatCount(totalContent)}</dd>
                 </div>
-              ))}
-            </div>
-          }
-        />
-      )}
+                <div>
+                  <dt>
+                    <Film aria-hidden="true" /> 电影
+                  </dt>
+                  <dd>{formatCount(stats.total_movies || 0)}</dd>
+                </div>
+                <div>
+                  <dt>
+                    <Tv aria-hidden="true" /> 剧集
+                  </dt>
+                  <dd>{formatCount(stats.total_series || 0)}</dd>
+                </div>
+              </dl>
+            </section>
 
-      <Spin spinning={loading && !stats}>
-        {/* 顶部三个大数字概览 */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={24} md={8}>
-            <SummaryCard
-              title="媒体库数量"
-              value={stats?.total_libraries || 0}
-              suffix="个"
-              icon={<AppstoreOutlined />}
-              gradient={['#3a7bd5', '#3a6073']}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <SummaryCard
-              title="电影总数"
-              value={stats?.total_movies || 0}
-              suffix="部"
-              icon={<VideoCameraOutlined />}
-              gradient={['#2980b9', '#6dd5fa']}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-            <SummaryCard
-              title="电视剧总数"
-              value={stats?.total_series || 0}
-              suffix="部"
-              icon={<DesktopOutlined />}
-              gradient={['#8e2de2', '#c471f5']}
-            />
-          </Col>
-        </Row>
+            <section className={styles.librariesSection}>
+              <header className={styles.sectionHeader}>
+                <div>
+                  <p>LIBRARIES</p>
+                  <h2>媒体库</h2>
+                  <span>按内容量排序</span>
+                </div>
+                <strong>{stats.libraries?.length || 0} 个</strong>
+              </header>
 
-        {/* 各媒体库明细 */}
-        <div style={{ marginTop: 24 }}>
-          <Space
-            align="baseline"
-            style={{
-              marginBottom: 12,
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <Title level={5} style={{ margin: 0 }}>
-              媒体库明细
-            </Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              按内容总量降序排序
-            </Text>
-          </Space>
-
-          {!loading && (!stats?.libraries || stats.libraries.length === 0) ? (
-            <Card variant="borderless" style={{ borderRadius: 14 }}>
-              <Empty description="暂无 Emby 媒体库数据" />
-            </Card>
-          ) : (
-            <Row gutter={[16, 16]}>
-              {(stats?.libraries || []).map((lib) => (
-                <Col key={lib.emby_library_id} xs={24} sm={12} lg={8} xxl={6}>
-                  <LibraryCard
-                    stat={lib}
-                    totalMovies={stats?.total_movies || 0}
-                    totalSeries={stats?.total_series || 0}
-                  />
-                </Col>
-              ))}
-            </Row>
-          )}
-        </div>
-      </Spin>
+              {!stats.libraries || stats.libraries.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <Library aria-hidden="true" />
+                  <h3>还没有可展示的媒体库</h3>
+                  <p>确认 Emby 已创建媒体库并允许当前 API Key 访问。</p>
+                </div>
+              ) : (
+                <div className={styles.libraryGrid}>
+                  {stats.libraries.map((library, index) => (
+                    <LibraryCard
+                      index={index}
+                      key={library.emby_library_id}
+                      stat={library}
+                      totalMovies={stats.total_movies || 0}
+                      totalSeries={stats.total_series || 0}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        ) : (
+          <div className={styles.emptyState}>
+            <Library aria-hidden="true" />
+            <h3>暂时无法读取媒体库</h3>
+            <p>刷新页面重试，或检查 Emby 服务配置。</p>
+          </div>
+        )}
+      </div>
     </PageContainer>
   );
 };

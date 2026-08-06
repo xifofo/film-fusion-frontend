@@ -15,6 +15,7 @@ const Login = lazy(() => import('@/pages/user/login'));
 const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
 const CloudPaths = lazy(() => import('@/pages/cloud-paths'));
 const Directories = lazy(() => import('@/pages/directories'));
+const DownloadQueue = lazy(() => import('@/pages/download-queue'));
 const Organize = lazy(() => import('@/pages/directories/Organize'));
 const EpisodeOrganize = lazy(
   () => import('@/pages/directories/EpisodeOrganize'),
@@ -138,6 +139,10 @@ const routes: RouteObject[] = [
       {
         path: 'directories',
         element: <Directories />,
+      },
+      {
+        path: 'download-queue',
+        element: <DownloadQueue />,
       },
       {
         path: 'directories/organize/:id',

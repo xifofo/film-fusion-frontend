@@ -1,4 +1,3 @@
-import type { Settings as ProLayoutSettings } from '@ant-design/pro-components';
 import {
   createContext,
   type Dispatch,
@@ -11,17 +10,16 @@ import {
   useState,
 } from 'react';
 import { getCurrentUser } from '@/services/film-fusion';
-import defaultSettings from '../../config/defaultSettings';
-
-type LayoutSettings = Partial<ProLayoutSettings>;
+import defaultSettings, {
+  type AppLayoutSettings,
+} from '../../config/defaultSettings';
 
 type AppStateContextValue = {
   currentUser?: API.User;
   loading: boolean;
-  settings: LayoutSettings;
+  settings: AppLayoutSettings;
   refreshCurrentUser: () => Promise<API.User | undefined>;
   setCurrentUser: Dispatch<SetStateAction<API.User | undefined>>;
-  setSettings: Dispatch<SetStateAction<LayoutSettings>>;
 };
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(
@@ -31,7 +29,7 @@ const AppStateContext = createContext<AppStateContextValue | undefined>(
 const LOGIN_PATH = '/user/login';
 const THEME_STORAGE_KEY = 'film-fusion-nav-theme';
 
-function resolveInitialSettings(): LayoutSettings {
+function resolveInitialSettings(): AppLayoutSettings {
   try {
     const navTheme = localStorage.getItem(THEME_STORAGE_KEY);
     if (navTheme === 'light' || navTheme === 'realDark') {
@@ -49,9 +47,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       window.location.pathname !== LOGIN_PATH &&
       Boolean(localStorage.getItem('token')),
   );
-  const [settings, setSettings] = useState<LayoutSettings>(
-    resolveInitialSettings,
-  );
+  const [settings] = useState<AppLayoutSettings>(resolveInitialSettings);
 
   const refreshCurrentUser = useCallback(async () => {
     setLoading(true);
@@ -83,6 +79,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const navTheme = settings.navTheme === 'realDark' ? 'realDark' : 'light';
     document.documentElement.dataset.theme =
       navTheme === 'realDark' ? 'dark' : 'light';
+    document.documentElement.classList.toggle('dark', navTheme === 'realDark');
     try {
       localStorage.setItem(THEME_STORAGE_KEY, navTheme);
     } catch {}
@@ -95,7 +92,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       settings,
       refreshCurrentUser,
       setCurrentUser,
-      setSettings,
     }),
     [currentUser, loading, refreshCurrentUser, settings],
   );
