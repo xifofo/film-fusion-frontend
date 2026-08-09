@@ -1,15 +1,22 @@
 import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import {
+  Alert,
   Button,
+  Modal,
   message,
-  Popconfirm,
   Popover,
+  Select,
   Space,
   Tag,
   Tooltip,
   Typography,
 } from 'antd';
 import React, { useState } from 'react';
+import {
+  DEFAULT_WEB115_RELOGIN_APP,
+  WEB115_RELOGIN_APP_OPTIONS,
+  WEB115_USE_DEFAULT_APP,
+} from '@/constants/web115';
 import { refreshWeb115Cookie } from '@/services/film-fusion';
 
 const { Text } = Typography;
@@ -39,7 +46,10 @@ const CookieKeepAlive: React.FC<CookieKeepAliveProps> = ({
   const detail = (
     <Space direction="vertical" size={4} style={{ maxWidth: 300 }}>
       <Text>
-        绑定设备端：<Text strong>{status.app || '—'}</Text>
+        自动续期端：<Text strong>{status.app || '—'}</Text>
+      </Text>
+      <Text type="secondary">
+        续期策略：{status.use_default ? '跟随系统默认' : '该存储单独设置'}
       </Text>
       <Text type="secondary">上次续期：{fmtTime(status.last_refresh_at)}</Text>
       <Text type="secondary">上次检查：{fmtTime(status.last_check_at)}</Text>
@@ -74,6 +84,10 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
   onChanged,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<
+    API.Web115ReloginApp | typeof WEB115_USE_DEFAULT_APP
+  >(WEB115_USE_DEFAULT_APP);
 
   if (record.storage_type !== '115open') {
     return null;
@@ -85,12 +99,29 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
       ? '请先配置 Cookie'
       : undefined;
 
+  const handleOpen = () => {
+    setSelectedApp(
+      status?.use_default
+        ? WEB115_USE_DEFAULT_APP
+        : status?.app || DEFAULT_WEB115_RELOGIN_APP,
+    );
+    setOpen(true);
+  };
+
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const resp = await refreshWeb115Cookie({ cloud_storage_id: record.id });
+      const resp = await refreshWeb115Cookie({
+        cloud_storage_id: record.id,
+        app: selectedApp,
+      });
       if (resp.code === 0) {
-        message.success('Cookie 续期成功');
+        message.success(
+          selectedApp === WEB115_USE_DEFAULT_APP
+            ? 'Cookie 续期成功，后续自动续期将跟随系统默认'
+            : `Cookie 续期成功，自动续期端已设为 ${selectedApp}`,
+        );
+        setOpen(false);
       } else {
         message.error(resp.message || 'Cookie 续期失败');
       }
@@ -115,17 +146,56 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
   }
 
   return (
-    <Popconfirm
-      title="立即换端续期？"
-      description="用当前在线 Cookie 免扫码换发一份新 Cookie（绑定独立设备端，不影响日常登录）。"
-      onConfirm={handleRefresh}
-      okText="续期"
-      cancelText="取消"
-    >
-      <Button type="link" size="small" loading={loading} style={{ padding: 0 }}>
+    <>
+      <Button
+        type="link"
+        size="small"
+        loading={loading}
+        style={{ padding: 0 }}
+        onClick={handleOpen}
+      >
         立即续期
       </Button>
-    </Popconfirm>
+      <Modal
+        title={`Cookie 续期 - ${record.storage_name}`}
+        open={open}
+        okText="续期并保存"
+        cancelText="取消"
+        confirmLoading={loading}
+        maskClosable={!loading}
+        keyboard={!loading}
+        destroyOnHidden
+        onOk={handleRefresh}
+        onCancel={() => {
+          if (!loading) setOpen(false);
+        }}
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div>
+            <Text strong>自动续期设备端</Text>
+            <Select
+              aria-label="自动续期设备端"
+              value={selectedApp}
+              options={[
+                {
+                  label: `跟随系统默认（当前：${status?.app || DEFAULT_WEB115_RELOGIN_APP}）`,
+                  value: WEB115_USE_DEFAULT_APP,
+                },
+                ...WEB115_RELOGIN_APP_OPTIONS,
+              ]}
+              style={{ width: '100%', marginTop: 8 }}
+              onChange={setSelectedApp}
+            />
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            message="该选择同时用于本次和后续自动续期"
+            description="选择“跟随系统默认”时使用系统设置中的默认设备端；选择具体设备端则保存为此存储的独立设置。确认后系统会立即换发一份新 Cookie。"
+          />
+        </Space>
+      </Modal>
+    </>
   );
 };
 

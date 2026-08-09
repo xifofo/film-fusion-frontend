@@ -809,11 +809,21 @@ declare namespace API {
     result?: Organize115CookieResult;
   };
 
+  type Web115ReloginApp =
+    | 'web'
+    | 'android'
+    | 'ios'
+    | 'tv'
+    | 'alipaymini'
+    | 'wechatmini'
+    | 'qandroid';
+
   /** 115 Cookie 保活状态 */
   type Web115CookieStatus = {
     storage_id: number;
     storage_name: string;
-    app: string;
+    app: Web115ReloginApp;
+    use_default: boolean;
     healthy: boolean;
     has_cookie: boolean;
     last_refresh_at?: string;
@@ -825,7 +835,7 @@ declare namespace API {
   /** 115 Cookie 换端续期请求 */
   type Web115CookieRefreshRequest = {
     cloud_storage_id: number;
-    app?: string;
+    app?: Web115ReloginApp | 'default';
   };
 
   /** 115 Cookie 目录请求参数 */
@@ -943,6 +953,8 @@ declare namespace API {
     errors: string[];
   };
 
+  type Match302AccessMode = 'auto' | 'openapi_only' | 'cookie_only';
+
   /** 云存储配置 */
   type CloudStorage = {
     id: number;
@@ -964,6 +976,7 @@ declare namespace API {
     error_message?: string;
     last_error_at?: string;
     config?: string;
+    match302_access_mode: Match302AccessMode;
     match302_max_active: number;
     match302_cache_max_gb: number;
     sort_order: number;
@@ -989,6 +1002,7 @@ declare namespace API {
     auto_refresh?: boolean;
     refresh_before_min?: number;
     config?: string;
+    match302_access_mode?: Match302AccessMode;
     match302_max_active?: number;
     match302_cache_max_gb?: number;
     sort_order?: number;
@@ -1005,6 +1019,7 @@ declare namespace API {
     refresh_before_min?: number;
     status?: 'active' | 'disabled' | 'error';
     config?: string;
+    match302_access_mode?: Match302AccessMode;
     match302_max_active?: number;
     match302_cache_max_gb?: number;
     sort_order?: number;
@@ -1508,6 +1523,7 @@ declare namespace API {
       username: string;
       password: string;
       download_115_concurrency: number;
+      cookie_115_default_app: Web115ReloginApp;
       process_new_media: boolean;
       security: {
         enabled: boolean;

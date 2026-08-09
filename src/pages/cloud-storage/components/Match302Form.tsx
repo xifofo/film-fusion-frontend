@@ -1,8 +1,16 @@
-import { ProForm, ProFormDigit } from '@ant-design/pro-components';
+import {
+  ProForm,
+  ProFormDigit,
+  ProFormSelect,
+} from '@ant-design/pro-components';
 import React from 'react';
-import { HALF_COL, type StorageSectionFormProps } from './storageFormTypes';
+import {
+  FULL_COL,
+  HALF_COL,
+  type StorageSectionFormProps,
+} from './storageFormTypes';
 
-/** Match302 分区：最大同时播放 / 子账号缓存上限 */
+/** Match302 分区：访问方式 / 最大同时播放 / 子账号缓存上限 */
 const Match302Form: React.FC<StorageSectionFormProps> = ({
   values,
   onSave,
@@ -11,10 +19,26 @@ const Match302Form: React.FC<StorageSectionFormProps> = ({
     grid
     rowProps={{ gutter: [16, 0] }}
     layout="vertical"
-    initialValues={values}
-    submitter={{ searchConfig: { submitText: '保存 Match302', resetText: '重置' } }}
+    initialValues={{
+      ...values,
+      match302_access_mode: values.match302_access_mode || 'auto',
+    }}
+    submitter={{
+      searchConfig: { submitText: '保存 Match302', resetText: '重置' },
+    }}
     onFinish={async (value) => onSave(value)}
   >
+    <ProFormSelect
+      colProps={FULL_COL}
+      name="match302_access_mode"
+      label="Match302 访问方式"
+      options={[
+        { label: '自动降级（OpenAPI → Cookie）', value: 'auto' },
+        { label: '仅 OpenAPI', value: 'openapi_only' },
+        { label: '仅 Cookie（DownloadWithUA）', value: 'cookie_only' },
+      ]}
+      extra="控制路径解析、播放直链和秒传源直链。选择“仅 Cookie”后，即使保留 AccessToken，Match302 链路也不会调用 OpenAPI；多账号秒传本身仍需有效 Cookie。"
+    />
     <ProFormDigit
       colProps={HALF_COL}
       name="match302_max_active"

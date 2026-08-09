@@ -10,7 +10,6 @@ import {
   ProForm,
   ProFormDigit,
   ProFormSelect,
-  ProFormSwitch,
   ProFormText,
 } from '@ant-design/pro-components';
 import {
@@ -29,6 +28,8 @@ import {
 import { createStyles } from 'antd-style';
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
+import { WEB115_RELOGIN_APP_OPTIONS } from '@/constants/web115';
+import { SettingsToggle } from '@/pages/system-settings/components/SettingsToggle';
 import {
   getAppConfig,
   getHDHiveAuthorizeURL,
@@ -160,72 +161,8 @@ const useStyles = createStyles(({ css, token }) => ({
   toggleGrid: css`
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
-
-    > .ant-form-item {
-      flex: 0 1 320px;
-      min-width: 0;
-      margin: 0;
-      padding: 7px 10px 7px 12px;
-      border: 1px solid ${token.colorBorderSecondary};
-      border-radius: 8px;
-      background: ${token.colorFillAlter};
-      transition:
-        border-color ${token.motionDurationFast},
-        background ${token.motionDurationFast};
-    }
-
-    > .ant-form-item:hover {
-      border-color: ${token.colorBorder};
-      background: ${token.colorFillQuaternary};
-    }
-
-    > .ant-form-item > .ant-form-item-row {
-      flex-flow: row nowrap !important;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    > .ant-form-item .ant-form-item-label {
-      flex: 1 1 auto !important;
-      min-width: 0;
-      max-width: none;
-      padding: 0 !important;
-      text-align: start;
-      white-space: normal;
-    }
-
-    > .ant-form-item .ant-form-item-label > label {
-      height: auto;
-      color: ${token.colorText};
-      line-height: 20px;
-      white-space: normal;
-    }
-
-    > .ant-form-item .ant-form-item-control {
-      flex: 0 0 auto !important;
-      width: auto;
-      min-width: auto;
-      max-width: none;
-    }
-
-    > .ant-form-item .ant-form-item-control-input {
-      min-height: 24px;
-    }
-
-    > .ant-form-item .ant-form-item-control-input-content {
-      display: flex;
-      align-items: center;
-      line-height: 1;
-    }
-
-    @media (max-width: 700px) {
-      > .ant-form-item {
-        flex-basis: 100%;
-      }
-    }
+    gap: 10px;
+    margin-bottom: 20px;
   `,
   sectionAlert: css`
     margin-bottom: 20px;
@@ -704,13 +641,35 @@ const SystemSettingsPage: React.FC = () => {
                         </SettingsSection>
 
                         <SettingsSection
+                          title="115 Cookie 保活"
+                          description="设置未单独指定设备端的 115 存储在自动续期时使用的全局默认值。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormSelect
+                              width="md"
+                              name={['server', 'cookie_115_default_app']}
+                              label="默认自动续期设备端"
+                              tooltip="保存后即时生效，但不会立即触发续期；单存储设置仍优先于此默认值。"
+                              options={[...WEB115_RELOGIN_APP_OPTIONS]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: '请选择默认自动续期设备端',
+                                },
+                              ]}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
                           title="登录与访问保护"
                           description="限制连续失败请求；经过反向代理时再填写可信代理网段。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['server', 'security', 'enabled']}
-                              label="启用管理后台登录保护"
+                              title="管理后台登录保护"
+                              description="登录失败达到阈值后，临时封禁账号与来源 IP。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -772,9 +731,10 @@ const SystemSettingsPage: React.FC = () => {
                           description="控制是否接收并处理新入库媒体事件。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['server', 'process_new_media']}
-                              label="处理新增媒体事件"
+                              title="处理新增媒体事件"
+                              description="收到 Webhook 新入库通知后，执行已配置的媒体处理流程。"
                             />
                           </div>
                         </SettingsSection>
@@ -1083,9 +1043,10 @@ const SystemSettingsPage: React.FC = () => {
                             }
                           />
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['webhook', 'clouddrive2', 'enabled']}
-                              label="启用 Bearer Token 鉴权"
+                              title="Bearer Token 鉴权"
+                              description="要求 CloudDrive2 请求携带正确 Token；关闭后仍会接收 Webhook。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1147,11 +1108,11 @@ const SystemSettingsPage: React.FC = () => {
                           description="连接 Emby 并配置 FilmFusion 的代理监听参数。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['emby', 'enabled']}
-                              label={
-                                <span>启用 Emby 代理服务{restartTag}</span>
-                              }
+                              title="Emby 代理服务"
+                              description="启动 FilmFusion 的 Emby 反向代理监听。"
+                              badge={restartTag}
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1196,13 +1157,15 @@ const SystemSettingsPage: React.FC = () => {
                           description="控制播放请求中需要补充的媒体元数据。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['emby', 'add_current_media_info']}
-                              label="播放时补充当前媒体信息"
+                              title="补充当前媒体信息"
+                              description="开始播放时，获取并补充当前媒体的播放信息。"
                             />
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['emby', 'add_next_media_info']}
-                              label="添加下一部媒体信息"
+                              title="预取下一集媒体信息"
+                              description="播放剧集时，提前获取下一集的媒体信息。"
                             />
                           </div>
                         </SettingsSection>
@@ -1212,9 +1175,10 @@ const SystemSettingsPage: React.FC = () => {
                           description="限制 Emby 登录失败请求；直接开放代理端口时无需填写可信代理。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['emby', 'security', 'enabled']}
-                              label="启用登录保护"
+                              title="Emby 登录保护"
+                              description="登录失败达到阈值后，临时封禁账号与来源 IP。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1292,9 +1256,10 @@ const SystemSettingsPage: React.FC = () => {
                             }
                           />
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['telegram', 'enabled']}
-                              label="启用 Telegram 通知"
+                              title="Telegram 通知"
+                              description="允许 FilmFusion 通过下方 Bot 配置发送消息。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1348,17 +1313,20 @@ const SystemSettingsPage: React.FC = () => {
                           description="选择消息发送方式与需要推送的安全告警。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['telegram', 'silent']}
-                              label="静默发送"
+                              title="静默发送"
+                              description="Telegram 收到消息时不播放提示音。"
                             />
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['telegram', 'notify_emby_brute_force']}
-                              label="Emby 登录爆破告警"
+                              title="Emby 登录爆破告警"
+                              description="检测到 Emby 登录暴力尝试时发送 Telegram 告警。"
                             />
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['telegram', 'notify_system_brute_force']}
-                              label="FilmFusion 登录爆破告警"
+                              title="FilmFusion 登录爆破告警"
+                              description="检测到管理后台登录暴力尝试时发送 Telegram 告警。"
                             />
                           </div>
                         </SettingsSection>
@@ -1376,9 +1344,10 @@ const SystemSettingsPage: React.FC = () => {
                           description="控制自动生成任务以及海报拼接规则。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['emby', 'cover', 'enabled']}
-                              label="启用封面生成"
+                              title="自动生成媒体库封面"
+                              description="允许封面生成器按下方 cron 定时更新媒体库封面。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1496,9 +1465,10 @@ const SystemSettingsPage: React.FC = () => {
                             description="查询结果会按下方缓存时间复用，减少重复请求。"
                           />
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['tmdb', 'enabled']}
-                              label="启用 TMDB API"
+                              title="TMDB API"
+                              description="允许预整理队列查询 TMDB 本季集数并缓存结果。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1582,9 +1552,10 @@ const SystemSettingsPage: React.FC = () => {
                             }
                           />
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['hdhive', 'enabled']}
-                              label="启用 HDHive OpenAPI"
+                              title="HDHive OpenAPI"
+                              description="允许 FilmFusion 使用下方应用参数调用 HDHive。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1636,9 +1607,10 @@ const SystemSettingsPage: React.FC = () => {
                           description="管理用户 Token 及其自动续期策略。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['hdhive', 'auto_refresh']}
-                              label="自动刷新 Access Token"
+                              title="自动刷新 Access Token"
+                              description="到期前使用已保存的 Refresh Token 自动续期。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
@@ -1705,9 +1677,11 @@ const SystemSettingsPage: React.FC = () => {
                           description="设置日志详细程度、输出形式与文件轮转策略。"
                         >
                           <div className={styles.toggleGrid}>
-                            <ProFormSwitch
+                            <SettingsToggle
                               name={['log', 'compress']}
-                              label={<span>压缩旧日志{restartTag}</span>}
+                              title="压缩旧日志"
+                              description="日志轮转后压缩历史文件，减少磁盘占用。"
+                              badge={restartTag}
                             />
                           </div>
                           <div className={styles.fieldGrid}>

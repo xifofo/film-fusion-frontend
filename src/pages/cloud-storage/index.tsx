@@ -95,6 +95,17 @@ const CloudStorageList: React.FC = () => {
   const limitText = (value?: number) =>
     value && value > 0 ? `${value}` : '不限';
 
+  const getMatch302AccessModeTag = (mode?: API.Match302AccessMode) => {
+    const modeMap = {
+      auto: { color: 'default', text: '自动降级' },
+      openapi_only: { color: 'blue', text: '仅 OpenAPI' },
+      cookie_only: { color: 'green', text: '仅 Cookie' },
+    } as const;
+    const normalizedMode = mode && mode in modeMap ? mode : 'auto';
+    const item = modeMap[normalizedMode];
+    return <Tag color={item.color}>方式 {item.text}</Tag>;
+  };
+
   const columns: ProColumns<API.CloudStorage>[] = [
     {
       title: 'ID',
@@ -245,11 +256,12 @@ const CloudStorageList: React.FC = () => {
       render: (_, record) => record.error_message || '-',
     },
     {
-      title: '302限制',
-      width: 190,
+      title: 'Match302',
+      width: 250,
       hideInSearch: true,
       render: (_, record) => (
         <Space size={4} wrap>
+          {getMatch302AccessModeTag(record.match302_access_mode)}
           <Tag>播放 {limitText(record.match302_max_active)}</Tag>
           <Tag>缓存 {limitText(record.match302_cache_max_gb)} GB</Tag>
         </Space>
