@@ -5,6 +5,7 @@ import {
   CloseCircleOutlined,
   DeleteOutlined,
   ExportOutlined,
+  EyeInvisibleOutlined,
   EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
@@ -18,7 +19,6 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import {
-  FooterToolbar,
   PageContainer,
   ProDescriptions,
   ProTable,
@@ -80,6 +80,10 @@ const PAGE_LIMIT = 1150;
 const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
 const EPISODE_FILENAME_REGEX_STORAGE_KEY =
   'film-fusion.episodeOrganize.filenameRegex';
+const DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
+  'film-fusion.organize.directoryPanelVisible';
+const EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
+  'film-fusion.episodeOrganize.directoryPanelVisible';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
@@ -153,6 +157,28 @@ function saveFilenameRegexConfig(
   }
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(config));
+  } catch {
+    return;
+  }
+}
+
+function loadDirectoryPanelVisible(storageKey: string): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  try {
+    return window.localStorage.getItem(storageKey) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function saveDirectoryPanelVisible(storageKey: string, visible: boolean) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(storageKey, String(visible));
   } catch {
     return;
   }
@@ -485,6 +511,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const filenameRegexStorageKey = episodeMode
     ? EPISODE_FILENAME_REGEX_STORAGE_KEY
     : FILENAME_REGEX_STORAGE_KEY;
+  const directoryPanelVisibleStorageKey = episodeMode
+    ? EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY
+    : DIRECTORY_PANEL_VISIBLE_STORAGE_KEY;
   const defaultRegexConfig = episodeMode
     ? defaultEpisodeFilenameRegexConfig
     : defaultFilenameRegexConfig;
@@ -501,6 +530,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [selectedKey, setSelectedKey] = useState<string>();
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [directoryPanelVisible, setDirectoryPanelVisible] = useState(() =>
+    loadDirectoryPanelVisible(directoryPanelVisibleStorageKey),
+  );
   const [filenameRegexConfig, setFilenameRegexConfig] =
     useState<FilenameRegexConfig>(() =>
       loadFilenameRegexConfig(filenameRegexStorageKey, defaultRegexConfig),
@@ -565,6 +597,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       setBestVersionEnabled(true);
     }
   }, [episodeMode]);
+
+  useEffect(() => {
+    saveDirectoryPanelVisible(
+      directoryPanelVisibleStorageKey,
+      directoryPanelVisible,
+    );
+  }, [directoryPanelVisible, directoryPanelVisibleStorageKey]);
 
   const previewCategoryOptions = useMemo(() => {
     const names =
@@ -2487,7 +2526,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       ) : null}
 
       <Row gutter={16} style={{ alignItems: 'stretch' }}>
-        <Col xs={24} md={9} lg={8} xl={7}>
+        <Col
+          xs={24}
+          md={9}
+          lg={8}
+          xl={7}
+          style={{ display: directoryPanelVisible ? undefined : 'none' }}
+        >
           <Card
             title={
               <Space>
@@ -2540,9 +2585,33 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           </Card>
         </Col>
 
-        <Col xs={24} md={15} lg={16} xl={17}>
+        <Col
+          xs={24}
+          md={directoryPanelVisible ? 15 : 24}
+          lg={directoryPanelVisible ? 16 : 24}
+          xl={directoryPanelVisible ? 17 : 24}
+        >
           <Card
             size="small"
+            extra={
+              <Button
+                aria-label={
+                  directoryPanelVisible ? '隐藏 115 目录栏' : '显示 115 目录栏'
+                }
+                icon={
+                  directoryPanelVisible ? (
+                    <EyeInvisibleOutlined />
+                  ) : (
+                    <EyeOutlined />
+                  )
+                }
+                onClick={() => setDirectoryPanelVisible((visible) => !visible)}
+                size="small"
+                type="text"
+              >
+                {directoryPanelVisible ? '隐藏目录栏' : '显示目录栏'}
+              </Button>
+            }
             title={
               <Space size={8} wrap>
                 <span style={{ color: 'rgba(0,0,0,0.45)' }}>当前查看：</span>
@@ -2552,7 +2621,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   />
                 ) : (
                   <Typography.Text type="secondary">
-                    点击左侧目录预览路径，勾选 ☑ 多选目录后点击整理
+                    {directoryPanelVisible
+                      ? '点击左侧目录预览路径，勾选 ☑ 多选目录后点击整理'
+                      : '目录栏已隐藏，显示目录栏后可继续选择目录'}
                   </Typography.Text>
                 )}
               </Space>
@@ -3235,27 +3306,37 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         </Space>
       </Modal>
 
-      <div style={{ height: 72 }} />
-      <FooterToolbar
-        extra={
-          <Space size={8} wrap>
-            <Tag color={checkedKeys.length > 0 ? 'blue' : 'default'}>
-              已选目录 {checkedKeys.length}
-            </Tag>
-            {activePreviewTaskLabel ? (
-              <Typography.Text
-                type="secondary"
-                ellipsis={{ tooltip: activePreviewTaskLabel }}
-                style={{ maxWidth: 420 }}
-              >
-                当前预整理：{activePreviewTaskLabel}
-              </Typography.Text>
-            ) : null}
-          </Space>
-        }
+      <div aria-hidden="true" className="h-32 sm:h-24 xl:h-20" />
+      <section
+        aria-label="整理操作"
+        className="fixed right-3 bottom-3 left-3 z-[99] box-border flex w-auto max-w-max flex-col gap-2 rounded-2xl border border-black/[0.08] bg-white/90 px-3 py-2.5 shadow-[0_14px_42px_rgba(0,0,0,0.16)] backdrop-blur-2xl sm:right-4 sm:bottom-4 sm:left-auto lg:right-6 lg:bottom-5 lg:max-w-[calc(100vw-var(--app-sidebar-offset)-3rem)] xl:flex-row xl:items-center dark:border-white/10 dark:bg-neutral-950/88 dark:shadow-[0_14px_42px_rgba(0,0,0,0.5)]"
       >
-        <Space size={8} wrap>
-          <Space size={4}>
+        <div className="flex min-w-0 items-center gap-2 px-0.5">
+          <Tag
+            color={checkedKeys.length > 0 ? 'blue' : 'default'}
+            style={{ marginInlineEnd: 0 }}
+          >
+            已选 {checkedKeys.length} 个目录
+          </Tag>
+          {activePreviewTaskLabel ? (
+            <Typography.Text
+              className="min-w-0"
+              type="secondary"
+              ellipsis={{ tooltip: activePreviewTaskLabel }}
+              style={{ maxWidth: 320 }}
+            >
+              当前预整理：{activePreviewTaskLabel}
+            </Typography.Text>
+          ) : null}
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="h-px w-full shrink-0 bg-black/[0.08] xl:h-6 xl:w-px dark:bg-white/10"
+        />
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1">
             <Typography.Text type="secondary">演练模式</Typography.Text>
             <Switch
               checked={dryRun}
@@ -3263,7 +3344,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               unCheckedChildren="否"
               onChange={(checked) => setDryRun(checked)}
             />
-          </Space>
+          </div>
           <Button
             icon={<PlayCircleOutlined />}
             onClick={() => triggerOrganize('dry')}
@@ -3290,8 +3371,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           >
             {applyButtonText}
           </Button>
-        </Space>
-      </FooterToolbar>
+        </div>
+      </section>
     </PageContainer>
   );
 };

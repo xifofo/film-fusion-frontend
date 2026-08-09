@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Menu as MenuIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 
@@ -112,7 +113,14 @@ export default function AppLayout() {
   return (
     <>
       {currentUser && (
-        <div className="relative isolate flex min-h-svh w-full overflow-x-clip bg-[#f2f2ef] font-sans text-neutral-950 [--ring:#171717] dark:bg-[#080808] dark:text-white dark:[--ring:#ffffff]">
+        <div
+          className="relative isolate flex min-h-svh w-full overflow-x-clip bg-[#f2f2ef] font-sans text-neutral-950 [--ring:#171717] dark:bg-[#080808] dark:text-white dark:[--ring:#ffffff]"
+          style={
+            {
+              '--app-sidebar-offset': sidebarCollapsed ? '5.75rem' : '17.5rem',
+            } as CSSProperties
+          }
+        >
           <div
             aria-hidden="true"
             className="pointer-events-none fixed inset-0 -z-10 opacity-80 dark:opacity-55"

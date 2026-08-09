@@ -1,4 +1,4 @@
-import { LoaderCircle, LogOut } from 'lucide-react';
+import { ChevronUp, LoaderCircle, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -59,41 +59,68 @@ export function AccountMenu({ collapsed = false }: AccountMenuProps) {
       <DropdownMenuTrigger
         aria-label="打开账户菜单"
         className={cn(
-          'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border-0 !bg-transparent px-1 text-left text-neutral-950 shadow-none outline-none hover:!bg-transparent focus-visible:ring-2 focus-visible:ring-black/15 data-popup-open:!bg-transparent dark:text-white dark:focus-visible:ring-white/25',
+          'group flex h-11 w-full min-w-0 items-center gap-2.5 rounded-xl border-0 !bg-transparent px-2 text-left text-neutral-950 shadow-none outline-none transition-colors hover:!bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-black/15 data-popup-open:!bg-black/[0.055] dark:text-white dark:hover:!bg-white/[0.07] dark:focus-visible:ring-white/25 dark:data-popup-open:!bg-white/10',
           collapsed && 'justify-center px-0',
         )}
         title={collapsed ? currentUser.username : undefined}
       >
-        <Avatar className="size-7" size="sm">
+        <Avatar
+          className="size-8 rounded-[8px] border-black/10 bg-neutral-950 shadow-[0_5px_14px_rgba(0,0,0,0.14)] dark:border-white/12 dark:bg-white"
+          size="sm"
+        >
           {currentUser.avatar && (
             <AvatarImage alt="" src={currentUser.avatar} />
           )}
-          <AvatarFallback>{initial}</AvatarFallback>
+          <AvatarFallback className="text-[11px] tracking-[-0.02em]">
+            {initial}
+          </AvatarFallback>
         </Avatar>
         <span className={cn('min-w-0 flex-1', collapsed && 'sr-only')}>
-          <span className="block max-w-32 truncate text-[13px] font-medium">
+          <span className="block truncate text-[13px] font-semibold tracking-[-0.01em]">
             {currentUser.username}
           </span>
         </span>
+        {!collapsed && (
+          <ChevronUp
+            aria-hidden="true"
+            className="size-3.5 shrink-0 text-neutral-400 transition-colors group-hover:text-neutral-600 group-data-popup-open:text-neutral-700 dark:text-white/35 dark:group-hover:text-white/60 dark:group-data-popup-open:text-white/70"
+            strokeWidth={1.8}
+          />
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="start"
-        className="w-64 rounded-2xl p-2"
+        className="w-[15.25rem] rounded-[18px] p-1.5"
         side="top"
+        sideOffset={10}
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2 py-2 font-normal">
-            <span className="block truncate text-sm font-semibold text-neutral-950 dark:text-white">
-              {currentUser.username}
-            </span>
-            <span className="mt-0.5 block truncate text-[11px] text-neutral-400 dark:text-white/40">
-              {currentUser.email?.trim() || 'Film Fusion 管理账户'}
+          <DropdownMenuLabel className="flex items-center gap-3 px-2.5 py-2.5 font-normal">
+            <Avatar
+              className="size-9 rounded-[9px] border-black/10 bg-neutral-950 shadow-[0_6px_18px_rgba(0,0,0,0.14)] dark:border-white/12 dark:bg-white"
+              size="lg"
+            >
+              {currentUser.avatar && (
+                <AvatarImage alt="" src={currentUser.avatar} />
+              )}
+              <AvatarFallback className="text-xs tracking-[-0.02em]">
+                {initial}
+              </AvatarFallback>
+            </Avatar>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-medium tracking-[0.08em] text-neutral-400 dark:text-white/40">
+                当前账户
+              </span>
+              <span className="mt-0.5 block truncate text-sm font-semibold tracking-[-0.01em] text-neutral-950 dark:text-white">
+                {currentUser.username}
+              </span>
             </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          className="h-10 rounded-xl px-2.5"
           disabled={loggingOut}
           onClick={() => void loginOut()}
           variant="destructive"
