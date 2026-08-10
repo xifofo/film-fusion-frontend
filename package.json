@@ -46,6 +46,7 @@
     "dayjs": "^1.11.13",
     "liquid-glass-react": "^1.1.1",
     "lucide-react": "^1.27.0",
+    "motion": "^13.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-intl": "^10.1.18",

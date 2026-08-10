@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import { useEffect, useId, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { AccountMenu } from '@/components/AccountMenu';
@@ -28,6 +29,8 @@ export function AppSidebar({
   title,
 }: AppSidebarProps) {
   const location = useLocation();
+  const activeIndicatorId = useId();
+  const shouldReduceMotion = useReducedMotion();
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     return new Set(
       menuItems
@@ -75,7 +78,7 @@ export function AppSidebar({
           className={cn(
             'group relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium no-underline transition-[background-color,color,box-shadow,transform] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30',
             active
-              ? '!bg-neutral-950 !text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] dark:!bg-white dark:!text-neutral-950'
+              ? '!text-white dark:!text-neutral-950'
               : '!text-neutral-600 hover:!bg-black/[0.055] hover:!text-neutral-950 dark:!text-white/62 dark:hover:!bg-white/10 dark:hover:!text-white',
             collapsed && 'justify-center px-0',
             nested && !collapsed && 'h-9 text-[13px]',
@@ -84,15 +87,39 @@ export function AppSidebar({
           title={collapsed ? item.name : undefined}
           to={item.path}
         >
+          {active && (
+            <motion.span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-neutral-950 shadow-[0_10px_24px_rgba(0,0,0,0.16)] dark:bg-white"
+              initial={false}
+              layoutId={activeIndicatorId}
+              style={{ borderRadius: 12 }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0 }
+                  : {
+                      type: 'spring',
+                      stiffness: 520,
+                      damping: 38,
+                      mass: 0.62,
+                    }
+              }
+            />
+          )}
           <Icon
             aria-hidden="true"
             className={cn(
-              'size-[17px] shrink-0 transition-transform duration-200 group-hover:scale-105',
+              'relative z-10 size-[17px] shrink-0 transition-transform duration-200 group-hover:scale-105',
               nested && 'size-4',
             )}
             strokeWidth={active ? 2.2 : 1.8}
           />
-          <span className={cn('min-w-0 truncate', collapsed && 'sr-only')}>
+          <span
+            className={cn(
+              'relative z-10 min-w-0 truncate',
+              collapsed && 'sr-only',
+            )}
+          >
             {item.name}
           </span>
         </Link>

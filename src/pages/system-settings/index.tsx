@@ -11,6 +11,7 @@ import {
   ProFormDigit,
   ProFormSelect,
   ProFormText,
+  ProFormTextArea,
 } from '@ant-design/pro-components';
 import {
   Alert,
@@ -180,6 +181,20 @@ const useStyles = createStyles(({ css, token }) => ({
     display: block;
     margin-bottom: 20px;
     line-height: 22px;
+  `,
+  userAgentActions: css`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-bottom: 20px;
+  `,
+  userAgentEditor: css`
+    .pro-field-xl,
+    .ant-input-textarea {
+      width: 100% !important;
+      max-width: none;
+    }
   `,
   backgroundAsset: css`
     display: grid;
@@ -355,6 +370,8 @@ const SystemSettingsPage: React.FC = () => {
     form,
   );
   const webhookToken = Form.useWatch(['webhook', 'clouddrive2', 'token'], form);
+  const browserUserAgent =
+    Form.useWatch(['server', 'web_115_user_agent'], form) || '';
   const loginBackgroundURL = Form.useWatch(
     ['site', 'login_background_url'],
     form,
@@ -548,6 +565,16 @@ const SystemSettingsPage: React.FC = () => {
     }
   };
 
+  const handleGetBrowserUserAgent = () => {
+    if (typeof navigator === 'undefined') {
+      messageApi.error('当前环境无法读取浏览器 UA');
+      return;
+    }
+
+    form.setFieldValue(['server', 'web_115_user_agent'], navigator.userAgent);
+    messageApi.success('已获取当前浏览器 UA，请点击“保存配置”完成保存');
+  };
+
   return (
     <PageContainer
       className={styles.page}
@@ -605,7 +632,7 @@ const SystemSettingsPage: React.FC = () => {
                       <div className={styles.tabPanel}>
                         <SettingsSection
                           title="基础服务"
-                          description="管理后台的监听端口、登录凭据与任务并发。"
+                          description="管理后台的监听端口与登录凭据。"
                         >
                           <div className={styles.fieldGrid}>
                             <ProFormText
@@ -615,13 +642,6 @@ const SystemSettingsPage: React.FC = () => {
                               rules={[
                                 { required: true, message: '请输入端口' },
                               ]}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['server', 'download_115_concurrency']}
-                              label={<span>115 下载并发{restartTag}</span>}
-                              min={1}
-                              fieldProps={{ precision: 0 }}
                             />
                             <ProFormText
                               width="md"
@@ -636,27 +656,6 @@ const SystemSettingsPage: React.FC = () => {
                                 placeholder:
                                   secretPlaceholder('server.password'),
                               }}
-                            />
-                          </div>
-                        </SettingsSection>
-
-                        <SettingsSection
-                          title="115 Cookie 保活"
-                          description="设置未单独指定设备端的 115 存储在自动续期时使用的全局默认值。"
-                        >
-                          <div className={styles.fieldGrid}>
-                            <ProFormSelect
-                              width="md"
-                              name={['server', 'cookie_115_default_app']}
-                              label="默认自动续期设备端"
-                              tooltip="保存后即时生效，但不会立即触发续期；单存储设置仍优先于此默认值。"
-                              options={[...WEB115_RELOGIN_APP_OPTIONS]}
-                              rules={[
-                                {
-                                  required: true,
-                                  message: '请选择默认自动续期设备端',
-                                },
-                              ]}
                             />
                           </div>
                         </SettingsSection>
@@ -736,6 +735,96 @@ const SystemSettingsPage: React.FC = () => {
                               title="处理新增媒体事件"
                               description="收到 Webhook 新入库通知后，执行已配置的媒体处理流程。"
                             />
+                          </div>
+                        </SettingsSection>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: '115',
+                    label: '115',
+                    forceRender: true,
+                    children: (
+                      <div className={styles.tabPanel}>
+                        <SettingsSection
+                          title="115 Open 下载"
+                          description="设置 115 下载队列的并发处理数量。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormDigit
+                              width="md"
+                              name={['server', 'download_115_concurrency']}
+                              label={<span>下载并发{restartTag}</span>}
+                              min={1}
+                              fieldProps={{ precision: 0 }}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
+                          title="Cookie 保活"
+                          description="设置未单独指定设备端的 115 存储在自动续期时使用的全局默认值。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormSelect
+                              width="md"
+                              name={['server', 'cookie_115_default_app']}
+                              label="默认自动续期设备端"
+                              tooltip="保存后即时生效，但不会立即触发续期；单存储设置仍优先于此默认值。"
+                              options={[...WEB115_RELOGIN_APP_OPTIONS]}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: '请选择默认自动续期设备端',
+                                },
+                              ]}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
+                          title="115 User-Agent"
+                          description="可手动配置，也可读取当前浏览器的 User-Agent；当前仅持久化，暂不参与任何 115 请求。"
+                        >
+                          <div className={styles.userAgentEditor}>
+                            <ProFormTextArea
+                              width="xl"
+                              name={['server', 'web_115_user_agent']}
+                              label="User-Agent"
+                              placeholder="例如：Mozilla/5.0 ..."
+                              fieldProps={{
+                                autoSize: { minRows: 2, maxRows: 5 },
+                                maxLength: 2048,
+                                showCount: true,
+                              }}
+                              rules={[
+                                {
+                                  max: 2048,
+                                  message: 'User-Agent 不能超过 2048 个字符',
+                                },
+                                {
+                                  pattern: /^[^\r\n]*$/,
+                                  message: 'User-Agent 不能包含换行',
+                                },
+                              ]}
+                            />
+                          </div>
+                          <div className={styles.userAgentActions}>
+                            <Button onClick={handleGetBrowserUserAgent}>
+                              获取当前浏览器 UA
+                            </Button>
+                            <Typography.Text
+                              type="secondary"
+                              copyable={
+                                browserUserAgent
+                                  ? { text: browserUserAgent }
+                                  : false
+                              }
+                            >
+                              {browserUserAgent
+                                ? '复制当前填写的 UA'
+                                : '可手动填写，或从当前浏览器获取'}
+                            </Typography.Text>
                           </div>
                         </SettingsSection>
                       </div>

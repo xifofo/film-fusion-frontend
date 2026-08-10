@@ -1524,6 +1524,7 @@ declare namespace API {
       password: string;
       download_115_concurrency: number;
       cookie_115_default_app: Web115ReloginApp;
+      web_115_user_agent: string;
       process_new_media: boolean;
       security: {
         enabled: boolean;
