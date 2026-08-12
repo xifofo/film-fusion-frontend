@@ -245,10 +245,13 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
             />
           </Tooltip>
           <Button
+            aria-label={`编辑 RSS 设置 ${source.name}`}
             icon={<EditOutlined />}
             onClick={() => open(source)}
             size="small"
-          />
+          >
+            编辑
+          </Button>
           <Popconfirm
             description="RSS 源和唯一流程会一起删除，历史运行记录仍会保留。"
             onConfirm={() => remove(source)}

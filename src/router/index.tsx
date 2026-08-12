@@ -35,6 +35,7 @@ const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const RSSMonitor = lazy(() => import('@/pages/rss-monitor'));
+const RSSGenerator = lazy(() => import('@/pages/rss-generator'));
 const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
@@ -200,6 +201,10 @@ const routes: RouteObject[] = [
       {
         path: 'organize-logs',
         element: <OrganizeLogs />,
+      },
+      {
+        path: 'rss-generator',
+        element: <RSSGenerator />,
       },
       {
         path: 'rss-monitor',

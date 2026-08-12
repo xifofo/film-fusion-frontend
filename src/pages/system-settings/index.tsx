@@ -54,6 +54,9 @@ const notificationChannelOptions: Array<{
   { label: 'Webhook', value: 'webhook' },
 ];
 
+const DEFAULT_RSS_AUTOMATION_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
+
 const useStyles = createStyles(({ css, token }) => ({
   page: css`
     --settings-panel-radius: 12px;
@@ -587,6 +590,14 @@ const SystemSettingsPage: React.FC = () => {
     messageApi.success('已获取当前浏览器 UA，请点击“保存配置”完成保存');
   };
 
+  const handleResetRSSAutomationUserAgent = () => {
+    form.setFieldValue(
+      ['rss_automation', 'user_agent'],
+      DEFAULT_RSS_AUTOMATION_USER_AGENT,
+    );
+    messageApi.success('已恢复默认 RSS 自动化 UA，请点击“保存配置”完成保存');
+  };
+
   return (
     <PageContainer
       className={styles.page}
@@ -606,7 +617,7 @@ const SystemSettingsPage: React.FC = () => {
               配置按用途持久化
             </Typography.Text>
             <Typography.Text type="secondary">
-              登录页外观保存到数据库，其余运行配置写入
+              登录页外观、115 与 RSS 自动化运行配置保存到数据库，其余配置写入
               config.yaml；「需重启」项除外。
             </Typography.Text>
           </span>
@@ -747,6 +758,58 @@ const SystemSettingsPage: React.FC = () => {
                               title="处理新增媒体事件"
                               description="收到 Webhook 新入库通知后，执行已配置的媒体处理流程。"
                             />
+                          </div>
+                        </SettingsSection>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'rss-automation',
+                    label: 'RSS 自动化',
+                    forceRender: true,
+                    children: (
+                      <div className={styles.tabPanel}>
+                        <SettingsSection
+                          title="RSS 请求"
+                          description="设置 RSS 自动化在样本预览和定时抓取时发送的浏览器标识。"
+                        >
+                          <div className={styles.userAgentEditor}>
+                            <ProFormTextArea
+                              width="xl"
+                              name={['rss_automation', 'user_agent']}
+                              label="User-Agent"
+                              placeholder="例如：Mozilla/5.0 ..."
+                              extra="保存后立即用于新的 RSS 自动化请求，不影响旧 RSS 监控。"
+                              fieldProps={{
+                                autoSize: { minRows: 3, maxRows: 6 },
+                                maxLength: 2048,
+                                showCount: true,
+                              }}
+                              rules={[
+                                {
+                                  required: true,
+                                  whitespace: true,
+                                  message: '请输入 RSS 自动化 User-Agent',
+                                },
+                                {
+                                  max: 2048,
+                                  message: 'User-Agent 不能超过 2048 个字符',
+                                },
+                                {
+                                  pattern: /^[^\r\n]*$/,
+                                  message: 'User-Agent 不能包含换行',
+                                },
+                              ]}
+                            />
+                          </div>
+                          <div className={styles.userAgentActions}>
+                            <Button onClick={handleResetRSSAutomationUserAgent}>
+                              恢复默认 UA
+                            </Button>
+                            <Typography.Text type="secondary">
+                              默认模拟 macOS Chrome
+                              150；自定义值只保存在数据库。
+                            </Typography.Text>
                           </div>
                         </SettingsSection>
                       </div>

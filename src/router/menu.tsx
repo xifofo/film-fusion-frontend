@@ -14,6 +14,7 @@ import {
   ListRestart,
   RadioTower,
   Route,
+  Rss,
   ScanSearch,
   Settings,
   SquareTerminal,
@@ -75,6 +76,11 @@ export const menuItems: AppMenuItem[] = [
         path: '/emby/stats',
       },
       {
+        name: '观看记录',
+        icon: Clapperboard,
+        path: '/emby-watch',
+      },
+      {
         name: '图片优化',
         icon: Images,
         path: '/emby/image-optimization',
@@ -107,11 +113,6 @@ export const menuItems: AppMenuItem[] = [
         path: '/emby/proxy-log',
       },
       {
-        name: '观看记录',
-        icon: Clapperboard,
-        path: '/emby-watch',
-      },
-      {
         name: '整理日志',
         icon: ListRestart,
         path: '/organize-logs',
@@ -124,14 +125,26 @@ export const menuItems: AppMenuItem[] = [
     ],
   },
   {
-    name: 'RSS 监控',
-    icon: RadioTower,
-    path: '/rss-monitor',
-  },
-  {
-    name: 'RSS 自动化',
-    icon: Route,
-    path: '/rss-automation',
+    name: 'RSS',
+    icon: Rss,
+    path: '/rss',
+    children: [
+      {
+        name: 'RSS 生成器',
+        icon: Rss,
+        path: '/rss-generator',
+      },
+      {
+        name: 'RSS 监控',
+        icon: RadioTower,
+        path: '/rss-monitor',
+      },
+      {
+        name: 'RSS 自动化',
+        icon: Route,
+        path: '/rss-automation',
+      },
+    ],
   },
   {
     name: '系统设置',

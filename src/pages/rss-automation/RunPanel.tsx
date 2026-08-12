@@ -80,7 +80,12 @@ const prettyJSON = (raw?: string) => {
   }
 };
 
-const RunPanel = () => {
+type RunPanelProps = {
+  workflowId?: number;
+  workflowName?: string;
+};
+
+const RunPanel = ({ workflowId, workflowName }: RunPanelProps) => {
   const [runs, setRuns] = useState<RSSAutomationRun[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -97,6 +102,7 @@ const RunPanel = () => {
       if (!silent) setLoading(true);
       try {
         const response = await listRSSAutomationRuns({
+          workflowId,
           status,
           limit: pageSize,
           offset: (page - 1) * pageSize,
@@ -114,7 +120,7 @@ const RunPanel = () => {
         if (!silent) setLoading(false);
       }
     },
-    [messageApi, page, status],
+    [messageApi, page, status, workflowId],
   );
 
   useEffect(() => {
@@ -272,7 +278,21 @@ const RunPanel = () => {
       render: (_, node) => formatTime(node.completed_at || node.started_at),
     },
     {
+      title: '输入',
+      width: 280,
+      render: (_, node) => (
+        <Paragraph
+          copyable={Boolean(node.input_json)}
+          ellipsis={{ rows: 3, expandable: true }}
+          style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}
+        >
+          {prettyJSON(node.input_json)}
+        </Paragraph>
+      ),
+    },
+    {
       title: '输出 / 错误',
+      width: 320,
       render: (_, node) => (
         <Paragraph
           copyable={Boolean(node.output_json || node.error_message)}
@@ -310,7 +330,7 @@ const RunPanel = () => {
             </Button>
           </Space>
         }
-        title="流程运行记录"
+        title={workflowName ? `${workflowName} · 运行日志` : '流程运行记录'}
       >
         <Table
           columns={columns}
@@ -428,7 +448,7 @@ const RunPanel = () => {
                 dataSource={detail.node_runs}
                 pagination={false}
                 rowKey="id"
-                scroll={{ x: 900 }}
+                scroll={{ x: 1180 }}
                 size="small"
               />
             </Card>

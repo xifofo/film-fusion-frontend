@@ -52,7 +52,10 @@ describe('AutomationOverview', () => {
         data={dashboard}
         loading={false}
         onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onManualRun={vi.fn()}
         onToggle={onToggle}
+        onViewLogs={vi.fn()}
       />,
     );
 
@@ -82,10 +85,60 @@ describe('AutomationOverview', () => {
         }}
         loading={false}
         onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onManualRun={vi.fn()}
         onToggle={vi.fn()}
+        onViewLogs={vi.fn()}
       />,
     );
 
     expect(screen.getByText('已停用，不再检查 RSS 源')).toBeTruthy();
+  });
+
+  it('opens the selected automation editor from its card', () => {
+    const onEdit = vi.fn();
+    render(
+      <AutomationOverview
+        data={dashboard}
+        loading={false}
+        onCreate={vi.fn()}
+        onEdit={onEdit}
+        onManualRun={vi.fn()}
+        onToggle={vi.fn()}
+        onViewLogs={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '编辑自动化 下载新番' }),
+    );
+
+    expect(onEdit).toHaveBeenCalledWith(11);
+  });
+
+  it('opens manual selection and logs for the selected automation', () => {
+    const onManualRun = vi.fn();
+    const onViewLogs = vi.fn();
+    render(
+      <AutomationOverview
+        data={dashboard}
+        loading={false}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onManualRun={onManualRun}
+        onToggle={vi.fn()}
+        onViewLogs={onViewLogs}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '手动运行已有条目 下载新番' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: '查看运行日志 下载新番' }),
+    );
+
+    expect(onManualRun).toHaveBeenCalledWith(11);
+    expect(onViewLogs).toHaveBeenCalledWith(11);
   });
 });

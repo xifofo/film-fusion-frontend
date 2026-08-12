@@ -1,4 +1,9 @@
-import { PlusOutlined } from '@ant-design/icons';
+import {
+  EditOutlined,
+  FileTextOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { Button, Card, Empty, Switch, Tag, Typography } from 'antd';
 import type {
   RSSAutomationDashboard,
@@ -13,7 +18,10 @@ type AutomationOverviewProps = {
   data: RSSAutomationDashboard;
   loading: boolean;
   onCreate: () => void;
+  onEdit: (workflowId: number) => void;
+  onManualRun: (workflowId: number) => void;
   onToggle: (sourceId: number, enabled: boolean) => Promise<void> | void;
+  onViewLogs: (workflowId: number) => void;
   togglingSourceId?: number;
 };
 
@@ -33,7 +41,10 @@ const AutomationOverview = ({
   data,
   loading,
   onCreate,
+  onEdit,
+  onManualRun,
   onToggle,
+  onViewLogs,
   togglingSourceId,
 }: AutomationOverviewProps) => {
   const sourceByID = new Map(data.sources.map((source) => [source.id, source]));
@@ -106,6 +117,43 @@ const AutomationOverview = ({
               : undefined;
             return (
               <Card
+                actions={[
+                  <Button
+                    aria-label={`手动运行已有条目 ${workflow.name}`}
+                    className={styles.automationCardAction}
+                    disabled={!source}
+                    icon={<PlayCircleOutlined />}
+                    key="manual-run"
+                    onClick={() => onManualRun(workflow.id)}
+                    size="small"
+                    type="text"
+                  >
+                    手动运行
+                  </Button>,
+                  <Button
+                    aria-label={`查看运行日志 ${workflow.name}`}
+                    className={styles.automationCardAction}
+                    icon={<FileTextOutlined />}
+                    key="run-logs"
+                    onClick={() => onViewLogs(workflow.id)}
+                    size="small"
+                    type="text"
+                  >
+                    运行日志
+                  </Button>,
+                  <Button
+                    aria-label={`编辑自动化 ${workflow.name}`}
+                    className={styles.automationCardAction}
+                    disabled={!source}
+                    icon={<EditOutlined />}
+                    key="edit"
+                    onClick={() => onEdit(workflow.id)}
+                    size="small"
+                    type="text"
+                  >
+                    编辑
+                  </Button>,
+                ]}
                 className={styles.automationCard}
                 key={workflow.id}
                 loading={loading}

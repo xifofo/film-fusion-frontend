@@ -248,6 +248,32 @@ export type RSSAutomationRunDetail = {
   node_runs: RSSAutomationNodeRun[];
 };
 
+export type RSSAutomationManualCandidate = {
+  entry_id: number;
+  title: string;
+  detail_url?: string;
+  download_url?: string;
+  published_at?: string;
+  discovered_at: string;
+  action_names: string[];
+  action_types: RSSAutomationNodeType[];
+};
+
+export type RSSAutomationManualCandidateList = {
+  workflow_id: number;
+  workflow_version: number;
+  items: RSSAutomationManualCandidate[];
+  scanned_entries: number;
+  has_more: boolean;
+};
+
+export type RSSAutomationManualRunResult = {
+  requested: number;
+  created: number;
+  run_ids: number[];
+  skipped: Array<{ entry_id: number; reason: string }>;
+};
+
 export const DEFAULT_RSS_AUTOMATION_MAPPING: RSSAutomationMapping = {
   item_selector: 'channel/item',
   fields: [
@@ -396,6 +422,17 @@ export const updateRSSAutomationWorkflow = (
     }>
   >(`/api/rss-automation/workflows/${id}`, input);
 
+export const listRSSAutomationManualCandidates = (id: number, limit = 100) =>
+  apiClient.get<API.Response<RSSAutomationManualCandidateList>>(
+    `/api/rss-automation/workflows/${id}/manual-candidates?limit=${limit}`,
+  );
+
+export const createRSSAutomationManualRuns = (id: number, entryIds: number[]) =>
+  apiClient.post<API.Response<RSSAutomationManualRunResult>>(
+    `/api/rss-automation/workflows/${id}/manual-runs`,
+    { entry_ids: entryIds },
+  );
+
 export const createRSSAutomationTarget = (input: RSSAutomationTargetInput) =>
   apiClient.post<API.Response<RSSAutomationTarget>>(
     '/api/rss-automation/targets',
@@ -422,11 +459,13 @@ export const testRSSAutomationTarget = (id: number) =>
   );
 
 export const listRSSAutomationRuns = (params?: {
+  workflowId?: number;
   status?: string;
   limit?: number;
   offset?: number;
 }) => {
   const search = new URLSearchParams();
+  if (params?.workflowId) search.set('workflow_id', String(params.workflowId));
   if (params?.status) search.set('status', params.status);
   search.set('limit', String(params?.limit ?? 50));
   search.set('offset', String(params?.offset ?? 0));

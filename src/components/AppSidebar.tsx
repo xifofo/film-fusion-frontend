@@ -130,7 +130,7 @@ export function AppSidebar({
     <div
       className={cn(
         'relative flex h-full min-h-0 flex-col overflow-hidden border border-black/[0.055] bg-white/[0.78] text-neutral-950 shadow-[0_24px_70px_rgba(0,0,0,0.07)] backdrop-blur-2xl dark:border-white/10 dark:bg-neutral-950/[0.78] dark:text-white dark:shadow-black/25',
-        mobile ? 'rounded-none border-y-0 border-l-0' : 'rounded-l-[26px]',
+        mobile ? 'rounded-none border-y-0 border-l-0' : 'rounded-none',
       )}
     >
       <div

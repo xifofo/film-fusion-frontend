@@ -115,6 +115,7 @@ type WorkflowPanelProps = {
   previewFeed?: RSSAutomationParsedFeed;
   onWizardBack?: (definition: RSSAutomationDefinition) => void;
   onWizardNext?: (definition: RSSAutomationDefinition) => Promise<void> | void;
+  showWorkflowList?: boolean;
 };
 
 type WorkflowMeta = {
@@ -333,6 +334,7 @@ const WorkflowPanelInner = ({
   previewFeed,
   onWizardBack,
   onWizardNext,
+  showWorkflowList = true,
 }: WorkflowPanelProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<RSSFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<RSSFlowEdge>([]);
@@ -954,6 +956,8 @@ const WorkflowPanelInner = ({
     <div
       className={`${styles.workflowShell} ${
         mode === 'wizard' ? styles.workflowShellWizard : ''
+      } ${
+        mode === 'manage' && !showWorkflowList ? styles.workflowShellSingle : ''
       }`}
     >
       {contextHolder}
@@ -964,7 +968,7 @@ const WorkflowPanelInner = ({
         ref={importFileRef}
         type="file"
       />
-      {mode === 'manage' && (
+      {mode === 'manage' && showWorkflowList && (
         <aside className={styles.workflowList}>
           <div className={styles.panelHeading}>
             <div>

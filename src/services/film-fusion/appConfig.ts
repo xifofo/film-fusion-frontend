@@ -8,14 +8,14 @@ export async function getPublicAppConfig(options?: { [key: string]: any }) {
   );
 }
 
-/** 读取 config.yaml 当前配置（密钥脱敏） */
+/** 读取 YAML 与数据库运行配置的统一视图（密钥脱敏） */
 export async function getAppConfig(options?: { [key: string]: any }) {
   return apiClient.get<API.Response<API.AppConfigResult>>('/api/app-config', {
     ...(options || {}),
   });
 }
 
-/** 保存配置到 config.yaml 并热重载 */
+/** 按配置归属保存到 YAML 或数据库并热重载 */
 export async function saveAppConfig(
   config: API.AppConfig,
   options?: { [key: string]: any },

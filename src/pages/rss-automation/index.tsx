@@ -1,7 +1,8 @@
 import '@xyflow/react/dist/style.css';
 
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { Button, message } from 'antd';
+import { Button, message, Tabs } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import {
@@ -11,9 +12,18 @@ import {
 } from '@/services/film-fusion';
 import AutomationOverview from './AutomationOverview';
 import AutomationWizard from './AutomationWizard';
+import ManualRunModal from './ManualRunModal';
+import RunPanel from './RunPanel';
+import SourcePanel from './SourcePanel';
+import WorkflowPanel from './WorkflowPanel';
 
 const RSSAutomationPage = () => {
-  const [view, setView] = useState<'overview' | 'wizard'>('overview');
+  const [view, setView] = useState<'overview' | 'wizard' | 'editor' | 'logs'>(
+    'overview',
+  );
+  const [editingWorkflowId, setEditingWorkflowId] = useState<number>();
+  const [logWorkflowId, setLogWorkflowId] = useState<number>();
+  const [manualWorkflowId, setManualWorkflowId] = useState<number>();
   const [dashboard, setDashboard] = useState<RSSAutomationDashboard>();
   const [cloudStorages, setCloudStorages] = useState<API.CloudStorage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,14 +114,36 @@ const RSSAutomationPage = () => {
     failed_runs: 0,
     source_running: false,
   };
+  const editingWorkflow = data.workflows.find(
+    (workflow) => workflow.id === editingWorkflowId,
+  );
+  const editingSource = data.sources.find(
+    (source) => source.id === editingWorkflow?.source_id,
+  );
+  const logWorkflow = data.workflows.find(
+    (workflow) => workflow.id === logWorkflowId,
+  );
+  const manualWorkflow = data.workflows.find(
+    (workflow) => workflow.id === manualWorkflowId,
+  );
+
+  const returnToOverview = () => {
+    setEditingWorkflowId(undefined);
+    setLogWorkflowId(undefined);
+    setView('overview');
+  };
 
   return (
     <PageContainer
       extra={
-        view === 'wizard'
+        view !== 'overview'
           ? [
-              <Button key="exit-wizard" onClick={() => setView('overview')}>
-                退出向导
+              <Button
+                icon={<ArrowLeftOutlined />}
+                key="return-overview"
+                onClick={returnToOverview}
+              >
+                返回自动化列表
               </Button>,
             ]
           : undefined
@@ -124,7 +156,16 @@ const RSSAutomationPage = () => {
           data={data}
           loading={loading}
           onCreate={() => setView('wizard')}
+          onEdit={(workflowId) => {
+            setEditingWorkflowId(workflowId);
+            setView('editor');
+          }}
+          onManualRun={setManualWorkflowId}
           onToggle={toggleAutomation}
+          onViewLogs={(workflowId) => {
+            setLogWorkflowId(workflowId);
+            setView('logs');
+          }}
           togglingSourceId={togglingSourceId}
         />
       )}
@@ -132,14 +173,59 @@ const RSSAutomationPage = () => {
       {view === 'wizard' && (
         <AutomationWizard
           cloudStorages={cloudStorages}
-          onCancel={() => setView('overview')}
+          onCancel={returnToOverview}
           onCreated={async () => {
             await load(true);
-            setView('overview');
+            returnToOverview();
           }}
           targets={data.targets}
         />
       )}
+
+      {view === 'editor' && editingWorkflow && editingSource && (
+        <Tabs
+          destroyOnHidden={false}
+          items={[
+            {
+              key: 'workflow',
+              label: '流程设计',
+              children: (
+                <WorkflowPanel
+                  cloudStorages={cloudStorages}
+                  loading={loading}
+                  onChanged={() => load(true)}
+                  showWorkflowList={false}
+                  sources={[editingSource]}
+                  targets={data.targets}
+                  workflows={[editingWorkflow]}
+                />
+              ),
+            },
+            {
+              key: 'source',
+              label: 'RSS 设置',
+              children: (
+                <SourcePanel
+                  loading={loading}
+                  onChanged={() => load(true)}
+                  sources={[editingSource]}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
+
+      {view === 'logs' && logWorkflow && (
+        <RunPanel workflowId={logWorkflow.id} workflowName={logWorkflow.name} />
+      )}
+
+      <ManualRunModal
+        onClose={() => setManualWorkflowId(undefined)}
+        onQueued={() => load(true)}
+        open={Boolean(manualWorkflow)}
+        workflow={manualWorkflow}
+      />
     </PageContainer>
   );
 };

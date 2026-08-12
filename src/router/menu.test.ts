@@ -10,6 +10,13 @@ describe('findMenuTrail', () => {
     ]);
   });
 
+  it('groups watch history under Emby', () => {
+    expect(findMenuTrail('/emby-watch').map((item) => item.name)).toEqual([
+      'Emby',
+      '观看记录',
+    ]);
+  });
+
   it('prefers a more specific log route over the Emby prefix', () => {
     expect(findMenuTrail('/emby/proxy-log').map((item) => item.name)).toEqual([
       '日志中心',
@@ -25,7 +32,22 @@ describe('findMenuTrail', () => {
 
   it('exposes the independent RSS automation module', () => {
     expect(findMenuTrail('/rss-automation').map((item) => item.name)).toEqual([
+      'RSS',
       'RSS 自动化',
+    ]);
+  });
+
+  it('exposes the independent RSS generator module', () => {
+    expect(findMenuTrail('/rss-generator').map((item) => item.name)).toEqual([
+      'RSS',
+      'RSS 生成器',
+    ]);
+  });
+
+  it('groups RSS monitoring under the RSS menu', () => {
+    expect(findMenuTrail('/rss-monitor').map((item) => item.name)).toEqual([
+      'RSS',
+      'RSS 监控',
     ]);
   });
 

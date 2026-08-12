@@ -1520,7 +1520,7 @@ declare namespace API {
 
   type NotificationChannelID = 'telegram' | 'webhook';
 
-  /** 应用配置 - config.yaml 结构 */
+  /** 应用配置 - YAML 与数据库运行配置的统一编辑视图 */
   type AppConfig = {
     server: {
       port: string;
@@ -1538,6 +1538,9 @@ declare namespace API {
         block_minutes: number;
         trusted_proxy_cidrs: string[];
       };
+    };
+    rss_automation: {
+      user_agent: string;
     };
     site: {
       login_title: string;
