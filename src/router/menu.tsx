@@ -13,6 +13,7 @@ import {
   Link2,
   ListRestart,
   RadioTower,
+  Route,
   ScanSearch,
   Settings,
   SquareTerminal,
@@ -126,6 +127,11 @@ export const menuItems: AppMenuItem[] = [
     name: 'RSS 监控',
     icon: RadioTower,
     path: '/rss-monitor',
+  },
+  {
+    name: 'RSS 自动化',
+    icon: Route,
+    path: '/rss-automation',
   },
   {
     name: '系统设置',

@@ -36,7 +36,7 @@ import {
   getHDHiveAuthorizeURL,
   refreshHDHiveToken,
   saveAppConfig,
-  testTelegramNotification,
+  testNotificationChannel,
   uploadLoginBackground,
 } from '@/services/film-fusion';
 
@@ -45,6 +45,14 @@ const restartTag = (
     需重启
   </Tag>
 );
+
+const notificationChannelOptions: Array<{
+  label: string;
+  value: API.NotificationChannelID;
+}> = [
+  { label: 'Telegram', value: 'telegram' },
+  { label: 'Webhook', value: 'webhook' },
+];
 
 const useStyles = createStyles(({ css, token }) => ({
   page: css`
@@ -361,7 +369,8 @@ const SystemSettingsPage: React.FC = () => {
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
   const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
   const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
-  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [notificationChannelTesting, setNotificationChannelTesting] =
+    useState<API.NotificationChannelID>();
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [backgroundPreviewFailed, setBackgroundPreviewFailed] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
@@ -518,19 +527,22 @@ const SystemSettingsPage: React.FC = () => {
     }
   };
 
-  const handleTelegramTest = async () => {
-    setTelegramTesting(true);
+  const handleNotificationChannelTest = async (
+    channel: API.NotificationChannelID,
+    label: string,
+  ) => {
+    setNotificationChannelTesting(channel);
     try {
-      const res = await testTelegramNotification();
+      const res = await testNotificationChannel(channel);
       if (res.code === 0) {
-        messageApi.success('测试消息已发送');
+        messageApi.success(`${label} 测试消息已发送`);
       } else {
         messageApi.error(res.message || '测试消息发送失败');
       }
     } catch (error: any) {
       messageApi.error(error?.data || error?.message || '测试消息发送失败');
     } finally {
-      setTelegramTesting(false);
+      setNotificationChannelTesting(undefined);
     }
   };
 
@@ -1319,26 +1331,54 @@ const SystemSettingsPage: React.FC = () => {
                     ),
                   },
                   {
-                    key: 'telegram',
-                    label: 'Telegram',
+                    key: 'notifications',
+                    label: '通知',
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
                         <SettingsSection
-                          title="通知连接"
-                          description="配置 Telegram Bot 与消息接收目标。"
+                          title="通知身份"
+                          description="统一标识当前 FilmFusion 实例；事件内容与投递渠道彼此独立。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormText
+                              width="md"
+                              name={['notifications', 'instance_name']}
+                              label="实例名称"
+                              placeholder="FilmFusion"
+                              rules={[
+                                { required: true, message: '请输入实例名称' },
+                                {
+                                  max: 120,
+                                  message: '实例名称不能超过 120 个字符',
+                                },
+                              ]}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
+                          title="Telegram 渠道"
+                          description="Telegram 只负责投递；接收哪些事件由下方事件路由决定。"
                         >
                           <Alert
                             className={styles.sectionAlert}
                             type="info"
                             showIcon
-                            message="测试消息使用已保存的配置"
+                            message="渠道测试使用已保存的配置"
                             description="修改下方字段后请先保存，再发送测试消息。"
                             action={
                               <Button
                                 icon={<SendOutlined />}
-                                loading={telegramTesting}
-                                onClick={handleTelegramTest}
+                                loading={
+                                  notificationChannelTesting === 'telegram'
+                                }
+                                onClick={() =>
+                                  handleNotificationChannelTest(
+                                    'telegram',
+                                    'Telegram',
+                                  )
+                                }
                               >
                                 发送测试消息
                               </Button>
@@ -1346,36 +1386,40 @@ const SystemSettingsPage: React.FC = () => {
                           />
                           <div className={styles.toggleGrid}>
                             <SettingsToggle
-                              name={['telegram', 'enabled']}
-                              title="Telegram 通知"
-                              description="允许 FilmFusion 通过下方 Bot 配置发送消息。"
+                              name={['notifications', 'telegram', 'enabled']}
+                              title="启用 Telegram"
+                              description="允许事件路由向 Telegram Bot 投递消息。"
+                            />
+                            <SettingsToggle
+                              name={['notifications', 'telegram', 'silent']}
+                              title="静默发送"
+                              description="Telegram 收到消息时不播放提示音。"
                             />
                           </div>
                           <div className={styles.fieldGrid}>
-                            <ProFormText
-                              width="md"
-                              name={['telegram', 'instance_name']}
-                              label="实例名称"
-                              placeholder="FilmFusion"
-                            />
                             <ProFormText.Password
                               width="lg"
-                              name={['telegram', 'bot_token']}
+                              name={['notifications', 'telegram', 'bot_token']}
                               label="Bot Token"
                               fieldProps={{
-                                placeholder:
-                                  secretPlaceholder('telegram.bot_token'),
+                                placeholder: secretPlaceholder(
+                                  'notifications.telegram.bot_token',
+                                ),
                               }}
                             />
                             <ProFormText
                               width="lg"
-                              name={['telegram', 'chat_id']}
+                              name={['notifications', 'telegram', 'chat_id']}
                               label="Chat ID"
                               placeholder="-1001234567890"
                             />
                             <ProFormDigit
                               width="md"
-                              name={['telegram', 'message_thread_id']}
+                              name={[
+                                'notifications',
+                                'telegram',
+                                'message_thread_id',
+                              ]}
                               label="话题 ID"
                               tooltip="论坛群需要指定话题时填写；0 表示发送到群组默认话题。"
                               min={0}
@@ -1383,13 +1427,17 @@ const SystemSettingsPage: React.FC = () => {
                             />
                             <ProFormText
                               width="lg"
-                              name={['telegram', 'api_base']}
+                              name={['notifications', 'telegram', 'api_base']}
                               label="API 地址"
                               placeholder="https://api.telegram.org"
                             />
                             <ProFormDigit
                               width="md"
-                              name={['telegram', 'timeout_seconds']}
+                              name={[
+                                'notifications',
+                                'telegram',
+                                'timeout_seconds',
+                              ]}
                               label="请求超时 (秒)"
                               min={1}
                               fieldProps={{ precision: 0 }}
@@ -1398,24 +1446,126 @@ const SystemSettingsPage: React.FC = () => {
                         </SettingsSection>
 
                         <SettingsSection
-                          title="通知行为"
-                          description="选择消息发送方式与需要推送的安全告警。"
+                          title="Webhook 渠道"
+                          description="向自建服务发送统一 JSON 事件；可用 Bearer Token 验证来源。"
                         >
+                          <Alert
+                            className={styles.sectionAlert}
+                            type="info"
+                            showIcon
+                            message="Webhook 收到结构化通知事件"
+                            description="POST JSON 包含 instance、event、title、message、image_url、severity、occurred_at 与 metadata。修改后请先保存再测试。"
+                            action={
+                              <Button
+                                icon={<SendOutlined />}
+                                loading={
+                                  notificationChannelTesting === 'webhook'
+                                }
+                                onClick={() =>
+                                  handleNotificationChannelTest(
+                                    'webhook',
+                                    'Webhook',
+                                  )
+                                }
+                              >
+                                发送测试消息
+                              </Button>
+                            }
+                          />
                           <div className={styles.toggleGrid}>
                             <SettingsToggle
-                              name={['telegram', 'silent']}
-                              title="静默发送"
-                              description="Telegram 收到消息时不播放提示音。"
+                              name={['notifications', 'webhook', 'enabled']}
+                              title="启用 Webhook"
+                              description="允许事件路由向下方 URL 投递 JSON。"
                             />
-                            <SettingsToggle
-                              name={['telegram', 'notify_emby_brute_force']}
-                              title="Emby 登录爆破告警"
-                              description="检测到 Emby 登录暴力尝试时发送 Telegram 告警。"
+                          </div>
+                          <div className={styles.fieldGrid}>
+                            <ProFormText
+                              width="xl"
+                              name={['notifications', 'webhook', 'url']}
+                              label="Webhook URL"
+                              placeholder="https://example.com/filmfusion/events"
                             />
-                            <SettingsToggle
-                              name={['telegram', 'notify_system_brute_force']}
-                              title="FilmFusion 登录爆破告警"
-                              description="检测到管理后台登录暴力尝试时发送 Telegram 告警。"
+                            <ProFormText.Password
+                              width="lg"
+                              name={['notifications', 'webhook', 'token']}
+                              label="Bearer Token"
+                              fieldProps={{
+                                placeholder: secretPlaceholder(
+                                  'notifications.webhook.token',
+                                ),
+                              }}
+                            />
+                            <ProFormDigit
+                              width="md"
+                              name={[
+                                'notifications',
+                                'webhook',
+                                'timeout_seconds',
+                              ]}
+                              label="请求超时 (秒)"
+                              min={1}
+                              fieldProps={{ precision: 0 }}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
+                          title="事件路由"
+                          description="每类事件可以同时发送到多个渠道；清空选择表示关闭该类通知。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormSelect
+                              width="lg"
+                              name={[
+                                'notifications',
+                                'routes',
+                                'emby_brute_force',
+                              ]}
+                              label="Emby 登录爆破"
+                              options={notificationChannelOptions}
+                              fieldProps={{
+                                mode: 'multiple',
+                                allowClear: true,
+                              }}
+                            />
+                            <ProFormSelect
+                              width="lg"
+                              name={[
+                                'notifications',
+                                'routes',
+                                'system_brute_force',
+                              ]}
+                              label="FilmFusion 登录爆破"
+                              options={notificationChannelOptions}
+                              fieldProps={{
+                                mode: 'multiple',
+                                allowClear: true,
+                              }}
+                            />
+                            <ProFormSelect
+                              width="lg"
+                              name={['notifications', 'routes', 'rss_matched']}
+                              label="RSS 规则命中"
+                              options={notificationChannelOptions}
+                              fieldProps={{
+                                mode: 'multiple',
+                                allowClear: true,
+                              }}
+                            />
+                            <ProFormSelect
+                              width="lg"
+                              name={[
+                                'notifications',
+                                'routes',
+                                'web_115_cookie_invalid',
+                              ]}
+                              label="115 Cookie 失效"
+                              options={notificationChannelOptions}
+                              fieldProps={{
+                                mode: 'multiple',
+                                allowClear: true,
+                              }}
                             />
                           </div>
                         </SettingsSection>

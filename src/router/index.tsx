@@ -35,6 +35,7 @@ const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const RSSMonitor = lazy(() => import('@/pages/rss-monitor'));
+const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
 const HDHiveCallback = lazy(() => import('@/pages/hdhive-callback'));
@@ -203,6 +204,10 @@ const routes: RouteObject[] = [
       {
         path: 'rss-monitor',
         element: <RSSMonitor />,
+      },
+      {
+        path: 'rss-automation',
+        element: <RSSAutomation />,
       },
       {
         path: 'server-logs',

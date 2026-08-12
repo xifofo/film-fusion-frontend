@@ -23,6 +23,12 @@ describe('findMenuTrail', () => {
     ).toEqual(['目录配置']);
   });
 
+  it('exposes the independent RSS automation module', () => {
+    expect(findMenuTrail('/rss-automation').map((item) => item.name)).toEqual([
+      'RSS 自动化',
+    ]);
+  });
+
   it('returns an empty trail for an unknown route', () => {
     expect(findMenuTrail('/unknown')).toEqual([]);
   });

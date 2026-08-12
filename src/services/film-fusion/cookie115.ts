@@ -12,6 +12,18 @@ export async function get115CookieDirs(
   );
 }
 
+/** 获取 115 OpenAPI 目录列表（仅目录） */
+export async function get115OpenDirs(
+  data: API.Cookie115DirRequest,
+  options?: { [key: string]: any },
+) {
+  return apiClient.post<API.Response<API.Cookie115DirResponse>>(
+    '/api/115-open/dirs',
+    data,
+    { ...(options || {}) },
+  );
+}
+
 /** 查询各 115 存储的 cookie 保活状态 */
 export async function getWeb115KeepaliveStatus(options?: {
   [key: string]: any;

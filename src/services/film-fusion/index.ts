@@ -46,7 +46,9 @@ export * from './organize';
 export * from './organizeLog';
 // Pickcode 缓存相关API
 export * from './pickcodeCache';
-// RSS 增量监控与 Telegram 推送规则
+// 独立 RSS 自动化流程
+export * from './rssAutomation';
+// RSS 增量监控与通知路由规则
 export * from './rssMonitor';
 // 扫描任务相关API
 export * from './scanTask';

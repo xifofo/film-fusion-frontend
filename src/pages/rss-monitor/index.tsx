@@ -98,6 +98,18 @@ const notificationTag = (item: API.RSSMonitorItem) => {
           <Tag color="error">推送失败</Tag>
         </Tooltip>
       );
+    case 'partial':
+      return (
+        <Tooltip title={item.notification_error || '部分渠道推送失败'}>
+          <Tag color="warning">部分成功</Tag>
+        </Tooltip>
+      );
+    case 'skipped':
+      return (
+        <Tooltip title={item.notification_error || '该事件未配置投递渠道'}>
+          <Tag>已跳过</Tag>
+        </Tooltip>
+      );
     case 'baseline':
       return <Tag color="processing">基线</Tag>;
     default:
@@ -597,6 +609,8 @@ const RSSMonitorPage: React.FC = () => {
   ).length;
   const recentItems = dashboard?.recent_items || [];
   const recentMatchedItems = dashboard?.recent_matched_items || [];
+  const notificationReady =
+    dashboard?.notification_ready ?? dashboard?.telegram_ready;
   const eventTable = (items: API.RSSMonitorItem[], emptyText: string) => (
     <Table
       rowKey="id"
@@ -679,11 +693,12 @@ const RSSMonitorPage: React.FC = () => {
           style={{ marginBottom: 16 }}
         />
       )}
-      {dashboard && !dashboard.telegram_ready && (
+      {dashboard && !notificationReady && (
         <Alert
           type="warning"
           showIcon
-          message="Telegram 通知尚未就绪"
+          message="RSS 通知渠道尚未就绪"
+          description="请为“RSS 规则命中”选择至少一个已启用且配置完整的通知渠道，或清空事件路由以明确关闭推送。"
           action={
             <Button type="link" href="/system-settings">
               打开系统设置

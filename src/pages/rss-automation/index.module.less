@@ -1,0 +1,967 @@
+.overviewShell {
+  width: 100%;
+  min-width: 0;
+}
+
+.overviewToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 2px 14px;
+}
+
+.overviewEmpty {
+  :global(.ant-card-body) {
+    padding: 54px 20px;
+  }
+}
+
+.automationCardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.automationCard {
+  border-color: rgba(148, 163, 184, 0.24);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+
+  &:hover {
+    border-color: rgba(22, 119, 255, 0.34);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.automationCardHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+
+  h5:global(.ant-typography) {
+    margin: 0 0 4px;
+  }
+}
+
+.automationDescription {
+  min-height: 44px;
+  margin: 16px 0 !important;
+}
+
+.automationFacts {
+  display: grid;
+  grid-template-columns: 0.6fr 0.6fr 1fr;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+
+  > span {
+    display: grid;
+    gap: 4px;
+  }
+
+  :global(.ant-tag) {
+    width: max-content;
+    margin: 0;
+  }
+}
+
+.automationError {
+  overflow: hidden;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #b42318;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #fff1f0;
+}
+
+.automationCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+
+  :global(.ant-btn) {
+    height: auto;
+    padding: 0;
+  }
+}
+
+.wizardShell {
+  width: 100%;
+  min-width: 0;
+}
+
+.wizardSteps {
+  margin-bottom: 26px;
+}
+
+.wizardStepCard {
+  border-color: rgba(148, 163, 184, 0.22);
+
+  :global(.ant-card-body) {
+    padding: 32px;
+  }
+}
+
+.wizardStepIntro {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+
+  h4:global(.ant-typography) {
+    margin: 0 0 4px;
+  }
+}
+
+.wizardStepIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 15px;
+  color: #1677ff;
+  font-size: 22px;
+  background: #eaf3ff;
+}
+
+.wizardURLInput {
+  width: 100%;
+}
+
+.wizardAdvanced {
+  margin-top: 18px;
+
+  :global(.ant-collapse-header) {
+    padding-inline: 0 !important;
+  }
+
+  :global(.ant-collapse-content-box) {
+    padding-inline: 0 !important;
+  }
+}
+
+.wizardSampleResult {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.wizardSampleHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.successIcon {
+  color: #16a34a;
+}
+
+.sampleChoiceSelect {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.sampleFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sampleFieldCard {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 9px;
+  background: #f8fafc;
+
+  p:global(.ant-typography) {
+    margin: 6px 0 0;
+    word-break: break-all;
+  }
+}
+
+.wizardFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.workflowShell.workflowShellWizard {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 690px;
+  border: 0;
+  background: transparent;
+
+  .workflowMain {
+    padding: 0;
+  }
+}
+
+.wizardDesignerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+
+  .flowWorkspace {
+    grid-column: 1;
+    height: 650px;
+    min-height: 650px;
+  }
+
+  .flowSpin,
+  .flowSpin > :global(.ant-spin-container) {
+    min-height: 650px;
+  }
+}
+
+.samplePreviewPanel {
+  max-height: min(70vh, 680px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.samplePreviewModal {
+  :global(.ant-modal-body) {
+    overflow: hidden;
+  }
+}
+
+.previewModeTag {
+  margin-inline-end: 0;
+}
+
+.previewItemSelect {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.previewPath {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid #b7eb8f;
+  border-radius: 8px;
+  color: #52c41a;
+  background: #f6ffed;
+}
+
+.previewPathBody {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.previewPathLabel {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.previewPathText {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.previewSection {
+  margin-top: 12px;
+}
+
+.previewSectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.previewSectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.previewSectionCount {
+  font-size: 11px;
+}
+
+.previewVariableList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+
+  :global(.ant-tag) {
+    margin: 0;
+    white-space: normal;
+  }
+}
+
+.previewFieldList {
+  display: grid;
+  margin-top: 6px;
+  overflow: hidden;
+  border: 1px solid #edf0f4;
+  border-radius: 8px;
+}
+
+.previewField {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  min-width: 0;
+  gap: 8px;
+  align-items: start;
+  padding: 7px 9px;
+  border-bottom: 1px solid #edf0f4;
+  background: #fff;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  p:global(.ant-typography) {
+    min-width: 0;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.65;
+    word-break: break-all;
+  }
+}
+
+.previewFieldName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeConfigModal {
+  padding-bottom: 0;
+
+  :global(.ant-modal-content) {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :global(.ant-modal-header) {
+    margin: 0;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  :global(.ant-modal-body) {
+    max-height: min(76vh, 720px);
+    overflow-y: auto;
+    padding: 18px 20px 2px;
+  }
+
+  :global(.ant-modal-footer) {
+    margin: 0;
+    padding: 12px 20px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    background: #fff;
+  }
+}
+
+.nodeConfigFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nodeConfigForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  align-items: start;
+
+  > :global(.ant-form-item) {
+    min-width: 0;
+    margin-bottom: 18px;
+  }
+
+  > :global(.ant-divider-horizontal) {
+    margin: 0 0 16px;
+  }
+}
+
+.nodeConfigFull,
+.nodeConfigPreview,
+.nodeConfigHint,
+.nodeConfigRetryFields {
+  grid-column: 1 / -1;
+}
+
+.nodeConfigPreview {
+  margin-bottom: 16px;
+  padding: 8px 11px;
+
+  :global(.ant-alert-message) {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
+
+.nodeConfigHint {
+  display: block;
+  margin: -2px 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.nodeConfigRetryFields {
+  margin-bottom: 18px;
+}
+
+.templateVariableControl {
+  position: relative;
+}
+
+.templateVariableSuggestions {
+  overflow: hidden;
+  border: 1px solid #d9e2ee;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+}
+
+.templateVariablePopover {
+  :global(.ant-popover-inner) {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+.templateVariableSuggestionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf0f4;
+  background: #f8fafc;
+
+  :global(.ant-typography) {
+    margin: 0;
+    font-size: 11px;
+  }
+}
+
+.templateVariableSuggestionBody {
+  max-height: 236px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.templateVariableGroup {
+  display: grid;
+
+  > :global(.ant-typography) {
+    padding: 5px 7px 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+}
+
+.templateVariableOption {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(150px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 7px;
+  border: 0;
+  border-radius: 7px;
+  color: #334155;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+
+  code {
+    overflow: hidden;
+    color: #0958d9;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover,
+  &[aria-selected='true'] {
+    background: #e6f4ff;
+  }
+}
+
+.templateVariableEmpty {
+  display: block;
+  padding: 14px;
+  text-align: center;
+}
+
+.workflowShell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 760px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.workflowList {
+  overflow: auto;
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, #fbfdff 0%, #f6f8fb 100%);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+
+  :global(.ant-typography) {
+    margin: 0;
+  }
+}
+
+.workflowListItem {
+  padding: 13px 16px !important;
+  cursor: pointer;
+  transition: background 160ms ease;
+
+  &:hover {
+    background: rgba(22, 119, 255, 0.06);
+  }
+}
+
+.workflowListItemActive {
+  border-right: 3px solid #1677ff;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.workflowListMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 7px;
+}
+
+.workflowSourceName {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflowMain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.workflowMetaCard {
+  flex: 0 0 auto;
+}
+
+.workflowMetaGrid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 0.8fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.validationList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.flowWorkspace {
+  position: relative;
+  height: 590px;
+  min-height: 590px;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.flowSpin,
+.flowSpin > :global(.ant-spin-container) {
+  width: 100%;
+  height: 100%;
+  min-height: 590px;
+}
+
+.flowCanvasPrimary,
+.flowCanvasActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.flowCanvasDivider {
+  width: 1px;
+  height: 22px;
+  margin: 0 2px;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.flowNode {
+  position: relative;
+  display: flex;
+  width: 230px;
+  min-height: 76px;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 30px 12px 13px;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #64748b;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.flowNodeSelected {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.13),
+    0 8px 24px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.flowNodeIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  color: #334155;
+  background: #f1f5f9;
+}
+
+.flowNodeBody {
+  min-width: 0;
+}
+
+.flowNodeType {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flowNodeName {
+  overflow: hidden;
+  margin-top: 3px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flowNodePreviewInactive {
+  opacity: 0.48;
+  filter: grayscale(0.35);
+}
+
+.nodePreview {
+  max-width: 150px;
+  overflow: hidden;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodePreview_success {
+  color: #15803d;
+}
+
+.nodePreview_warning {
+  color: #b45309;
+}
+
+.nodePreview_neutral {
+  color: #64748b;
+}
+
+.portHandle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid #fff !important;
+  background: #64748b !important;
+  box-shadow: 0 0 0 1px #64748b;
+}
+
+.portLabel {
+  position: absolute;
+  right: 10px;
+  max-width: 42px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 9px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+.nodeStatus {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 9px;
+  font-weight: 600;
+  background: #e2e8f0;
+}
+
+.node_trigger {
+  border-left-color: #1677ff;
+}
+.node_regex,
+.node_keyword,
+.node_convert {
+  border-left-color: #7c3aed;
+}
+.node_if,
+.node_parallel,
+.node_join {
+  border-left-color: #d97706;
+}
+.node_qbittorrent,
+.node_offline115,
+.node_offline115_openapi,
+.node_notification {
+  border-left-color: #059669;
+}
+.node_end {
+  border-left-color: #475569;
+}
+
+.status_running {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+
+  .nodeStatus {
+    color: #0958d9;
+    background: #e6f4ff;
+  }
+}
+
+.status_succeeded .nodeStatus {
+  color: #237804;
+  background: #f6ffed;
+}
+
+.status_failed .nodeStatus {
+  color: #a8071a;
+  background: #fff1f0;
+}
+
+.status_skipped {
+  opacity: 0.56;
+}
+
+.panelAlert {
+  margin-bottom: 16px;
+}
+
+.samplePreview {
+  margin-top: 16px;
+}
+
+.jsonPreview {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  color: #d6e4ff;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #101827;
+}
+
+.runGraph {
+  width: 100%;
+  height: 390px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+@media (max-width: 1100px) {
+  .workflowShell {
+    grid-template-columns: 1fr;
+  }
+
+  .workflowList {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  .workflowMetaGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizardDesignerGrid {
+    grid-template-columns: 1fr;
+
+    .flowWorkspace {
+      grid-column: 1;
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .overviewToolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nodeConfigForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nodeConfigModal {
+    :global(.ant-modal-header) {
+      padding: 14px 16px;
+    }
+
+    :global(.ant-modal-body) {
+      padding: 16px 16px 0;
+    }
+
+    :global(.ant-modal-footer) {
+      padding: 10px 16px;
+    }
+  }
+
+  .nodeConfigFooter {
+    flex-wrap: wrap;
+  }
+
+  .automationCardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizardSteps {
+    :global(.ant-steps-item-description) {
+      display: none;
+    }
+  }
+
+  .wizardStepCard {
+    :global(.ant-card-body) {
+      padding: 22px 16px;
+    }
+  }
+
+  .wizardStepIntro {
+    align-items: flex-start;
+  }
+
+  .sampleFieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizardFooter {
+    align-items: stretch;
+    flex-direction: column-reverse;
+
+    :global(.ant-btn) {
+      width: 100%;
+    }
+  }
+
+  .workflowMain {
+    padding: 8px;
+  }
+
+  .flowWorkspace {
+    display: flex;
+    height: auto;
+    min-height: 1040px;
+    flex-direction: column;
+  }
+
+  .flowCanvasPrimary,
+  .flowCanvasActions {
+    gap: 4px;
+    margin: 8px;
+    padding: 4px;
+
+    :global(.ant-btn > span:not(.anticon)) {
+      display: none;
+    }
+  }
+
+  .flowSpin,
+  .flowSpin > :global(.ant-spin-container) {
+    width: 100%;
+    height: 680px;
+    min-height: 680px;
+    flex: 0 0 680px;
+  }
+}

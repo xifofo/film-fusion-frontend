@@ -565,7 +565,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const applyingPreviewTaskRef = useRef<API.OrganizePreviewTask | undefined>(
     undefined,
   );
-  const deleteSourceFolderAfterApplyRef = useRef(false);
   const requeuePreviewTaskAfterApplyRef = useRef(false);
   const clearingPreviewTaskStatusRef = useRef<
     API.OrganizePreviewTaskStatus | undefined
@@ -1018,8 +1017,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           !payload?.dry_run && sourceFolderDeletedCount > 0
             ? `，已删除原文件夹 ${sourceFolderDeletedCount} 个`
             : '';
+        const sourceFolderDeletePendingCount =
+          typeof payload?.source_folder_delete_pending_count === 'number'
+            ? payload.source_folder_delete_pending_count
+            : payload?.source_folder_delete_pending
+              ? 1
+              : 0;
+        const sourceFolderDeletePendingSuffix =
+          !payload?.dry_run && sourceFolderDeletePendingCount > 0
+            ? `，${sourceFolderDeletePendingCount} 个原文件夹将在字幕全部下载完成后自动删除`
+            : '';
         messageApi.success(
-          `${text}${suffix}${payload?.dry_run ? '（演练）' : ''}${sourceFolderDeletedSuffix}`,
+          `${text}${suffix}${payload?.dry_run ? '（演练）' : ''}${sourceFolderDeletedSuffix}${sourceFolderDeletePendingSuffix}`,
         );
         const sourceFolderDeleteErrors =
           payload?.source_folder_delete_errors || [];
@@ -1042,15 +1051,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setSelectedItemRowKeys(selection.selectedRowKeys);
         } else {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
-          const shouldDeleteSourceFolder =
-            deleteSourceFolderAfterApplyRef.current;
           const shouldRequeuePreviewTask =
             requeuePreviewTaskAfterApplyRef.current;
           const failedApplyGroups = (payload?.groups || []).filter(
             (group) => !!group.error,
           );
           applyingPreviewTaskRef.current = undefined;
-          deleteSourceFolderAfterApplyRef.current = false;
           requeuePreviewTaskAfterApplyRef.current = false;
           if (appliedPreviewTask && failedApplyGroups.length > 0) {
             messageApi.warning(
@@ -1073,26 +1079,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 refreshPreviewTasks();
               });
           } else if (appliedPreviewTask) {
-            deleteOrganizePreviewTask(
-              appliedPreviewTask.id,
-              shouldDeleteSourceFolder
-                ? { delete_source_folder: true }
-                : undefined,
-            )
-              .then((deleteResult) => {
-                const deleteResponse = deleteResult as any;
-                const deletePayload: API.DeleteOrganizePreviewTaskResult =
-                  deleteResponse &&
-                  typeof deleteResponse === 'object' &&
-                  'data' in deleteResponse &&
-                  'code' in deleteResponse
-                    ? deleteResponse.data
-                    : deleteResponse;
-                messageApi.success(
-                  deletePayload?.source_folder_deleted
-                    ? '已从预整理队列移除，源文件夹已移入回收站'
-                    : '已从预整理队列移除',
-                );
+            deleteOrganizePreviewTask(appliedPreviewTask.id)
+              .then(() => {
+                messageApi.success('已从预整理队列移除');
                 refreshPreviewTasks();
               })
               .catch((error: any) => {
@@ -1112,7 +1101,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       },
       onError: (error: any) => {
         applyingPreviewTaskRef.current = undefined;
-        deleteSourceFolderAfterApplyRef.current = false;
         requeuePreviewTaskAfterApplyRef.current = false;
         messageApi.error(error?.message || '整理失败，请重试');
       },
@@ -1617,7 +1605,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           return;
         }
         applyingPreviewTaskRef.current = undefined;
-        deleteSourceFolderAfterApplyRef.current = false;
         requeuePreviewTaskAfterApplyRef.current = false;
         runOrganizeWithMode(organizeParams);
         return;
@@ -1700,8 +1687,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 </Checkbox>
                 <Typography.Text type="secondary">
                   {activeVersionGroup
-                    ? `勾选后仅在所选版本整理成功时删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；取消勾选则保留其他版本，并重新生成预整理任务。`
-                    : '仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。'}
+                    ? `勾选后仅在所选版本整理成功且相关字幕全部下载完成后删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；下载失败时保留原文件夹。取消勾选则保留其他版本，并重新生成预整理任务。`
+                    : '仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。'}
                 </Typography.Text>
               </Space>
             </Space>
@@ -1711,14 +1698,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           cancelText: '取消',
           onOk: () => {
             applyingPreviewTaskRef.current = activePreviewTask;
-            deleteSourceFolderAfterApplyRef.current =
-              !!activePreviewTask && deleteSourceFolder;
             requeuePreviewTaskAfterApplyRef.current =
               !!activePreviewTask &&
               !!activeVersionGroup &&
               !deleteSourceFolder;
             runOrganizeWithMode(
-              !activePreviewTask && deleteSourceFolder
+              deleteSourceFolder
                 ? { ...organizeParams, delete_source_folder: true }
                 : organizeParams,
             );
@@ -1755,7 +1740,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 整理完成后删除原文件夹
               </Checkbox>
               <Typography.Text type="secondary">
-                仅在整理成功后执行，会将本次整理来源目录移入 115 回收站。
+                仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。
               </Typography.Text>
             </Space>
           </Space>
@@ -1765,7 +1750,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         cancelText: '取消',
         onOk: () => {
           applyingPreviewTaskRef.current = undefined;
-          deleteSourceFolderAfterApplyRef.current = false;
           requeuePreviewTaskAfterApplyRef.current = false;
           runOrganizeWithMode(
             deleteSourceFolder

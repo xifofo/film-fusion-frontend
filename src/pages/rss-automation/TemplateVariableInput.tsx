@@ -1,0 +1,294 @@
+import { Input, Popover, Typography } from 'antd';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  type SyntheticEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import styles from './index.module.less';
+import type { NodeFieldReference } from './NodeConfigDrawer';
+
+const { Text } = Typography;
+
+type TemplateVariableInputProps = {
+  id?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  references: NodeFieldReference[];
+  multiline?: boolean;
+  placeholder?: string;
+  ariaLabel: string;
+};
+
+type TemplateOption = NodeFieldReference & {
+  path: string;
+  token: string;
+};
+
+type ActiveTemplate = {
+  start: number;
+  query: string;
+};
+
+const activeTemplateAt = (
+  value: string,
+  cursor: number,
+): ActiveTemplate | undefined => {
+  const beforeCursor = value.slice(0, cursor);
+  const start = beforeCursor.lastIndexOf('{{');
+  if (start < 0 || beforeCursor.lastIndexOf('}}') > start) return undefined;
+
+  const query = beforeCursor.slice(start + 2);
+  if (query.includes('\n') || /[{}]/.test(query)) return undefined;
+  return { start, query: query.trimStart() };
+};
+
+const templateOption = (reference: NodeFieldReference): TemplateOption => {
+  const path = reference.value.replace(/^\$/, '');
+  return { ...reference, path, token: `{{${path}}}` };
+};
+
+const TemplateVariableInput = ({
+  id,
+  value = '',
+  onChange,
+  references,
+  multiline = false,
+  placeholder,
+  ariaLabel,
+}: TemplateVariableInputProps) => {
+  const listboxId = `template-variables-${useId().replaceAll(':', '')}`;
+  const inputElement = useRef<
+    HTMLInputElement | HTMLTextAreaElement | undefined
+  >(undefined);
+  const ignoreNextSelection = useRef(false);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const options = useMemo(() => references.map(templateOption), [references]);
+  const filteredOptions = useMemo(() => {
+    const needle = query.toLowerCase().replace(/^\$/, '');
+    if (!needle) return options;
+    return options.filter((option) =>
+      [option.path, option.name, option.preview]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [options, query]);
+  const groupedOptions = useMemo(
+    () =>
+      [
+        {
+          kind: 'item' as const,
+          label: 'RSS 原始字段',
+          options: filteredOptions.filter((option) => option.kind === 'item'),
+        },
+        {
+          kind: 'variable' as const,
+          label: '上游流程变量',
+          options: filteredOptions.filter(
+            (option) => option.kind === 'variable',
+          ),
+        },
+      ].filter((group) => group.options.length > 0),
+    [filteredOptions],
+  );
+
+  useEffect(() => {
+    if (!open || filteredOptions.length === 0) return;
+    document
+      .getElementById(`${listboxId}-${activeIndex}`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, filteredOptions.length, listboxId, open]);
+
+  const updateSuggestions = (
+    nextValue: string,
+    element: HTMLInputElement | HTMLTextAreaElement,
+  ) => {
+    inputElement.current = element;
+    const active = activeTemplateAt(
+      nextValue,
+      element.selectionStart ?? nextValue.length,
+    );
+    setOpen(Boolean(active));
+    setQuery(active?.query || '');
+    setActiveIndex(0);
+  };
+
+  const handleChange = (
+    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    onChange?.(event.target.value);
+    updateSuggestions(event.target.value, event.currentTarget);
+  };
+
+  const handleSelection = (
+    event: SyntheticEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    if (ignoreNextSelection.current) return;
+    updateSuggestions(value, event.currentTarget);
+  };
+
+  const insertOption = (option: TemplateOption) => {
+    const element = inputElement.current;
+    const cursor = element?.selectionStart ?? value.length;
+    const active = activeTemplateAt(value, cursor);
+    const start = active?.start ?? cursor;
+    let end = cursor;
+    const closingBraces = active ? value.indexOf('}}', cursor) : -1;
+    if (closingBraces >= 0) {
+      end = closingBraces + 2;
+    } else if (value.slice(end, end + 2) === '}}') {
+      end += 2;
+    }
+    const nextValue = `${value.slice(0, start)}${option.token}${value.slice(end)}`;
+    const nextCursor = start + option.token.length;
+
+    onChange?.(nextValue);
+    setOpen(false);
+    ignoreNextSelection.current = true;
+    window.requestAnimationFrame(() => {
+      element?.focus();
+      element?.setSelectionRange(nextCursor, nextCursor);
+      window.setTimeout(() => {
+        ignoreNextSelection.current = false;
+      }, 0);
+    });
+  };
+
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    if (!open) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+    if (filteredOptions.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((index) => (index + 1) % filteredOptions.length);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex(
+        (index) =>
+          (index - 1 + filteredOptions.length) % filteredOptions.length,
+      );
+      return;
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault();
+      insertOption(filteredOptions[activeIndex] || filteredOptions[0]);
+    }
+  };
+
+  const inputProps = {
+    'aria-activedescendant':
+      open && filteredOptions.length > 0
+        ? `${listboxId}-${activeIndex}`
+        : undefined,
+    'aria-autocomplete': 'list' as const,
+    'aria-controls': open ? listboxId : undefined,
+    'aria-expanded': open,
+    'aria-label': ariaLabel,
+    id,
+    onBlur: () => setOpen(false),
+    onChange: handleChange,
+    onClick: handleSelection,
+    onKeyDown: handleKeyDown,
+    onSelect: handleSelection,
+    placeholder,
+    value,
+  };
+
+  const suggestions = open ? (
+    // biome-ignore lint/a11y/useSemanticElements: This is an editable autocomplete popup, not a native select.
+    <div
+      aria-label="模板变量智能提示"
+      className={styles.templateVariableSuggestions}
+      id={listboxId}
+      role="listbox"
+      style={{
+        width: inputElement.current?.getBoundingClientRect().width || 640,
+      }}
+    >
+      <div className={styles.templateVariableSuggestionHeader}>
+        <Text strong>插入模板变量</Text>
+        <Text type="secondary">↑↓ 选择 · Enter 插入 · Esc 关闭</Text>
+      </div>
+      {groupedOptions.length > 0 ? (
+        <div className={styles.templateVariableSuggestionBody}>
+          {groupedOptions.map((group) => (
+            <div className={styles.templateVariableGroup} key={group.kind}>
+              <Text type="secondary">{group.label}</Text>
+              {group.options.map((option) => {
+                const index = filteredOptions.indexOf(option);
+                return (
+                  // biome-ignore lint/a11y/useSemanticElements: Buttons preserve mouse interaction while exposing autocomplete option semantics.
+                  <button
+                    aria-selected={index === activeIndex}
+                    className={styles.templateVariableOption}
+                    id={`${listboxId}-${index}`}
+                    key={option.token}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      insertOption(option);
+                    }}
+                    role="option"
+                    type="button"
+                  >
+                    <code>{option.token}</code>
+                    {option.preview && (
+                      <span title={option.preview}>{option.preview}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Text className={styles.templateVariableEmpty} type="secondary">
+          没有匹配的变量，可以继续手动输入
+        </Text>
+      )}
+    </div>
+  ) : null;
+
+  return (
+    <Popover
+      arrow={false}
+      content={suggestions}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) setOpen(false);
+      }}
+      open={open}
+      overlayClassName={styles.templateVariablePopover}
+      placement={multiline ? 'topLeft' : 'bottomLeft'}
+      trigger="click"
+    >
+      <div className={styles.templateVariableControl}>
+        {multiline ? (
+          <Input.TextArea
+            {...inputProps}
+            autoSize={{ minRows: 4, maxRows: 10 }}
+          />
+        ) : (
+          <Input {...inputProps} />
+        )}
+      </div>
+    </Popover>
+  );
+};
+
+export default TemplateVariableInput;

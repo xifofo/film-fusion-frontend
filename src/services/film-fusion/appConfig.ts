@@ -41,12 +41,13 @@ export async function uploadLoginBackground(
   >('/api/site-assets/login-background', formData, { ...(options || {}) });
 }
 
-/** 使用已保存的 Telegram 配置发送测试消息 */
-export async function testTelegramNotification(options?: {
-  [key: string]: any;
-}) {
+/** 使用已保存的渠道配置发送统一测试通知 */
+export async function testNotificationChannel(
+  channel: API.NotificationChannelID,
+  options?: { [key: string]: any },
+) {
   return apiClient.post<API.Response<unknown>>(
-    '/api/telegram/test',
+    `/api/notifications/channels/${channel}/test`,
     undefined,
     { ...(options || {}) },
   );

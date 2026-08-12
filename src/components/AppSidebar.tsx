@@ -4,7 +4,6 @@ import { useEffect, useId, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { AccountMenu } from '@/components/AccountMenu';
-import { OpticalLogo } from '@/components/OpticalLogo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { type AppMenuItem, menuItems, menuPathMatches } from '@/router/menu';
@@ -158,7 +157,11 @@ export function AppSidebar({
           onClick={onNavigate}
           to="/cloud-storage"
         >
-          <OpticalLogo className="size-10 shadow-[0_10px_30px_rgba(0,0,0,0.15)]" />
+          <img
+            alt=""
+            className="size-10 shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
+            src="/logo.svg"
+          />
           <span
             className={cn(
               'min-w-0 transition-opacity duration-200',

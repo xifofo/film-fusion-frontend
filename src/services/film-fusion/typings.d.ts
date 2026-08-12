@@ -688,6 +688,8 @@ declare namespace API {
     groups?: Organize115CookieGroup[];
     source_folder_deleted?: boolean;
     source_folder_deleted_count?: number;
+    source_folder_delete_pending?: boolean;
+    source_folder_delete_pending_count?: number;
     source_folder_delete_errors?: string[];
   };
 
@@ -1516,6 +1518,8 @@ declare namespace API {
     page_size?: number;
   };
 
+  type NotificationChannelID = 'telegram' | 'webhook';
+
   /** 应用配置 - config.yaml 结构 */
   type AppConfig = {
     server: {
@@ -1568,7 +1572,32 @@ declare namespace API {
       expire_time: number;
       issuer: string;
     };
-    telegram: {
+    notifications: {
+      instance_name: string;
+      routes: {
+        emby_brute_force: NotificationChannelID[];
+        system_brute_force: NotificationChannelID[];
+        rss_matched: NotificationChannelID[];
+        web_115_cookie_invalid: NotificationChannelID[];
+      };
+      telegram: {
+        enabled: boolean;
+        bot_token: string;
+        chat_id: string;
+        message_thread_id: number;
+        api_base: string;
+        timeout_seconds: number;
+        silent: boolean;
+      };
+      webhook: {
+        enabled: boolean;
+        url: string;
+        token: string;
+        timeout_seconds: number;
+      };
+    };
+    /** 旧后端/前端兼容视图，新界面不再使用。 */
+    telegram?: {
       enabled: boolean;
       bot_token: string;
       chat_id: string;
@@ -2032,7 +2061,13 @@ declare namespace API {
     | 'message_template'
   >;
 
-  type RSSNotificationStatus = 'baseline' | 'ignored' | 'sent' | 'failed';
+  type RSSNotificationStatus =
+    | 'baseline'
+    | 'ignored'
+    | 'sent'
+    | 'partial'
+    | 'failed'
+    | 'skipped';
 
   type RSSMonitorItem = {
     id: number;
@@ -2071,6 +2106,8 @@ declare namespace API {
     recent_matched_items: RSSMonitorItem[];
     retention_limit: number;
     running: boolean;
+    notification_ready: boolean;
+    /** 旧接口兼容字段。 */
     telegram_ready: boolean;
     total_seen: number;
     total_notified: number;
