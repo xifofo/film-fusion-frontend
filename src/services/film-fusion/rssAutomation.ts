@@ -123,6 +123,11 @@ export type RSSAutomationCreateResult = {
   validation: RSSAutomationValidationResult;
 };
 
+export type RSSAutomationEnabledResult = {
+  source: RSSAutomationSource;
+  workflow: RSSAutomationWorkflow;
+};
+
 export type RSSAutomationTargetInput = {
   name: string;
   type: 'qbittorrent';
@@ -351,6 +356,12 @@ export const updateRSSAutomationSource = (
 export const deleteRSSAutomation = (id: number) =>
   apiClient.delete<API.Response<Record<string, never>>>(
     `/api/rss-automation/automations/${id}`,
+  );
+
+export const setRSSAutomationEnabled = (id: number, enabled: boolean) =>
+  apiClient.patch<API.Response<RSSAutomationEnabledResult>>(
+    `/api/rss-automation/automations/${id}/enabled`,
+    { enabled },
   );
 
 export const sampleRSSAutomationSource = (input: RSSAutomationSourceInput) =>

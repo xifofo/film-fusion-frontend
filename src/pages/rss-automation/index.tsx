@@ -7,6 +7,7 @@ import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import {
   getCloudStorageList,
   getRSSAutomationDashboard,
+  setRSSAutomationEnabled,
 } from '@/services/film-fusion';
 import AutomationOverview from './AutomationOverview';
 import AutomationWizard from './AutomationWizard';
@@ -16,6 +17,7 @@ const RSSAutomationPage = () => {
   const [dashboard, setDashboard] = useState<RSSAutomationDashboard>();
   const [cloudStorages, setCloudStorages] = useState<API.CloudStorage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [togglingSourceId, setTogglingSourceId] = useState<number>();
   const [messageApi, contextHolder] = message.useMessage();
 
   const load = useCallback(
@@ -46,6 +48,43 @@ const RSSAutomationPage = () => {
       }
     },
     [messageApi],
+  );
+
+  const toggleAutomation = useCallback(
+    async (sourceId: number, enabled: boolean) => {
+      setTogglingSourceId(sourceId);
+      try {
+        const response = await setRSSAutomationEnabled(sourceId, enabled);
+        if (response.code !== 0 || !response.data) {
+          throw new Error(response.message || '更新 RSS 自动化状态失败');
+        }
+        const updated = response.data;
+        setDashboard((current) =>
+          current
+            ? {
+                ...current,
+                sources: current.sources.map((source) =>
+                  source.id === updated.source.id ? updated.source : source,
+                ),
+                workflows: current.workflows.map((workflow) =>
+                  workflow.id === updated.workflow.id
+                    ? updated.workflow
+                    : workflow,
+                ),
+              }
+            : current,
+        );
+        messageApi.success(enabled ? 'RSS 自动化已启动' : 'RSS 自动化已停用');
+        await load(true);
+      } catch (error: any) {
+        messageApi.error(
+          error?.data || error?.message || '更新 RSS 自动化状态失败',
+        );
+      } finally {
+        setTogglingSourceId(undefined);
+      }
+    },
+    [load, messageApi],
   );
 
   useEffect(() => {
@@ -85,6 +124,8 @@ const RSSAutomationPage = () => {
           data={data}
           loading={loading}
           onCreate={() => setView('wizard')}
+          onToggle={toggleAutomation}
+          togglingSourceId={togglingSourceId}
         />
       )}
 

@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { Button, Card, Empty, Tag, Typography } from 'antd';
+import { Button, Card, Empty, Switch, Tag, Typography } from 'antd';
 import type {
   RSSAutomationDashboard,
   RSSAutomationRunStatus,
@@ -13,6 +13,8 @@ type AutomationOverviewProps = {
   data: RSSAutomationDashboard;
   loading: boolean;
   onCreate: () => void;
+  onToggle: (sourceId: number, enabled: boolean) => Promise<void> | void;
+  togglingSourceId?: number;
 };
 
 const runStatus: Record<
@@ -31,6 +33,8 @@ const AutomationOverview = ({
   data,
   loading,
   onCreate,
+  onToggle,
+  togglingSourceId,
 }: AutomationOverviewProps) => {
   const sourceByID = new Map(data.sources.map((source) => [source.id, source]));
   const latestRunByWorkflow = new Map<
@@ -49,7 +53,13 @@ const AutomationOverview = ({
         <div className={styles.overviewToolbar}>
           <Text type="secondary">
             {data.workflows.length} 个自动化，
-            {data.workflows.filter((workflow) => workflow.enabled).length}{' '}
+            {
+              data.workflows.filter(
+                (workflow) =>
+                  workflow.enabled &&
+                  sourceByID.get(workflow.source_id)?.enabled,
+              ).length
+            }{' '}
             个正在监听
           </Text>
           <Button icon={<PlusOutlined />} onClick={onCreate} type="primary">
@@ -77,6 +87,7 @@ const AutomationOverview = ({
         <div className={styles.automationCardGrid}>
           {data.workflows.map((workflow) => {
             const source = sourceByID.get(workflow.source_id);
+            const enabled = Boolean(workflow.enabled && source?.enabled);
             const definition = parseWorkflowDefinition(
               workflow.definition_json,
             );
@@ -106,9 +117,19 @@ const AutomationOverview = ({
                       {source?.name || 'RSS 源已不存在'}
                     </Text>
                   </div>
-                  <Tag color={workflow.enabled ? 'success' : 'default'}>
-                    {workflow.enabled ? '正在监听' : '草稿'}
-                  </Tag>
+                  <Switch
+                    aria-label={`${enabled ? '停用' : '启动'}自动化 ${workflow.name}`}
+                    checked={enabled}
+                    checkedChildren="已启动"
+                    disabled={!source}
+                    loading={
+                      source !== undefined && togglingSourceId === source.id
+                    }
+                    onChange={(checked) => {
+                      if (source) void onToggle(source.id, checked);
+                    }}
+                    unCheckedChildren="已停用"
+                  />
                 </div>
                 <Paragraph
                   className={styles.automationDescription}
@@ -143,7 +164,9 @@ const AutomationOverview = ({
                 <div className={styles.automationCardFooter}>
                   <Text type="secondary">
                     {source
-                      ? `每 ${source.interval_minutes} 分钟检查一次`
+                      ? enabled
+                        ? `每 ${source.interval_minutes} 分钟检查一次`
+                        : '已停用，不再检查 RSS 源'
                       : 'RSS 源已不存在'}
                   </Text>
                 </div>
