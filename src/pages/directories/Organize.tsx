@@ -18,11 +18,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { PageContainer, ProTable } from '@ant-design/pro-components';
 import {
   Alert,
   Badge,
@@ -1403,26 +1399,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     [flatItemsForTable, versionGroups],
   );
 
-  const itemFactSummary = useMemo(() => {
-    return flatItemsForTable.reduce(
-      (acc, row) => {
-        if (row.episode_matched) acc.episodeMatched += 1;
-        if ((row.external_subtitle_files || []).length > 0) {
-          acc.externalSubtitle += 1;
-        }
-        if (row.best_version) acc.bestVersion += 1;
-        if (row.alternate_version) acc.alternateVersion += 1;
-        return acc;
-      },
-      {
-        episodeMatched: 0,
-        externalSubtitle: 0,
-        bestVersion: 0,
-        alternateVersion: 0,
-      },
-    );
-  }, [flatItemsForTable]);
-
   const selectedItemRowsForApply = useMemo(() => {
     const selectedSet = new Set(selectedItemRowKeys.map((key) => String(key)));
     return flatItemsForTable.filter((row) =>
@@ -2202,23 +2178,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         },
       },
       {
-        title: '类型/分类',
-        dataIndex: 'media_type',
-        width: 130,
-        render: (_, row) => (
-          <Space size={4} wrap>
-            <Tag>
-              {row.media_type === 'movie'
-                ? '电影'
-                : row.media_type === 'tv'
-                  ? '剧集'
-                  : '自动'}
-            </Tag>
-            {row.category ? <Tag>{row.category}</Tag> : null}
-          </Space>
-        ),
-      },
-      {
         title: '版本',
         dataIndex: 'best_version_count',
         width: 130,
@@ -2453,15 +2412,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       activePreviewTask.folder_name ||
       activePreviewTask.folder_id
     : undefined;
-  const showEpisodeFacts =
-    episodeMode ||
-    resultData?.media_type === 'tv' ||
-    effectiveMediaType === 'tv';
-  const showVersionFacts =
-    resultData?.media_type === 'movie' ||
-    resultData?.media_type === 'tv' ||
-    effectiveMediaType === 'movie' ||
-    effectiveMediaType === 'tv';
 
   return (
     <PageContainer
@@ -2483,31 +2433,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     >
       {contextHolder}
       {modalContextHolder}
-
-      {directoryDetail ? (
-        <ProDescriptions<API.CloudDirectory>
-          column={3}
-          dataSource={directoryDetail}
-          style={{ marginBottom: 16 }}
-          columns={[
-            { title: '目录名称', dataIndex: 'directory_name' },
-            {
-              title: '云存储',
-              render: () => directoryDetail.cloud_storage?.storage_name || '-',
-            },
-            { title: '保存路径', dataIndex: 'save_path', copyable: true },
-            { title: '内容前缀', dataIndex: 'content_prefix', copyable: true },
-            {
-              title: '按分类',
-              render: () => renderBoolTag(directoryDetail.classify_by_category),
-            },
-            {
-              title: 'URI 编码',
-              render: () => renderBoolTag(directoryDetail.content_encode_uri),
-            },
-          ]}
-        />
-      ) : null}
 
       <Row gutter={16} style={{ alignItems: 'stretch' }}>
         <Col
@@ -2805,106 +2730,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             />
 
             <div ref={previewResultRef}>
-              {!resultData ? (
-                <Alert
-                  type="info"
-                  showIcon
-                  message={episodeMode ? '尚未生成剧集预览' : '尚未整理'}
-                  description={
-                    episodeMode
-                      ? '勾选剧集目录后先预览，系统会用正则处理后的文件名识别；识别不到时再组合父级/祖父级目录名重试，并标记集数匹配、本地入库、外挂字幕和版本信息，方便手动检查。'
-                      : '在左侧勾选目录后可以直接点“预览整理”；也可以点“加入预整理”，后台会先展开子目录并逐个生成预览结果。子目录预整理完成后，在队列里点“查看结果”会把该目录的预览明细加载到这里，再单独确认是否整理这个子目录。'
-                  }
-                />
-              ) : (
+              {resultData ? (
                 <>
-                  {activePreviewTask ? (
-                    <Alert
-                      type="success"
-                      showIcon
-                      style={{ marginBottom: 12 }}
-                      message="当前预整理结果"
-                      description={
-                        <Space size={8} wrap>
-                          <Typography.Text strong>
-                            {activePreviewTaskLabel}
-                          </Typography.Text>
-                          <Tag color="blue">
-                            层级 {activePreviewTask.depth}/
-                            {activePreviewTask.max_depth}
-                          </Tag>
-                          <Tag color="green">
-                            可确认 {selectedItemRowsForApply.length} 条
-                          </Tag>
-                        </Space>
-                      }
-                    />
-                  ) : null}
-
-                  <ProDescriptions<API.Organize115CookieResult>
-                    column={4}
-                    dataSource={resultData}
-                    style={{ marginBottom: 12 }}
-                    columns={[
-                      { title: '目录配置 ID', dataIndex: 'cloud_directory_id' },
-                      { title: '云存储 ID', dataIndex: 'cloud_storage_id' },
-                      {
-                        title: '整理目录数',
-                        render: () =>
-                          resultData.groups?.length ??
-                          (resultData.folder_id ? 1 : 0),
-                      },
-                      { title: '文件总数', dataIndex: 'total' },
-                      {
-                        title: '演练模式',
-                        render: () => renderBoolTag(resultData.dry_run),
-                      },
-                      ...(showEpisodeFacts
-                        ? [
-                            {
-                              title: '集数匹配',
-                              render: () => (
-                                <Tag color="blue">
-                                  {itemFactSummary.episodeMatched}
-                                </Tag>
-                              ),
-                            },
-                          ]
-                        : []),
-                      {
-                        title: '外挂字幕',
-                        render: () => (
-                          <Tag
-                            color={
-                              itemFactSummary.externalSubtitle > 0
-                                ? 'error'
-                                : 'default'
-                            }
-                          >
-                            {itemFactSummary.externalSubtitle}
-                          </Tag>
-                        ),
-                      },
-                      ...(showVersionFacts
-                        ? [
-                            {
-                              title: '最佳版本',
-                              render: () => (
-                                <Space size={4} wrap>
-                                  <Tag color="success">
-                                    {itemFactSummary.bestVersion}
-                                  </Tag>
-                                  <Tag color="error">
-                                    {itemFactSummary.alternateVersion}
-                                  </Tag>
-                                </Space>
-                              ),
-                            },
-                          ]
-                        : []),
-                    ]}
-                  />
-
                   {(() => {
                     const errored = (resultData.groups || []).filter(
                       (g) => !!g?.error,
@@ -3106,7 +2933,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     ]}
                   />
                 </>
-              )}
+              ) : null}
             </div>
           </Card>
         </Col>
