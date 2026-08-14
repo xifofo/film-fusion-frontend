@@ -76,6 +76,7 @@ const TemplateVariableInput = ({
     if (!needle) return options;
     return options.filter((option) =>
       [option.path, option.name, option.preview]
+        .concat(option.dataType || '', option.description || '')
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -96,6 +97,11 @@ const TemplateVariableInput = ({
           options: filteredOptions.filter(
             (option) => option.kind === 'variable',
           ),
+        },
+        {
+          kind: 'node' as const,
+          label: '上游节点输出',
+          options: filteredOptions.filter((option) => option.kind === 'node'),
         },
       ].filter((group) => group.options.length > 0),
     [filteredOptions],
@@ -247,9 +253,14 @@ const TemplateVariableInput = ({
                     role="option"
                     type="button"
                   >
-                    <code>{option.token}</code>
-                    {option.preview && (
-                      <span title={option.preview}>{option.preview}</span>
+                    <span>
+                      <code>{option.token}</code>
+                      {option.dataType && <small>{option.dataType}</small>}
+                    </span>
+                    {(option.preview || option.description) && (
+                      <span title={option.description || option.preview}>
+                        {option.preview || option.description}
+                      </span>
                     )}
                   </button>
                 );

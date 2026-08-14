@@ -113,14 +113,14 @@ const FeedList = ({
                   预览
                 </Button>,
                 <Button
-                  aria-label={`管理 Token ${feed.name}`}
+                  aria-label={`管理订阅 ${feed.name}`}
                   className={styles.cardAction}
                   icon={<KeyOutlined />}
                   key="tokens"
                   onClick={() => onTokens(feed)}
                   type="text"
                 >
-                  Token
+                  订阅
                 </Button>,
                 <Button
                   aria-label={`编辑 ${feed.name}`}

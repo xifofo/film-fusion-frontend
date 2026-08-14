@@ -16,6 +16,7 @@ const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
 const CloudPaths = lazy(() => import('@/pages/cloud-paths'));
 const Directories = lazy(() => import('@/pages/directories'));
 const DownloadQueue = lazy(() => import('@/pages/download-queue'));
+const Downloaders = lazy(() => import('@/pages/downloaders'));
 const Organize = lazy(() => import('@/pages/directories/Organize'));
 const EpisodeOrganize = lazy(
   () => import('@/pages/directories/EpisodeOrganize'),
@@ -34,10 +35,10 @@ const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
 const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
-const RSSMonitor = lazy(() => import('@/pages/rss-monitor'));
 const RSSGenerator = lazy(() => import('@/pages/rss-generator'));
 const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
+const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
 const HDHiveCallback = lazy(() => import('@/pages/hdhive-callback'));
 const NotFound = lazy(() => import('@/pages/404'));
@@ -147,6 +148,10 @@ const routes: RouteObject[] = [
         element: <DownloadQueue />,
       },
       {
+        path: 'downloaders',
+        element: <Downloaders />,
+      },
+      {
         path: 'directories/organize/:id',
         element: <Organize />,
       },
@@ -208,7 +213,7 @@ const routes: RouteObject[] = [
       },
       {
         path: 'rss-monitor',
-        element: <RSSMonitor />,
+        element: <Navigate replace to="/rss-automation" />,
       },
       {
         path: 'rss-automation',
@@ -217,6 +222,10 @@ const routes: RouteObject[] = [
       {
         path: 'server-logs',
         element: <ServerLogs />,
+      },
+      {
+        path: 'system-info',
+        element: <SystemInfo />,
       },
       {
         path: 'system-settings',

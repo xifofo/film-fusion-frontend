@@ -18,8 +18,20 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'parallel',
   'join',
   'qbittorrent',
+  'wait_qbittorrent',
   'offline115',
   'offline115_openapi',
+  'wait115',
+  'moviepilot_title_recognize',
+  'media_exists',
+  'hdhive_query',
+  'hdhive_unlock',
+  'moviepilot_recognize',
+  'organize_strm',
+  'strm_verify',
+  'strm_regenerate',
+  'emby_refresh_wait',
+  'http_request',
   'notification',
   'end',
 ];
@@ -39,6 +51,7 @@ export type WorkflowRemovedBindings = {
   offline115_accounts: number;
   offline115_openapi_accounts: number;
   offline115_directories: number;
+  organize_directories: number;
 };
 
 export type WorkflowImportRequirements = {
@@ -46,6 +59,7 @@ export type WorkflowImportRequirements = {
   offline115Accounts: number;
   offline115OpenAPIAccounts: number;
   directorySelections: number;
+  organizeDirectories: number;
 };
 
 export type ParsedWorkflowTransfer = {
@@ -182,6 +196,7 @@ const makePortable = (definition: RSSAutomationDefinition) => {
     offline115_accounts: 0,
     offline115_openapi_accounts: 0,
     offline115_directories: 0,
+    organize_directories: 0,
   };
 
   portable.nodes = portable.nodes.map((node) => {
@@ -205,6 +220,18 @@ const makePortable = (definition: RSSAutomationDefinition) => {
         delete config.directory_id;
       }
       delete ui.directory_path;
+    }
+    if (
+      [
+        'organize_strm',
+        'media_exists',
+        'strm_verify',
+        'strm_regenerate',
+      ].includes(node.type) &&
+      Number(config.cloud_directory_id || 0) > 0
+    ) {
+      removed.organize_directories += 1;
+      delete config.cloud_directory_id;
     }
     return {
       ...node,
@@ -231,6 +258,15 @@ export const getWorkflowImportRequirements = (
     (node) =>
       (node.type === 'offline115' || node.type === 'offline115_openapi') &&
       (node.config?.directory_id !== undefined || node.ui?.directory_path),
+  ).length,
+  organizeDirectories: definition.nodes.filter(
+    (node) =>
+      [
+        'organize_strm',
+        'media_exists',
+        'strm_verify',
+        'strm_regenerate',
+      ].includes(node.type) && node.config?.cloud_directory_id !== undefined,
   ).length,
 });
 
@@ -266,6 +302,7 @@ export const parseWorkflowTransferText = (
   let definitionValue: unknown = parsed;
   let source: ParsedWorkflowTransfer['source'] = 'bare-definition';
   let exportedDirectorySelections = 0;
+  let exportedOrganizeDirectories = 0;
   if (isRecord(parsed) && parsed.format === RSS_WORKFLOW_TRANSFER_FORMAT) {
     if (parsed.format_version !== RSS_WORKFLOW_TRANSFER_VERSION) {
       throw new Error('流程文件版本不受支持，请升级 Film Fusion');
@@ -281,6 +318,10 @@ export const parseWorkflowTransferText = (
         0,
         Number(parsed.removed_bindings.offline115_directories) || 0,
       );
+      exportedOrganizeDirectories = Math.max(
+        0,
+        Number(parsed.removed_bindings.organize_directories) || 0,
+      );
     }
   }
 
@@ -289,6 +330,10 @@ export const parseWorkflowTransferText = (
   requirements.directorySelections = Math.max(
     requirements.directorySelections,
     exportedDirectorySelections,
+  );
+  requirements.organizeDirectories = Math.max(
+    requirements.organizeDirectories,
+    exportedOrganizeDirectories,
   );
   const portable = makePortable(validated).definition;
   return {

@@ -67,6 +67,7 @@ describe('RSS workflow transfer', () => {
       offline115_accounts: 1,
       offline115_openapi_accounts: 0,
       offline115_directories: 1,
+      organize_directories: 0,
     });
   });
 
@@ -83,6 +84,7 @@ describe('RSS workflow transfer', () => {
       offline115Accounts: 1,
       offline115OpenAPIAccounts: 0,
       directorySelections: 1,
+      organizeDirectories: 0,
     });
   });
 
@@ -129,6 +131,60 @@ describe('RSS workflow transfer', () => {
         }),
       ),
     ).toThrow('指向不存在的节点');
+  });
+
+  it('removes local media directory bindings from shared workflows', () => {
+    const withOrganize = structuredClone(definition);
+    withOrganize.nodes.push(
+      {
+        id: 'organize',
+        type: 'organize_strm',
+        position: { x: 500, y: 240 },
+        config: { cloud_directory_id: 9, media_type: 'tv' },
+      },
+      {
+        id: 'dedupe',
+        type: 'media_exists',
+        position: { x: 500, y: 360 },
+        config: { cloud_directory_id: 9, tmdb_id: '$item.tmdb_id' },
+      },
+      {
+        id: 'verify',
+        type: 'strm_verify',
+        position: { x: 500, y: 480 },
+        config: { cloud_directory_id: 9 },
+      },
+      {
+        id: 'regenerate',
+        type: 'strm_regenerate',
+        position: { x: 500, y: 600 },
+        config: { cloud_directory_id: 9 },
+      },
+    );
+
+    const exported = createWorkflowTransferPackage(withOrganize, '整理流程');
+    const organize = exported.definition.nodes.find(
+      (node) => node.id === 'organize',
+    );
+    const dedupe = exported.definition.nodes.find(
+      (node) => node.id === 'dedupe',
+    );
+    const verify = exported.definition.nodes.find(
+      (node) => node.id === 'verify',
+    );
+    const regenerate = exported.definition.nodes.find(
+      (node) => node.id === 'regenerate',
+    );
+
+    expect(organize?.config).toEqual({ media_type: 'tv' });
+    expect(dedupe?.config).toEqual({ tmdb_id: '$item.tmdb_id' });
+    expect(verify?.config).toEqual({});
+    expect(regenerate?.config).toEqual({});
+    expect(exported.removed_bindings.organize_directories).toBe(4);
+    expect(
+      parseWorkflowTransferText(JSON.stringify(exported)).requirements
+        .organizeDirectories,
+    ).toBe(4);
   });
 
   it('creates a filesystem-safe sharing filename', () => {

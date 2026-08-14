@@ -396,15 +396,19 @@
   }
 }
 
-.secretFields {
+.secretFields,
+.subscriptionFields {
   display: grid;
   gap: 14px;
-  margin-top: 18px;
 
   label {
     display: grid;
     gap: 6px;
   }
+}
+
+.secretFields {
+  margin-top: 18px;
 }
 
 :global(.dark) {

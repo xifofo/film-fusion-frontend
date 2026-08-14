@@ -41,7 +41,7 @@ import {
   retryRSSAutomationRun,
 } from '@/services/film-fusion';
 import FlowNode from './FlowNode';
-import { definitionToFlow, parseWorkflowDefinition } from './flow';
+import { definitionToFlow, NODE_LABELS, parseWorkflowDefinition } from './flow';
 import styles from './index.module.less';
 
 const { Paragraph, Text } = Typography;
@@ -251,7 +251,9 @@ const RunPanel = ({ workflowId, workflowName }: RunPanelProps) => {
       render: (_, node) => (
         <Space direction="vertical" size={0}>
           <Text strong>{node.node_name || node.node_id}</Text>
-          <Text type="secondary">{node.node_type}</Text>
+          <Text type="secondary">
+            {NODE_LABELS[node.node_type] || node.node_type}
+          </Text>
         </Space>
       ),
     },

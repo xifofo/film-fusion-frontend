@@ -5,6 +5,7 @@ import FeedList from './FeedList';
 
 const feed: RSSGeneratorFeed = {
   id: 7,
+  public_id: 'feed-public-id',
   name: '作者动态',
   slug: 'author-updates',
   route_kind: 'http_html',
@@ -46,9 +47,7 @@ describe('RSS generator feed list', () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: '管理 Token 作者动态' }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: '管理订阅 作者动态' }));
     expect(onTokens).toHaveBeenCalledWith(feed);
   });
 

@@ -9,7 +9,7 @@ import type {
   RSSAutomationDashboard,
   RSSAutomationRunStatus,
 } from '@/services/film-fusion';
-import { parseWorkflowDefinition } from './flow';
+import { ACTION_NODE_TYPES, parseWorkflowDefinition } from './flow';
 import styles from './index.module.less';
 
 const { Paragraph, Text, Title } = Typography;
@@ -104,12 +104,7 @@ const AutomationOverview = ({
             );
             const actionCount =
               definition?.nodes.filter((node) =>
-                [
-                  'qbittorrent',
-                  'offline115',
-                  'offline115_openapi',
-                  'notification',
-                ].includes(node.type),
+                ACTION_NODE_TYPES.includes(node.type),
               ).length || 0;
             const latestRun = latestRunByWorkflow.get(workflow.id);
             const latestStatus = latestRun

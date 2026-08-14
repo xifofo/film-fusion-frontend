@@ -39,6 +39,12 @@ export const absoluteFeedURL = (
   origin = window.location.origin,
 ) => new URL(value, origin).toString();
 
+export const lanFeedURL = (
+  publicId: string,
+  format: 'xml' | 'atom',
+  origin = window.location.origin,
+) => absoluteFeedURL(`/rss/${encodeURIComponent(publicId)}.${format}`, origin);
+
 type TokenFormValues = {
   name: string;
   expires_at?: Dayjs;
@@ -200,12 +206,44 @@ const TokenManager = ({
   return (
     <div className={styles.tokenShell}>
       <Alert
-        description="公开订阅使用独立的只读 Token，不会暴露登录 JWT。每位使用者建议创建独立 Token，便于单独轮换或撤销。"
+        description="局域网可直接使用下方免 Token 地址；公网订阅使用独立的只读 Token，不会暴露登录 JWT。"
         icon={<SafetyCertificateOutlined />}
-        message="Token 访问控制"
+        message="局域网免 Token，公网需要 Token"
         showIcon
         type="info"
       />
+
+      <Card title="局域网免 Token 地址">
+        <Paragraph type="secondary">
+          仅来源 IP
+          属于局域网时有效。经过反向代理时，请先在系统设置中配置可信代理 IP /
+          CIDR。
+        </Paragraph>
+        <div className={styles.subscriptionFields}>
+          {[
+            ['RSS 2.0 地址', lanFeedURL(feed.public_id, 'xml')],
+            ['Atom 地址', lanFeedURL(feed.public_id, 'atom')],
+          ].map(([label, value], index) => (
+            <label htmlFor={`rss-lan-url-${index}`} key={label}>
+              <Text>{label}</Text>
+              <Input
+                addonAfter={
+                  <Button
+                    aria-label={`复制局域网${label}`}
+                    icon={<CopyOutlined />}
+                    onClick={() => copy(value)}
+                    size="small"
+                    type="text"
+                  />
+                }
+                id={`rss-lan-url-${index}`}
+                readOnly
+                value={value}
+              />
+            </label>
+          ))}
+        </div>
+      </Card>
 
       <Card>
         <div className={styles.tokenHeading}>
@@ -289,7 +327,7 @@ const TokenManager = ({
         }
       >
         <Alert
-          description="关闭窗口后无法找回完整 Token。如遗失，请轮换生成新 Token。不要把订阅地址发给不受信任的人。"
+          description="关闭窗口后无法找回完整 Token。如遗失，请轮换生成新 Token。公网地址会把 Token 放在 ?token= 查询参数中，不要发给不受信任的人。"
           message="请立即复制并安全保存"
           showIcon
           type="warning"

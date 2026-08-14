@@ -4,13 +4,23 @@ import {
   Binary,
   Braces,
   CircleStop,
+  Clock,
   CloudDownload,
   Download,
+  FolderCog,
+  Gauge,
   GitBranch,
   GitFork,
+  HardDriveDownload,
+  Library,
+  Link2,
   RadioTower,
   RefreshCcwDot,
+  RefreshCw,
+  ScanSearch,
   Search,
+  ShieldCheck,
+  Webhook,
 } from 'lucide-react';
 import type { RSSAutomationNodeType } from '@/services/film-fusion';
 import {
@@ -30,8 +40,20 @@ const icons: Record<RSSAutomationNodeType, React.ReactNode> = {
   parallel: <GitFork size={17} />,
   join: <RefreshCcwDot size={17} />,
   qbittorrent: <Download size={17} />,
+  wait_qbittorrent: <Gauge size={17} />,
   offline115: <CloudDownload size={17} />,
   offline115_openapi: <CloudDownload size={17} />,
+  wait115: <Clock size={17} />,
+  moviepilot_title_recognize: <ScanSearch size={17} />,
+  media_exists: <Library size={17} />,
+  hdhive_query: <Search size={17} />,
+  hdhive_unlock: <Link2 size={17} />,
+  moviepilot_recognize: <ScanSearch size={17} />,
+  organize_strm: <FolderCog size={17} />,
+  strm_verify: <ShieldCheck size={17} />,
+  strm_regenerate: <RefreshCw size={17} />,
+  emby_refresh_wait: <HardDriveDownload size={17} />,
+  http_request: <Webhook size={17} />,
   notification: <Bell size={17} />,
   end: <CircleStop size={17} />,
 };
@@ -93,6 +115,33 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
         <>
           <SourceHandle id="matched" label="匹配" top="31%" />
           <SourceHandle id="unmatched" label="不匹配" top="60%" />
+          <SourceHandle id="failure" label="异常" top="84%" />
+        </>
+      );
+    }
+    if (type === 'media_exists') {
+      return (
+        <>
+          <SourceHandle id="exists" label="已存在" top="31%" />
+          <SourceHandle id="missing" label="不存在" top="60%" />
+          <SourceHandle id="failure" label="异常" top="84%" />
+        </>
+      );
+    }
+    if (type === 'hdhive_query') {
+      return (
+        <>
+          <SourceHandle id="found" label="找到" top="31%" />
+          <SourceHandle id="not_found" label="没有" top="60%" />
+          <SourceHandle id="failure" label="异常" top="84%" />
+        </>
+      );
+    }
+    if (type === 'strm_verify') {
+      return (
+        <>
+          <SourceHandle id="valid" label="有效" top="31%" />
+          <SourceHandle id="invalid" label="无效" top="60%" />
           <SourceHandle id="failure" label="异常" top="84%" />
         </>
       );

@@ -25,11 +25,42 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   parallel: '并行分支',
   join: '汇合',
   qbittorrent: 'qBittorrent',
+  wait_qbittorrent: '等待 qBittorrent 完成',
   offline115: '115 Cookie 离线',
   offline115_openapi: '115 OpenAPI 离线',
+  wait115: '等待 115 下载完成',
+  moviepilot_title_recognize: 'MP 标题识别',
+  media_exists: '本地 / Emby 查重',
+  hdhive_query: 'HDHive 资源查询',
+  hdhive_unlock: 'HDHive 资源解锁',
+  moviepilot_recognize: 'MP 媒体识别',
+  organize_strm: '整理生成 STRM',
+  strm_verify: 'STRM 校验',
+  strm_regenerate: 'STRM 重生成',
+  emby_refresh_wait: 'Emby 刷新并等待入库',
+  http_request: 'HTTP / Webhook',
   notification: '发送通知',
   end: '结束',
 };
+
+export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
+  'qbittorrent',
+  'wait_qbittorrent',
+  'offline115',
+  'offline115_openapi',
+  'wait115',
+  'moviepilot_title_recognize',
+  'media_exists',
+  'hdhive_query',
+  'hdhive_unlock',
+  'moviepilot_recognize',
+  'organize_strm',
+  'strm_verify',
+  'strm_regenerate',
+  'emby_refresh_wait',
+  'http_request',
+  'notification',
+];
 
 export const PORT_LABELS: Record<string, string> = {
   next: '继续',
@@ -39,6 +70,12 @@ export const PORT_LABELS: Record<string, string> = {
   unmatched: '不匹配',
   true: '是',
   false: '否',
+  exists: '已存在',
+  missing: '不存在',
+  found: '找到资源',
+  not_found: '没有资源',
+  valid: '有效',
+  invalid: '无效',
   always: '总是',
 };
 
@@ -176,6 +213,73 @@ export const createNodeDefinition = (
   }
   if (type === 'parallel') config.branches = ['branch-1', 'branch-2'];
   if (type === 'join') config.policy = 'all_completed';
+  if (type === 'wait115') {
+    Object.assign(config, {
+      poll_interval_seconds: 30,
+      max_wait_minutes: 10080,
+    });
+  }
+  if (type === 'wait_qbittorrent') {
+    Object.assign(config, {
+      poll_interval_seconds: 30,
+      max_wait_minutes: 10080,
+    });
+  }
+  if (type === 'moviepilot_recognize') config.tmdb_id = '';
+  if (type === 'moviepilot_title_recognize') {
+    Object.assign(config, { input: '$item.title', tmdb_id: '' });
+  }
+  if (type === 'media_exists') {
+    Object.assign(config, {
+      tmdb_id: '$item.tmdb_id',
+      title: '$item.title',
+      year: '$item.year',
+      media_type: '$item.media_type',
+      category: '$item.category',
+    });
+  }
+  if (type === 'hdhive_query') {
+    Object.assign(config, {
+      tmdb_id: '$item.tmdb_id',
+      media_type: '$item.media_type',
+      resolution: '',
+      pan_type: '',
+    });
+  }
+  if (type === 'hdhive_unlock') config.slug = '$item.resource_slug';
+  if (type === 'organize_strm') {
+    Object.assign(config, {
+      media_type: 'auto',
+      best_version_enabled: false,
+      delete_source_folder: false,
+      filename_regex_enabled: false,
+      timeout_seconds: 600,
+    });
+  }
+  if (type === 'strm_regenerate') {
+    Object.assign(config, { timeout_seconds: 60 });
+  }
+  if (type === 'emby_refresh_wait') {
+    Object.assign(config, {
+      tmdb_id: '$item.tmdb_id',
+      media_type: '$item.media_type',
+      refresh_library: true,
+      poll_interval_seconds: 15,
+      max_wait_minutes: 30,
+    });
+  }
+  if (type === 'http_request') {
+    Object.assign(config, {
+      method: 'POST',
+      url: '',
+      headers: {},
+      body: '',
+      content_type: 'application/json',
+      allow_private_network: false,
+      follow_redirects: false,
+      timeout_seconds: 30,
+    });
+  }
   if (
     type === 'qbittorrent' ||
     type === 'offline115' ||
@@ -199,6 +303,14 @@ export const createNodeDefinition = (
       type === 'qbittorrent' ||
       type === 'offline115' ||
       type === 'offline115_openapi' ||
+      type === 'wait_qbittorrent' ||
+      type === 'wait115' ||
+      type === 'moviepilot_title_recognize' ||
+      type === 'media_exists' ||
+      type === 'hdhive_query' ||
+      type === 'hdhive_unlock' ||
+      type === 'moviepilot_recognize' ||
+      type === 'emby_refresh_wait' ||
       type === 'notification'
         ? 3
         : 1,

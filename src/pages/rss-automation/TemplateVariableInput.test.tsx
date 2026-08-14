@@ -16,6 +16,14 @@ const references = [
     value: '$vars.episode',
     preview: '124',
   },
+  {
+    kind: 'node' as const,
+    name: 'MP 标题识别 · TMDB ID',
+    value: '$nodes.mp.output.tmdb_id',
+    dataType: 'string',
+    description: '识别到的 TMDB 媒体 ID。',
+    preview: '1396',
+  },
 ];
 
 const Harness = ({ initialValue = '' }: { initialValue?: string }) => {
@@ -85,5 +93,20 @@ describe('TemplateVariableInput', () => {
     );
 
     expect(textarea.value).toBe('旧：{{item.title}} 后');
+  });
+
+  it('shows protocol type and Chinese description for upstream node outputs', () => {
+    render(<Harness />);
+    const textarea = screen.getByRole('textbox', { name: '通知内容' });
+
+    fireEvent.change(textarea, { target: { value: '{{TMDB' } });
+
+    expect(
+      screen.getByRole('option', {
+        name: /\{\{nodes\.mp\.output\.tmdb_id\}\}/,
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText('string')).toBeTruthy();
+    expect(screen.getByTitle('识别到的 TMDB 媒体 ID。')).toBeTruthy();
   });
 });

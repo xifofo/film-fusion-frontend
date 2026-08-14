@@ -10,9 +10,9 @@ import {
   Folder,
   GitBranch,
   Images,
+  Info,
   Link2,
   ListRestart,
-  RadioTower,
   Route,
   Rss,
   ScanSearch,
@@ -49,6 +49,11 @@ export const menuItems: AppMenuItem[] = [
     name: '下载队列',
     icon: Download,
     path: '/download-queue',
+  },
+  {
+    name: '下载器设置',
+    icon: Download,
+    path: '/downloaders',
   },
   {
     name: 'Match302 重定向',
@@ -135,16 +140,16 @@ export const menuItems: AppMenuItem[] = [
         path: '/rss-generator',
       },
       {
-        name: 'RSS 监控',
-        icon: RadioTower,
-        path: '/rss-monitor',
-      },
-      {
         name: 'RSS 自动化',
         icon: Route,
         path: '/rss-automation',
       },
     ],
+  },
+  {
+    name: '系统信息',
+    icon: Info,
+    path: '/system-info',
   },
   {
     name: '系统设置',

@@ -55,10 +55,49 @@ export type RSSAutomationNodeType =
   | 'parallel'
   | 'join'
   | 'qbittorrent'
+  | 'wait_qbittorrent'
   | 'offline115'
   | 'offline115_openapi'
+  | 'wait115'
+  | 'moviepilot_title_recognize'
+  | 'media_exists'
+  | 'hdhive_query'
+  | 'hdhive_unlock'
+  | 'moviepilot_recognize'
+  | 'organize_strm'
+  | 'strm_verify'
+  | 'strm_regenerate'
+  | 'emby_refresh_wait'
+  | 'http_request'
   | 'notification'
   | 'end';
+
+export type RSSAutomationVariableType =
+  | 'string'
+  | 'integer'
+  | 'number'
+  | 'boolean'
+  | 'array'
+  | 'object'
+  | 'datetime'
+  | 'any';
+
+export type RSSAutomationVariableProtocol = {
+  name: string;
+  type: RSSAutomationVariableType;
+  label: string;
+  description: string;
+  example?: unknown;
+  required?: boolean;
+  template?: boolean;
+};
+
+export type RSSAutomationNodeProtocol = {
+  type: RSSAutomationNodeType;
+  label: string;
+  inputs: RSSAutomationVariableProtocol[];
+  outputs: RSSAutomationVariableProtocol[];
+};
 
 export type RSSAutomationPosition = { x: number; y: number };
 
@@ -200,7 +239,57 @@ export type RSSAutomationEntry = {
   content_key?: string;
   published_at?: string;
   fields_json: string;
+  baseline: boolean;
   discovered_at: string;
+};
+
+export type RSSAutomationLegacyMigrationStatus = {
+  available: boolean;
+  complete: boolean;
+  source_count: number;
+  enabled_source_count: number;
+  migrated_source_count: number;
+  pending_source_count: number;
+  rule_count: number;
+  enabled_rule_count: number;
+  disabled_rule_count: number;
+  item_count: number;
+};
+
+export type RSSAutomationLegacyMigrationResult = {
+  sources_migrated: number;
+  workflows_created: number;
+  entries_migrated: number;
+  legacy_sources_stopped: number;
+  enabled_rules_migrated: number;
+  disabled_rules_kept: number;
+  status: RSSAutomationLegacyMigrationStatus;
+};
+
+export type RSSAutomationEntryHistoryItem = {
+  entry: RSSAutomationEntry;
+  source_name: string;
+  matched: boolean;
+  legacy: boolean;
+  rule_name?: string;
+  latest_run?: RSSAutomationRun;
+  media_title?: string;
+  media_year?: string;
+  media_type?: string;
+  media_category?: string;
+  season_episode?: string;
+  rating?: number;
+  quality?: string;
+  tmdb_id?: string;
+  poster_url?: string;
+  recognition_error?: string;
+  notification_status?: string;
+  notification_error?: string;
+};
+
+export type RSSAutomationEntryHistory = {
+  items: RSSAutomationEntryHistoryItem[];
+  total: number;
 };
 
 export type RSSAutomationDashboard = {
@@ -213,6 +302,8 @@ export type RSSAutomationDashboard = {
   running_nodes: number;
   failed_runs: number;
   source_running: boolean;
+  legacy_migration?: RSSAutomationLegacyMigrationStatus;
+  node_protocols?: RSSAutomationNodeProtocol[];
 };
 
 export type RSSAutomationParsedFeed = {
@@ -370,6 +461,11 @@ export const createRSSAutomation = (input: RSSAutomationCreateInput) =>
     input,
   );
 
+export const migrateLegacyRSSMonitor = () =>
+  apiClient.post<API.Response<RSSAutomationLegacyMigrationResult>>(
+    '/api/rss-automation/legacy-migration',
+  );
+
 export const updateRSSAutomationSource = (
   id: number,
   input: RSSAutomationSourceInput,
@@ -458,6 +554,28 @@ export const testRSSAutomationTarget = (id: number) =>
     `/api/rss-automation/targets/${id}/test`,
   );
 
+export const getDownloaders = () =>
+  apiClient.get<API.Response<RSSAutomationTarget[]>>('/api/downloaders');
+
+export const createDownloader = (input: RSSAutomationTargetInput) =>
+  apiClient.post<API.Response<RSSAutomationTarget>>('/api/downloaders', input);
+
+export const updateDownloader = (id: number, input: RSSAutomationTargetInput) =>
+  apiClient.put<API.Response<RSSAutomationTarget>>(
+    `/api/downloaders/${id}`,
+    input,
+  );
+
+export const deleteDownloader = (id: number) =>
+  apiClient.delete<API.Response<Record<string, never>>>(
+    `/api/downloaders/${id}`,
+  );
+
+export const testDownloader = (id: number) =>
+  apiClient.post<API.Response<Record<string, never>>>(
+    `/api/downloaders/${id}/test`,
+  );
+
 export const listRSSAutomationRuns = (params?: {
   workflowId?: number;
   status?: string;
@@ -472,6 +590,22 @@ export const listRSSAutomationRuns = (params?: {
   return apiClient.get<
     API.Response<{ items: RSSAutomationRun[]; total: number }>
   >(`/api/rss-automation/runs?${search}`);
+};
+
+export const listRSSAutomationEntries = (params?: {
+  filter?: 'all' | 'matched';
+  sourceId?: number;
+  limit?: number;
+  offset?: number;
+}) => {
+  const search = new URLSearchParams();
+  if (params?.filter) search.set('filter', params.filter);
+  if (params?.sourceId) search.set('source_id', String(params.sourceId));
+  search.set('limit', String(params?.limit ?? 50));
+  search.set('offset', String(params?.offset ?? 0));
+  return apiClient.get<API.Response<RSSAutomationEntryHistory>>(
+    `/api/rss-automation/entries?${search}`,
+  );
 };
 
 export const getRSSAutomationRun = (id: number) =>

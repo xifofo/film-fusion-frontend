@@ -54,6 +54,7 @@ import {
 import type {
   RSSAutomationDefinition,
   RSSAutomationNodeDefinition,
+  RSSAutomationNodeProtocol,
   RSSAutomationNodeType,
   RSSAutomationParsedFeed,
   RSSAutomationSource,
@@ -107,6 +108,8 @@ type WorkflowPanelProps = {
   sources: RSSAutomationSource[];
   targets: RSSAutomationTarget[];
   cloudStorages: API.CloudStorage[];
+  cloudDirectories: API.CloudDirectory[];
+  nodeProtocols?: RSSAutomationNodeProtocol[];
   loading: boolean;
   onChanged: () => Promise<void> | void;
   onCreate?: () => void;
@@ -143,6 +146,9 @@ const bindingRequirements = (value: ParsedWorkflowTransfer['requirements']) =>
     value.directorySelections > 0
       ? `${value.directorySelections} 个 115 保存目录`
       : '',
+    value.organizeDirectories > 0
+      ? `${value.organizeDirectories} 个整理目录配置`
+      : '',
   ].filter(Boolean);
 
 const palette: Array<{
@@ -153,7 +159,24 @@ const palette: Array<{
   { title: '流程控制', types: ['if', 'parallel', 'join', 'end'] },
   {
     title: '执行动作',
-    types: ['qbittorrent', 'offline115_openapi', 'offline115', 'notification'],
+    types: [
+      'qbittorrent',
+      'wait_qbittorrent',
+      'offline115_openapi',
+      'offline115',
+      'wait115',
+      'moviepilot_title_recognize',
+      'media_exists',
+      'hdhive_query',
+      'hdhive_unlock',
+      'moviepilot_recognize',
+      'organize_strm',
+      'strm_verify',
+      'strm_regenerate',
+      'emby_refresh_wait',
+      'http_request',
+      'notification',
+    ],
   },
 ];
 
@@ -326,6 +349,8 @@ const WorkflowPanelInner = ({
   sources,
   targets,
   cloudStorages,
+  cloudDirectories,
+  nodeProtocols = [],
   loading,
   onChanged,
   onCreate,
@@ -477,15 +502,37 @@ const WorkflowPanelInner = ({
     for (const flowNode of nodes) {
       if (!ancestorIDs.has(flowNode.id)) continue;
       const definition = flowNode.data.definition;
-      if (!['regex', 'convert'].includes(definition.type)) continue;
-      const name = String(definition.config?.variable || '').trim();
-      if (!name) continue;
-      addReference({
-        kind: 'variable',
-        name,
-        value: `$vars.${name}`,
-        preview: referencePreview(simulation?.variables[name]),
-      });
+      if (['regex', 'convert'].includes(definition.type)) {
+        const name = String(definition.config?.variable || '').trim();
+        if (name) {
+          addReference({
+            kind: 'variable',
+            name,
+            value: `$vars.${name}`,
+            preview: referencePreview(simulation?.variables[name]),
+          });
+        }
+      }
+      const previewOutput = simulation?.nodes[flowNode.id]?.output;
+      const previewRecord =
+        previewOutput && typeof previewOutput === 'object'
+          ? (previewOutput as Record<string, unknown>)
+          : undefined;
+      const protocol = nodeProtocols.find(
+        (candidate) => candidate.type === definition.type,
+      );
+      for (const output of protocol?.outputs || []) {
+        addReference({
+          kind: 'node',
+          name: `${definition.name || NODE_LABELS[definition.type]} · ${output.label}`,
+          value: `$nodes.${definition.id}.output.${output.name}`,
+          preview:
+            referencePreview(previewRecord?.[output.name]) ||
+            referencePreview(output.example),
+          dataType: output.type,
+          description: output.description,
+        });
+      }
     }
 
     const configuredReference = (() => {
@@ -508,6 +555,12 @@ const WorkflowPanelInner = ({
       ) {
         return String(selectedNode.config?.url || '').trim();
       }
+      if (selectedNode.type === 'moviepilot_title_recognize') {
+        return String(selectedNode.config?.input || '').trim();
+      }
+      if (selectedNode.type === 'moviepilot_recognize') {
+        return String(selectedNode.config?.tmdb_id || '').trim();
+      }
       return '';
     })();
     if (configuredReference.startsWith('$item.')) {
@@ -525,6 +578,12 @@ const WorkflowPanelInner = ({
           simulation?.variables[configuredReference.slice('$vars.'.length)],
         ),
       });
+    } else if (configuredReference.startsWith('$nodes.')) {
+      addReference({
+        kind: 'node',
+        name: configuredReference,
+        value: configuredReference,
+      });
     }
 
     return references;
@@ -536,6 +595,7 @@ const WorkflowPanelInner = ({
     selectedNode,
     selectedNodeId,
     simulation?.variables,
+    nodeProtocols,
   ]);
   const displayNodes = useMemo(
     () =>
@@ -1356,9 +1416,13 @@ const WorkflowPanelInner = ({
       </Modal>
 
       <NodeConfigModal
+        cloudDirectories={cloudDirectories}
         cloudStorages={cloudStorages}
         fieldReferences={fieldReferences}
         node={selectedNode}
+        nodeProtocol={nodeProtocols.find(
+          (protocol) => protocol.type === selectedNode?.type,
+        )}
         onChange={updateNode}
         onClose={() => setSelectedNodeId(undefined)}
         onDelete={deleteNode}

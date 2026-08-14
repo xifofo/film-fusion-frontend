@@ -58,4 +58,6 @@ export * from './scanTask';
 export * from './serverLog';
 // STRM 相关API
 export * from './strm';
+// 管理员只读系统信息
+export * from './systemInfo';
 export * from './user';

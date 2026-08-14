@@ -26,10 +26,10 @@ import type {
   RSSAutomationTargetInput,
 } from '@/services/film-fusion';
 import {
-  createRSSAutomationTarget,
-  deleteRSSAutomationTarget,
-  testRSSAutomationTarget,
-  updateRSSAutomationTarget,
+  createDownloader,
+  deleteDownloader,
+  testDownloader,
+  updateDownloader,
 } from '@/services/film-fusion';
 import styles from './index.module.less';
 
@@ -37,7 +37,8 @@ const { Link, Text } = Typography;
 
 type TargetPanelProps = {
   targets: RSSAutomationTarget[];
-  cloudStorages: API.CloudStorage[];
+  cloudStorages?: API.CloudStorage[];
+  show115Accounts?: boolean;
   onChanged: () => Promise<void> | void;
 };
 
@@ -58,7 +59,8 @@ const parseTarget = (target: RSSAutomationTarget): RSSAutomationTargetInput => {
 
 const TargetPanel = ({
   targets,
-  cloudStorages,
+  cloudStorages = [],
+  show115Accounts = false,
   onChanged,
 }: TargetPanelProps) => {
   const [form] = Form.useForm<RSSAutomationTargetInput>();
@@ -90,8 +92,8 @@ const TargetPanel = ({
     try {
       const values = await form.validateFields();
       const response = editing
-        ? await updateRSSAutomationTarget(editing.id, values)
-        : await createRSSAutomationTarget(values);
+        ? await updateDownloader(editing.id, values)
+        : await createDownloader(values);
       if (response.code !== 0) throw new Error(response.message);
       messageApi.success(
         editing ? 'qBittorrent 目标已更新' : 'qBittorrent 目标已创建',
@@ -109,7 +111,7 @@ const TargetPanel = ({
 
   const toggle = async (target: RSSAutomationTarget, enabled: boolean) => {
     try {
-      const response = await updateRSSAutomationTarget(target.id, {
+      const response = await updateDownloader(target.id, {
         ...parseTarget(target),
         enabled,
       });
@@ -123,7 +125,7 @@ const TargetPanel = ({
   const test = async (target: RSSAutomationTarget) => {
     setTestingId(target.id);
     try {
-      const response = await testRSSAutomationTarget(target.id);
+      const response = await testDownloader(target.id);
       if (response.code !== 0) throw new Error(response.message);
       messageApi.success(`${target.name} 登录与 API 连接正常`);
     } catch (error: any) {
@@ -135,7 +137,7 @@ const TargetPanel = ({
 
   const remove = async (target: RSSAutomationTarget) => {
     try {
-      const response = await deleteRSSAutomationTarget(target.id);
+      const response = await deleteDownloader(target.id);
       if (response.code !== 0) throw new Error(response.message);
       messageApi.success('下载目标已删除');
       await onChanged();
@@ -216,7 +218,7 @@ const TargetPanel = ({
             添加 qBittorrent
           </Button>
         }
-        title="qBittorrent 下载目标"
+        title="qBittorrent 下载器账号"
       >
         <Table
           columns={columns}
@@ -225,46 +227,48 @@ const TargetPanel = ({
           rowKey="id"
         />
       </Card>
-      <Card title="115 离线下载账号">
-        <Alert
-          className={styles.panelAlert}
-          message={
-            <span>
-              115 动作直接复用“云存储管理”中的账号与
-              Cookie，不在这里重复保存密钥。
-              <Link href="/cloud-storage"> 前往云存储管理</Link>
-            </span>
-          }
-          showIcon
-          type="info"
-        />
-        <Table<API.CloudStorage>
-          columns={[
-            { title: '账号名称', dataIndex: 'storage_name' },
-            {
-              title: '状态',
-              dataIndex: 'status',
-              render: (status: API.CloudStorage['status']) => (
-                <Tag color={status === 'active' ? 'success' : 'error'}>
-                  {status === 'active' ? '可用' : status}
-                </Tag>
-              ),
-            },
-            {
-              title: 'Cookie',
-              render: (_, storage) => (
-                <Tag color={storage.cookie ? 'success' : 'warning'}>
-                  {storage.cookie ? '已配置' : '缺少 Cookie'}
-                </Tag>
-              ),
-            },
-          ]}
-          dataSource={accounts115}
-          locale={{ emptyText: '还没有 115 OpenAPI 账号' }}
-          pagination={false}
-          rowKey="id"
-        />
-      </Card>
+      {show115Accounts && (
+        <Card title="115 离线下载账号">
+          <Alert
+            className={styles.panelAlert}
+            message={
+              <span>
+                115 动作直接复用“云存储管理”中的账号与
+                Cookie，不在这里重复保存密钥。
+                <Link href="/cloud-storage"> 前往云存储管理</Link>
+              </span>
+            }
+            showIcon
+            type="info"
+          />
+          <Table<API.CloudStorage>
+            columns={[
+              { title: '账号名称', dataIndex: 'storage_name' },
+              {
+                title: '状态',
+                dataIndex: 'status',
+                render: (status: API.CloudStorage['status']) => (
+                  <Tag color={status === 'active' ? 'success' : 'error'}>
+                    {status === 'active' ? '可用' : status}
+                  </Tag>
+                ),
+              },
+              {
+                title: 'Cookie',
+                render: (_, storage) => (
+                  <Tag color={storage.cookie ? 'success' : 'warning'}>
+                    {storage.cookie ? '已配置' : '缺少 Cookie'}
+                  </Tag>
+                ),
+              },
+            ]}
+            dataSource={accounts115}
+            locale={{ emptyText: '还没有 115 OpenAPI 账号' }}
+            pagination={false}
+            rowKey="id"
+          />
+        </Card>
+      )}
 
       <Modal
         cancelText="取消"
@@ -274,13 +278,13 @@ const TargetPanel = ({
         onCancel={() => setOpen(false)}
         onOk={save}
         open={open}
-        title={editing ? '编辑 qBittorrent 目标' : '添加 qBittorrent 目标'}
+        title={editing ? '编辑 qBittorrent 账号' : '添加 qBittorrent 账号'}
       >
         <Form form={form} layout="vertical" preserve={false}>
           <Form.Item name="type" hidden>
             <Input />
           </Form.Item>
-          <Form.Item label="目标名称" name="name" rules={[{ required: true }]}>
+          <Form.Item label="账号名称" name="name" rules={[{ required: true }]}>
             <Input placeholder="家庭 NAS qB" />
           </Form.Item>
           <Form.Item

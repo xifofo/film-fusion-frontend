@@ -15,6 +15,7 @@ import {
 import { useEffect } from 'react';
 import type {
   RSSAutomationNodeDefinition,
+  RSSAutomationNodeProtocol,
   RSSAutomationTarget,
 } from '@/services/film-fusion';
 import DirectoryIdInput from './DirectoryIdInput';
@@ -29,7 +30,9 @@ type NodeConfigModalProps = {
   node?: RSSAutomationNodeDefinition;
   targets: RSSAutomationTarget[];
   cloudStorages: API.CloudStorage[];
+  cloudDirectories: API.CloudDirectory[];
   fieldReferences: NodeFieldReference[];
+  nodeProtocol?: RSSAutomationNodeProtocol;
   preview?: RSSAutomationNodePreview;
   onClose: () => void;
   onChange: (node: RSSAutomationNodeDefinition) => void;
@@ -37,11 +40,18 @@ type NodeConfigModalProps = {
 };
 
 export type NodeFieldReference = {
-  kind: 'item' | 'variable';
+  kind: 'item' | 'variable' | 'node';
   name: string;
   value: string;
   preview?: string;
+  dataType?: string;
+  description?: string;
 };
+
+type NodeInputProtocolMap = Map<
+  string,
+  RSSAutomationNodeProtocol['inputs'][number]
+>;
 
 const valueTypeOptions = [
   { label: '文本 string', value: 'string' },
@@ -91,6 +101,26 @@ const normalizeBranches = (raw: unknown) => {
     .filter((value, index, branches) => branches.indexOf(value) === index);
 };
 
+const parseHTTPHeaders = (raw: unknown): Record<string, string> => {
+  const text = String(raw ?? '').trim();
+  if (!text) return {};
+  const parsed = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('请求头必须是 JSON 对象');
+  }
+  const headers: Record<string, string> = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (
+      !name.trim() ||
+      !['string', 'number', 'boolean'].includes(typeof value)
+    ) {
+      throw new Error('请求头的名称不能为空，值必须是文本或标量');
+    }
+    headers[name] = String(value);
+  }
+  return headers;
+};
+
 const conditionValue = (operator: string, raw: unknown) => {
   if (operator === 'in') {
     return String(raw ?? '')
@@ -105,37 +135,56 @@ const conditionValue = (operator: string, raw: unknown) => {
   return raw;
 };
 
-const fieldReferenceOptions = (references: NodeFieldReference[]) =>
-  [
-    {
-      label: 'RSS 原始字段',
-      options: references
-        .filter((reference) => reference.kind === 'item')
-        .map((reference) => ({
-          label: reference.preview
-            ? `${reference.name} · ${reference.preview}`
-            : reference.name,
-          value: reference.value,
-        })),
-    },
-    {
-      label: '上游流程变量',
-      options: references
-        .filter((reference) => reference.kind === 'variable')
-        .map((reference) => ({
-          label: reference.preview
-            ? `${reference.name} · ${reference.preview}`
-            : reference.name,
-          value: reference.value,
-        })),
-    },
-  ].filter((group) => group.options.length > 0);
+const TemplateConfigField = ({
+  field,
+  label,
+  references,
+  protocol,
+  placeholder,
+  required = false,
+}: {
+  field: string;
+  label: string;
+  references: NodeFieldReference[];
+  protocol?: RSSAutomationNodeProtocol['inputs'][number];
+  placeholder?: string;
+  required?: boolean;
+}) => (
+  <Form.Item
+    className={styles.nodeConfigFull}
+    extra={protocol ? protocolFieldExtra(protocol) : undefined}
+    label={label}
+    name={field}
+    rules={required ? [{ required: true }] : undefined}
+  >
+    <TemplateVariableInput
+      ariaLabel={label}
+      placeholder={placeholder || '输入 {{ 选择上游变量'}
+      references={references}
+    />
+  </Form.Item>
+);
+
+const protocolExample = (value: unknown) => {
+  if (value == null || value === '') return '';
+  return typeof value === 'string' ? value : JSON.stringify(value);
+};
+
+const protocolFieldExtra = (
+  protocol?: RSSAutomationNodeProtocol['inputs'][number],
+) => {
+  if (!protocol) return undefined;
+  const example = protocolExample(protocol.example);
+  return `${protocol.description}（${protocol.type}）${example ? ` 例：${example}` : ''}`;
+};
 
 const NodeConfigModal = ({
   node,
   targets,
   cloudStorages,
+  cloudDirectories,
   fieldReferences,
+  nodeProtocol,
   preview,
   onClose,
   onChange,
@@ -145,8 +194,11 @@ const NodeConfigModal = ({
   const operator = Form.useWatch('condition_operator', form);
   const cloudStorageID = Form.useWatch('cloud_storage_id', form);
   const directoryPath = Form.useWatch('directory_path', form);
-  const referenceOptions = fieldReferenceOptions(fieldReferences);
-
+  const filenameRegexEnabled = Form.useWatch('filename_regex_enabled', form);
+  const inputProtocols: NodeInputProtocolMap = new Map(
+    (nodeProtocol?.inputs || []).map((protocol) => [protocol.name, protocol]),
+  );
+  const inputProtocol = (field: string) => inputProtocols.get(field);
   useEffect(() => {
     if (!node) return;
     form.resetFields();
@@ -163,6 +215,7 @@ const NodeConfigModal = ({
       condition_value: Array.isArray(rawConditionValue)
         ? rawConditionValue.join(', ')
         : rawConditionValue,
+      headers_json: JSON.stringify(config.headers || {}, null, 2),
       directory_path:
         typeof node.ui?.directory_path === 'string'
           ? node.ui.directory_path
@@ -193,8 +246,30 @@ const NodeConfigModal = ({
       'paused',
       'sequential',
       'directory_id',
+      'poll_interval_seconds',
+      'max_wait_minutes',
+      'image_url',
+      'tmdb_id',
+      'input',
+      'year',
+      'resolution',
+      'pan_type',
+      'slug',
+      'cloud_directory_id',
+      'media_type',
+      'best_version_enabled',
+      'delete_source_folder',
+      'filename_regex_enabled',
+      'filename_regex_pattern',
+      'filename_regex_replacement',
       'title',
       'message',
+      'refresh_library',
+      'method',
+      'body',
+      'content_type',
+      'allow_private_network',
+      'follow_redirects',
       'timeout_seconds',
     ];
     for (const key of configKeys) {
@@ -219,6 +294,9 @@ const NodeConfigModal = ({
             }
           : {}),
       };
+    }
+    if (node.type === 'http_request') {
+      config.headers = parseHTTPHeaders(values.headers_json);
     }
     const ui = { ...(node.ui || {}) };
     if (node.type === 'offline115' || node.type === 'offline115_openapi') {
@@ -249,17 +327,18 @@ const NodeConfigModal = ({
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
-              extra="选择当前 RSS 字段，或前面节点已经生成的变量。"
+              extra={
+                protocolFieldExtra(inputProtocol('input')) ||
+                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+              }
               label="输入字段"
               name="input"
               rules={[{ required: true }]}
             >
-              <Select
-                aria-label="输入字段"
-                optionFilterProp="label"
-                options={referenceOptions}
-                placeholder="选择 RSS 字段或上游变量"
-                showSearch
+              <TemplateVariableInput
+                ariaLabel="输入字段"
+                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                references={fieldReferences}
               />
             </Form.Item>
             <Form.Item
@@ -296,17 +375,18 @@ const NodeConfigModal = ({
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
-              extra="选择当前 RSS 字段，或前面节点已经生成的变量。"
+              extra={
+                protocolFieldExtra(inputProtocol('input')) ||
+                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+              }
               label="输入字段"
               name="input"
               rules={[{ required: true }]}
             >
-              <Select
-                aria-label="输入字段"
-                optionFilterProp="label"
-                options={referenceOptions}
-                placeholder="选择 RSS 字段或上游变量"
-                showSearch
+              <TemplateVariableInput
+                ariaLabel="输入字段"
+                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                references={fieldReferences}
               />
             </Form.Item>
             <Form.Item
@@ -353,17 +433,18 @@ const NodeConfigModal = ({
           <>
             <Form.Item
               className={styles.nodeConfigFull}
-              extra="选择当前 RSS 字段，或前面节点已经生成的变量。"
+              extra={
+                protocolFieldExtra(inputProtocol('input')) ||
+                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+              }
               label="输入字段"
               name="input"
               rules={[{ required: true }]}
             >
-              <Select
-                aria-label="输入字段"
-                optionFilterProp="label"
-                options={referenceOptions}
-                placeholder="选择 RSS 字段或上游变量"
-                showSearch
+              <TemplateVariableInput
+                ariaLabel="输入字段"
+                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                references={fieldReferences}
               />
             </Form.Item>
             <Form.Item
@@ -391,17 +472,18 @@ const NodeConfigModal = ({
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
-              extra="只列出当前 RSS 字段和这个判断节点之前生成的变量。"
+              extra={
+                protocolFieldExtra(inputProtocol('condition.field')) ||
+                '只列出当前 RSS 字段和这个判断节点之前生成的变量。'
+              }
               label="比较字段"
               name="condition_field"
               rules={[{ required: true }]}
             >
-              <Select
-                aria-label="比较字段"
-                optionFilterProp="label"
-                options={referenceOptions}
-                placeholder="选择要判断的字段或变量"
-                showSearch
+              <TemplateVariableInput
+                ariaLabel="比较字段"
+                placeholder="输入 {{ 选择要判断的字段或变量"
+                references={fieldReferences}
               />
             </Form.Item>
             <Form.Item
@@ -416,9 +498,20 @@ const NodeConfigModal = ({
                 label="比较值"
                 name="condition_value"
                 rules={[{ required: true }]}
-                extra={operator === 'in' ? '多个值用英文逗号分隔' : undefined}
+                extra={
+                  protocolFieldExtra(inputProtocol('condition.value')) ||
+                  (operator === 'in' ? '多个值用英文逗号分隔' : undefined)
+                }
               >
-                <Input placeholder="1000" />
+                <TemplateVariableInput
+                  ariaLabel="比较值"
+                  placeholder={
+                    operator === 'in'
+                      ? '多个值用英文逗号分隔'
+                      : '输入固定值，或输入 {{ 选择变量'
+                  }
+                  references={fieldReferences}
+                />
               </Form.Item>
             )}
           </>
@@ -477,10 +570,37 @@ const NodeConfigModal = ({
                 options={targets
                   .filter((target) => target.enabled)
                   .map((target) => ({ label: target.name, value: target.id }))}
-                placeholder="请先在下载目标中配置 qBittorrent"
+                placeholder="请先在“下载器设置”添加 qBittorrent 账号"
               />
             </Form.Item>
             <ActionFields fieldReferences={fieldReferences} showQB />
+          </>
+        );
+      case 'wait_qbittorrent':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="直接连接 qBittorrent 下载节点的成功出口。FilmFusion 会用提交时附加的内部标签定位任务，服务重启后仍可继续等待。"
+              message="只有 qBittorrent 下载完成后才走成功出口"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              label="检查间隔（秒）"
+              name="poll_interval_seconds"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={300} min={5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              extra="默认 10080 分钟，即 7 天。"
+              label="最长等待（分钟）"
+              name="max_wait_minutes"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={43200} min={1} style={{ width: '100%' }} />
+            </Form.Item>
           </>
         );
       case 'offline115':
@@ -536,11 +656,578 @@ const NodeConfigModal = ({
           </>
         );
       }
+      case 'wait115':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="直接连接在 115 Cookie/OpenAPI 离线节点的“成功”出口。任务提交后会持久化查询进度，服务重启也会继续等待。"
+              message="只有 115 云下载真正完成后，才会走成功出口。"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              label="检查间隔（秒）"
+              name="poll_interval_seconds"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={300} min={5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              label="最长等待（分钟）"
+              name="max_wait_minutes"
+              rules={[{ required: true }]}
+              extra="默认 10080 分钟，即 7 天；超时后走失败出口。"
+            >
+              <InputNumber max={43200} min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </>
+        );
+      case 'moviepilot_recognize':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="直接连接在“等待 115 下载完成”节点的成功出口。若下载结果是文件夹，会递归识别其中的视频文件。"
+              message="识别只读取文件名和文件夹上下文，不会修改 115 云端文件名。"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={`${protocolFieldExtra(inputProtocol('tmdb_id')) || '可留空自动识别。'} 运行时会按整理模块的规则构造 {tmdb-ID} 辅助识别名。`}
+              label="辅助 TMDB ID（可选）"
+              name="tmdb_id"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const text = String(value || '').trim();
+                    if (
+                      !text ||
+                      /^[1-9]\d{0,19}$/.test(text) ||
+                      text.startsWith('$') ||
+                      text.includes('{{')
+                    ) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('请输入正整数 TMDB ID 或流程变量'),
+                    );
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="辅助 TMDB ID"
+                placeholder="例如 1396，或输入 {{ 选择变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+          </>
+        );
+      case 'moviepilot_title_recognize':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="可放在关键词或 IF 筛选后、下载节点前。节点会输出 TMDB ID、标题、年份、分类、评分和海报地址，供下载路径或通知继续使用。"
+              message="使用 RSS 标题调用 MoviePilot 识别，不依赖 115 下载。"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('input')) ||
+                '通常选择 $item.title，也可以选择上游生成的标题变量。'
+              }
+              label="待识别标题"
+              name="input"
+              rules={[{ required: true }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="待识别标题"
+                placeholder="输入 {{ 选择 RSS 标题或上游变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={protocolFieldExtra(inputProtocol('tmdb_id'))}
+              label="辅助 TMDB ID（可选）"
+              name="tmdb_id"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const text = String(value || '').trim();
+                    if (
+                      !text ||
+                      /^[1-9]\d{0,19}$/.test(text) ||
+                      text.startsWith('$') ||
+                      text.includes('{{')
+                    ) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('请输入正整数 TMDB ID 或流程变量'),
+                    );
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="标题识别辅助 TMDB ID"
+                placeholder="例如 1396，或输入 {{ 选择变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+          </>
+        );
+      case 'media_exists':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="按目录配置计算本地目标目录，同时用 TMDB ID 查询 Emby。已存在走“已存在”，不存在走“不存在”。"
+              message="建议放在下载节点之前避免重复下载"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="查重目录配置"
+              name="cloud_directory_id"
+              rules={[{ required: true, message: '请选择查重目录配置' }]}
+            >
+              <Select
+                options={cloudDirectories.map((directory) => ({
+                  label: [
+                    directory.directory_name,
+                    directory.save_path || '未配置本地保存路径',
+                  ].join(' · '),
+                  value: directory.id,
+                  disabled: !directory.save_path,
+                }))}
+                placeholder="选择目录配置"
+                showSearch
+              />
+            </Form.Item>
+            <TemplateConfigField
+              field="tmdb_id"
+              label="TMDB ID"
+              placeholder="输入 {{ 选择 MP 识别结果"
+              protocol={inputProtocol('tmdb_id')}
+              references={fieldReferences}
+              required
+            />
+            <TemplateConfigField
+              field="title"
+              label="媒体标题"
+              protocol={inputProtocol('title')}
+              references={fieldReferences}
+            />
+            <TemplateConfigField
+              field="year"
+              label="年份"
+              protocol={inputProtocol('year')}
+              references={fieldReferences}
+            />
+            <TemplateConfigField
+              field="media_type"
+              label="媒体类型"
+              protocol={inputProtocol('media_type')}
+              references={fieldReferences}
+            />
+            <TemplateConfigField
+              field="category"
+              label="媒体分类"
+              protocol={inputProtocol('category')}
+              references={fieldReferences}
+            />
+          </>
+        );
+      case 'hdhive_query':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="按 TMDB ID 查询 HDHive，可按分辨率和网盘类型筛选。找到资源走“找到资源”，否则走“没有资源”。"
+              message="这里只查询资源，不会扣积分或解锁"
+              showIcon
+              type="info"
+            />
+            <TemplateConfigField
+              field="tmdb_id"
+              label="TMDB ID"
+              protocol={inputProtocol('tmdb_id')}
+              references={fieldReferences}
+              required
+            />
+            <TemplateConfigField
+              field="media_type"
+              label="媒体类型"
+              placeholder="movie、tv 或上游变量"
+              protocol={inputProtocol('media_type')}
+              references={fieldReferences}
+              required
+            />
+            <TemplateConfigField
+              field="resolution"
+              label="分辨率筛选（可选）"
+              placeholder="例如 2160p"
+              protocol={inputProtocol('resolution')}
+              references={fieldReferences}
+            />
+            <TemplateConfigField
+              field="pan_type"
+              label="网盘类型筛选（可选）"
+              placeholder="例如 115"
+              protocol={inputProtocol('pan_type')}
+              references={fieldReferences}
+            />
+          </>
+        );
+      case 'hdhive_unlock':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="连接 HDHive 查询节点的“找到资源”出口。运行时会真实解锁资源，可能消耗 HDHive 积分。"
+              message="这是实际解锁动作"
+              showIcon
+              type="warning"
+            />
+            <TemplateConfigField
+              field="slug"
+              label="资源 slug"
+              placeholder="输入 {{ 选择查询节点的 selected_slug"
+              protocol={inputProtocol('slug')}
+              references={fieldReferences}
+              required
+            />
+          </>
+        );
+      case 'organize_strm':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="运行时会复用“目录配置”里的分类、过滤、保存路径和 STRM 前缀，真实重命名并移动 115 文件，然后写入本地 STRM。默认不删除源目录，也不自动重试。"
+              message="这是实际整理动作"
+              showIcon
+              type="warning"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="目录配置必须与上游 115 下载节点使用同一个账号，并且需要设置保存路径和可用 Cookie。"
+              label="整理目录配置"
+              name="cloud_directory_id"
+              rules={[{ required: true, message: '请选择整理目录配置' }]}
+            >
+              <Select
+                aria-label="整理目录配置"
+                optionFilterProp="label"
+                options={cloudDirectories.map((directory) => {
+                  const storageType =
+                    directory.cloud_storage?.storage_type || '';
+                  const disabled =
+                    !directory.save_path ||
+                    (storageType !== '' && storageType !== '115open');
+                  return {
+                    label: [
+                      directory.directory_name,
+                      directory.cloud_storage?.storage_name,
+                      directory.save_path || '未配置 STRM 保存路径',
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                    value: directory.id,
+                    disabled,
+                  };
+                })}
+                placeholder="选择现有目录配置"
+                showSearch
+              />
+            </Form.Item>
+            <Form.Item label="媒体类型" name="media_type">
+              <Select
+                options={[
+                  { label: '自动识别', value: 'auto' },
+                  { label: '电影', value: 'movie' },
+                  { label: '电视剧 / 动漫', value: 'tv' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              extra="留空时沿用 MoviePilot 分类和目录配置的分类规则。"
+              label="指定分类（可选）"
+              name="category"
+            >
+              <Input placeholder="例如 国产剧集" />
+            </Form.Item>
+            <Form.Item
+              label="只保留最佳版本"
+              name="best_version_enabled"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </Form.Item>
+            <Form.Item
+              extra="直接下载到单个文件时不会删除其整个父目录。字幕尚未下载完时会进入延迟删除。"
+              label="整理成功后删除源目录"
+              name="delete_source_folder"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="删除" unCheckedChildren="保留" />
+            </Form.Item>
+            <Divider className={styles.nodeConfigFull} />
+            <Form.Item
+              label="启用文件名正则预处理"
+              name="filename_regex_enabled"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </Form.Item>
+            {filenameRegexEnabled && (
+              <>
+                <Form.Item
+                  label="文件名正则"
+                  name="filename_regex_pattern"
+                  rules={[{ required: true, message: '请输入文件名正则' }]}
+                >
+                  <Input placeholder=".* - (.*)-.*" />
+                </Form.Item>
+                <Form.Item label="替换内容" name="filename_regex_replacement">
+                  <Input placeholder="$1" />
+                </Form.Item>
+              </>
+            )}
+          </>
+        );
+      case 'strm_verify':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="只读取整理节点返回的 STRM 文件，校验路径边界、文件类型、大小和非空内容，不访问 115。"
+              message="只读校验，不会修改或重生成 STRM"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="STRM 目录配置"
+              name="cloud_directory_id"
+              rules={[{ required: true, message: '请选择 STRM 目录配置' }]}
+            >
+              <Select
+                options={cloudDirectories.map((directory) => ({
+                  label: [
+                    directory.directory_name,
+                    directory.save_path || '未配置 STRM 保存路径',
+                  ].join(' · '),
+                  value: directory.id,
+                  disabled: !directory.save_path,
+                }))}
+                placeholder="选择与整理节点相同的目录配置"
+                showSearch
+              />
+            </Form.Item>
+          </>
+        );
+      case 'strm_regenerate':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="只使用上游整理节点已返回的 STRM 路径和内容，在配置的本地根目录内原子重写；不请求 115。"
+              message="只能连接 STRM 校验节点的“无效”出口"
+              showIcon
+              type="warning"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="STRM 目录配置"
+              name="cloud_directory_id"
+              rules={[{ required: true, message: '请选择 STRM 目录配置' }]}
+            >
+              <Select
+                options={cloudDirectories.map((directory) => ({
+                  label: [
+                    directory.directory_name,
+                    directory.save_path || '未配置 STRM 保存路径',
+                  ].join(' · '),
+                  value: directory.id,
+                  disabled: !directory.save_path,
+                }))}
+                placeholder="选择与整理 / 校验节点相同的目录配置"
+                showSearch
+              />
+            </Form.Item>
+          </>
+        );
+      case 'emby_refresh_wait':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="首次执行触发一次 Emby 全库刷新，然后按 TMDB ID 轮询；服务重启后会继续等待且不会重复刷新。"
+              message="用于确认 STRM 已真正进入 Emby 媒体库"
+              showIcon
+              type="info"
+            />
+            <TemplateConfigField
+              field="tmdb_id"
+              label="TMDB ID"
+              protocol={inputProtocol('tmdb_id')}
+              references={fieldReferences}
+              required
+            />
+            <TemplateConfigField
+              field="media_type"
+              label="媒体类型（可选）"
+              placeholder="movie、tv 或上游变量"
+              protocol={inputProtocol('media_type')}
+              references={fieldReferences}
+            />
+            <Form.Item
+              label="触发 Emby 媒体库刷新"
+              name="refresh_library"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="刷新" unCheckedChildren="只等待" />
+            </Form.Item>
+            <Form.Item
+              label="检查间隔（秒）"
+              name="poll_interval_seconds"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={300} min={5} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              label="最长等待（分钟）"
+              name="max_wait_minutes"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={1440} min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </>
+        );
+      case 'http_request':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="预览时不发起请求。真正运行时默认禁止访问内网地址、禁止跳转，响应最多保留 1 MiB。"
+              message="通用 HTTP / Webhook 节点"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              label="HTTP 方法"
+              name="method"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(
+                  (value) => ({ label: value, value }),
+                )}
+              />
+            </Form.Item>
+            <TemplateConfigField
+              field="url"
+              label="请求地址"
+              placeholder="https://hooks.example/api/{{nodes.mp.output.tmdb_id}}"
+              protocol={inputProtocol('url')}
+              references={fieldReferences}
+              required
+            />
+            <Form.Item label="Content-Type" name="content_type">
+              <Input placeholder="application/json" />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={`${protocolFieldExtra(inputProtocol('headers')) || 'JSON 对象；请求头的值支持变量。'} Authorization 等敏感值会保存在流程定义中。`}
+              label="请求头 JSON"
+              name="headers_json"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    try {
+                      parseHTTPHeaders(value);
+                      return Promise.resolve();
+                    } catch (error: any) {
+                      return Promise.reject(
+                        new Error(error?.message || '请求头 JSON 无效'),
+                      );
+                    }
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="HTTP 请求头 JSON"
+                multiline
+                placeholder={
+                  '{\n  "X-Media-Type": "{{nodes.mp.output.media_type}}"\n}'
+                }
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('body')) ||
+                '最大 1 MiB；可输入 {{ 插入 RSS 字段或上游输出。'
+              }
+              label="请求体（可选）"
+              name="body"
+            >
+              <TemplateVariableInput
+                ariaLabel="HTTP 请求体"
+                multiline
+                placeholder={'{\n  "tmdb_id": "{{nodes.mp.output.tmdb_id}}"\n}'}
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              extra="只有调用 NAS / 容器内部接口时才开启。"
+              label="允许访问内网"
+              name="allow_private_network"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="允许" unCheckedChildren="禁止" />
+            </Form.Item>
+            <Form.Item
+              label="跟随 HTTP 跳转"
+              name="follow_redirects"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="跟随" unCheckedChildren="禁止" />
+            </Form.Item>
+          </>
+        );
       case 'notification':
         return (
           <>
             <Form.Item
               className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('image_url')) ||
+                '可留空；通常选择 MP 标题识别输出的海报地址。'
+              }
+              label="通知图片 / 海报（可选）"
+              name="image_url"
+            >
+              <TemplateVariableInput
+                ariaLabel="通知图片地址"
+                placeholder="输入 {{ 选择 poster_url"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={protocolFieldExtra(inputProtocol('title'))}
               label="通知标题"
               name="title"
             >
@@ -555,7 +1242,10 @@ const NodeConfigModal = ({
               label="通知内容"
               name="message"
               rules={[{ required: true }]}
-              extra="输入 {{ 唤起智能提示，可用 ↑↓ 选择并按 Enter 插入。"
+              extra={
+                protocolFieldExtra(inputProtocol('message')) ||
+                '输入 {{ 唤起智能提示，可用 ↑↓ 选择并按 Enter 插入。'
+              }
             >
               <TemplateVariableInput
                 ariaLabel="通知内容"
@@ -637,6 +1327,15 @@ const NodeConfigModal = ({
               }
             />
           )}
+          {nodeProtocol && (
+            <Alert
+              className={styles.nodeConfigPreview}
+              description={`输入 ${nodeProtocol.inputs.length} 个 · 输出 ${nodeProtocol.outputs.length} 个；变量均声明名称、类型、说明和示例值。`}
+              message="节点变量协议已登记"
+              showIcon
+              type="info"
+            />
+          )}
           <Form.Item
             className={styles.nodeConfigFull}
             label="节点名称"
@@ -657,12 +1356,40 @@ const NodeConfigModal = ({
                   name="max_attempts"
                   style={{ marginBottom: 0 }}
                 >
-                  <InputNumber max={10} min={1} />
+                  <InputNumber
+                    disabled={[
+                      'organize_strm',
+                      'strm_regenerate',
+                      'http_request',
+                    ].includes(node.type)}
+                    max={
+                      [
+                        'organize_strm',
+                        'strm_regenerate',
+                        'http_request',
+                      ].includes(node.type)
+                        ? 1
+                        : 10
+                    }
+                    min={1}
+                  />
                 </Form.Item>
                 {[
                   'qbittorrent',
+                  'wait_qbittorrent',
                   'offline115',
                   'offline115_openapi',
+                  'wait115',
+                  'moviepilot_title_recognize',
+                  'media_exists',
+                  'hdhive_query',
+                  'hdhive_unlock',
+                  'moviepilot_recognize',
+                  'organize_strm',
+                  'strm_verify',
+                  'strm_regenerate',
+                  'emby_refresh_wait',
+                  'http_request',
                   'notification',
                 ].includes(node.type) && (
                   <Form.Item
@@ -707,24 +1434,34 @@ const ActionFields = ({
       rules={[{ required: true }]}
       extra="选择 enclosure@url 等解析出的下载字段，通常为 download_url。"
     >
-      <Select
-        aria-label="下载 URL"
-        optionFilterProp="label"
-        options={fieldReferenceOptions(fieldReferences)}
-        placeholder="选择 RSS 下载字段或上游变量"
-        showSearch
+      <TemplateVariableInput
+        ariaLabel="下载 URL"
+        placeholder="输入 {{ 选择 RSS 下载字段或上游变量"
+        references={fieldReferences}
       />
     </Form.Item>
     {showQB && (
       <>
         <Form.Item label="保存路径" name="save_path">
-          <Input placeholder="/downloads/{{item.category}}" />
+          <TemplateVariableInput
+            ariaLabel="qBittorrent 保存路径"
+            placeholder="/downloads/{{item.category}}"
+            references={fieldReferences}
+          />
         </Form.Item>
         <Form.Item label="分类" name="category">
-          <Input placeholder="{{item.category}}" />
+          <TemplateVariableInput
+            ariaLabel="qBittorrent 分类"
+            placeholder="{{item.category}}"
+            references={fieldReferences}
+          />
         </Form.Item>
         <Form.Item className={styles.nodeConfigFull} label="标签" name="tags">
-          <Input placeholder="rss,自动化" />
+          <TemplateVariableInput
+            ariaLabel="qBittorrent 标签"
+            placeholder="rss,{{nodes.mp.output.media_type}}"
+            references={fieldReferences}
+          />
         </Form.Item>
         <Space className={styles.nodeConfigFull} size="large">
           <Form.Item label="暂停添加" name="paused" valuePropName="checked">

@@ -63,4 +63,90 @@ describe('RSS automation flow conversion', () => {
     expect(sourcePortLabel('success', join)).toBe('满足');
     expect(sourcePortLabel('failure', join)).toBe('未满足');
   });
+
+  it('creates durable 115 wait and MoviePilot recognition nodes', () => {
+    const wait = createNodeDefinition('wait115', { x: 100, y: 100 });
+    const recognize = createNodeDefinition('moviepilot_recognize', {
+      x: 300,
+      y: 100,
+    });
+
+    expect(wait.config).toMatchObject({
+      poll_interval_seconds: 30,
+      max_wait_minutes: 10080,
+    });
+    expect(wait.max_attempts).toBe(3);
+    expect(recognize.name).toBe('MP 媒体识别');
+    expect(recognize.config).toEqual({ tmdb_id: '' });
+  });
+
+  it('creates a pre-download MoviePilot title recognition node', () => {
+    const recognize = createNodeDefinition('moviepilot_title_recognize', {
+      x: 200,
+      y: 100,
+    });
+
+    expect(recognize.name).toBe('MP 标题识别');
+    expect(recognize.config).toEqual({ input: '$item.title', tmdb_id: '' });
+    expect(recognize.max_attempts).toBe(3);
+  });
+
+  it('creates a single-attempt organize and STRM node', () => {
+    const organize = createNodeDefinition('organize_strm', {
+      x: 500,
+      y: 100,
+    });
+
+    expect(organize.name).toBe('整理生成 STRM');
+    expect(organize.config).toMatchObject({
+      media_type: 'auto',
+      best_version_enabled: false,
+      delete_source_folder: false,
+      timeout_seconds: 600,
+    });
+    expect(organize.max_attempts).toBe(1);
+  });
+
+  it('creates the qB wait, lookup, verification and Emby nodes with safe defaults', () => {
+    const waitQB = createNodeDefinition('wait_qbittorrent', { x: 0, y: 0 });
+    const dedupe = createNodeDefinition('media_exists', { x: 0, y: 0 });
+    const query = createNodeDefinition('hdhive_query', { x: 0, y: 0 });
+    const verify = createNodeDefinition('strm_verify', { x: 0, y: 0 });
+    const regenerate = createNodeDefinition('strm_regenerate', { x: 0, y: 0 });
+    const emby = createNodeDefinition('emby_refresh_wait', { x: 0, y: 0 });
+    const http = createNodeDefinition('http_request', { x: 0, y: 0 });
+
+    expect(waitQB.config).toMatchObject({
+      poll_interval_seconds: 30,
+      max_wait_minutes: 10080,
+    });
+    expect(dedupe.config).toMatchObject({ tmdb_id: '$item.tmdb_id' });
+    expect(query.config).toMatchObject({
+      tmdb_id: '$item.tmdb_id',
+      media_type: '$item.media_type',
+      resolution: '',
+      pan_type: '',
+    });
+    expect(verify.name).toBe('STRM 校验');
+    expect(regenerate).toMatchObject({
+      name: 'STRM 重生成',
+      max_attempts: 1,
+      config: { timeout_seconds: 60 },
+    });
+    expect(emby.config).toMatchObject({
+      refresh_library: true,
+      poll_interval_seconds: 15,
+      max_wait_minutes: 30,
+    });
+    expect(http).toMatchObject({
+      name: 'HTTP / Webhook',
+      max_attempts: 1,
+      config: {
+        method: 'POST',
+        allow_private_network: false,
+        follow_redirects: false,
+        timeout_seconds: 30,
+      },
+    });
+  });
 });

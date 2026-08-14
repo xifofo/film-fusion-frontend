@@ -44,6 +44,20 @@ const renderTemplate = (template: unknown, context: Record<string, unknown>) =>
     return value == null ? '' : String(value);
   });
 
+const resolveConfiguredString = (
+  context: Record<string, unknown>,
+  configured: unknown,
+) => {
+  const expression = String(configured ?? '').trim();
+  if (!expression) return '';
+  if (expression.includes('{{')) return renderTemplate(expression, context);
+  if (expression.startsWith('$') || /^(item|vars|nodes)\./.test(expression)) {
+    const value = resolveReference(context, expression);
+    return value == null ? '' : String(value);
+  }
+  return expression;
+};
+
 const convertValue = (value: unknown, valueType: unknown) => {
   const raw = String(value ?? '').trim();
   switch (String(valueType || 'string')) {
@@ -87,6 +101,34 @@ const compare = (left: unknown, right: unknown) => {
   return leftText === rightText ? 0 : leftText > rightText ? 1 : -1;
 };
 
+const resolveConditionOperand = (
+  context: Record<string, unknown>,
+  raw: unknown,
+): { exists: boolean; value: unknown } => {
+  if (Array.isArray(raw)) {
+    const values = raw.map((item) => resolveConditionOperand(context, item));
+    return {
+      exists: values.every((item) => item.exists),
+      value: values.map((item) => item.value),
+    };
+  }
+  if (typeof raw !== 'string') return { exists: raw != null, value: raw };
+  const expression = raw.trim();
+  const exactTemplate = expression.match(/^\{\{\s*([^{}]+?)\s*\}\}$/);
+  if (exactTemplate) {
+    const value = resolveReference(context, exactTemplate[1]);
+    return { exists: value !== undefined, value };
+  }
+  if (expression.startsWith('$') || /^(item|vars|nodes)\./.test(expression)) {
+    const value = resolveReference(context, expression);
+    return { exists: value !== undefined, value };
+  }
+  if (expression.includes('{{')) {
+    return { exists: true, value: renderTemplate(expression, context) };
+  }
+  return { exists: true, value: raw };
+};
+
 const evaluateCondition = (
   raw: unknown,
   context: Record<string, unknown>,
@@ -101,19 +143,23 @@ const evaluateCondition = (
   }
   if (condition.not) return !evaluateCondition(condition.not, context);
 
-  const left = resolveReference(context, condition.field ?? condition.left);
+  const leftOperand = resolveConditionOperand(
+    context,
+    condition.field ?? condition.left,
+  );
+  const left = leftOperand.value;
   const operator = String(
     condition.operator ?? condition.op ?? '',
   ).toLowerCase();
-  let right = condition.value ?? condition.right;
-  if (typeof right === 'string' && right.trim().startsWith('$')) {
-    right = resolveReference(context, right);
-  }
+  const right = resolveConditionOperand(
+    context,
+    condition.value ?? condition.right,
+  ).value;
   switch (operator) {
     case 'exists':
-      return left != null && String(left).trim() !== '';
+      return leftOperand.exists && left != null && String(left).trim() !== '';
     case 'not_exists':
-      return left == null || String(left).trim() === '';
+      return !leftOperand.exists || left == null || String(left).trim() === '';
     case 'eq':
       return compare(left, right) === 0;
     case 'neq':
@@ -190,7 +236,7 @@ const previewNode = (
           selectedPorts: ['next'],
         };
       case 'regex': {
-        const input = String(resolveReference(context, config.input) ?? '');
+        const input = resolveConfiguredString(context, config.input);
         const expression = new RegExp(String(config.pattern || ''));
         const match = expression.exec(input);
         if (!match) {
@@ -221,9 +267,8 @@ const previewNode = (
         };
       }
       case 'keyword': {
-        const rawInput = resolveReference(context, config.input);
-        if (rawInput == null) throw new Error('输入字段没有值');
-        const input = String(rawInput);
+        const input = resolveConfiguredString(context, config.input);
+        if (!input) throw new Error('输入字段没有值');
         const keywords = Array.isArray(config.keywords)
           ? config.keywords
               .map(String)
@@ -265,7 +310,7 @@ const previewNode = (
         };
       }
       case 'convert': {
-        const input = resolveReference(context, config.input);
+        const input = resolveConfiguredString(context, config.input);
         const value = convertValue(input, config.value_type);
         const variable = String(config.variable || 'result');
         (context.vars as Record<string, unknown>)[variable] = value;
@@ -307,7 +352,7 @@ const previewNode = (
         };
       case 'qbittorrent':
       case 'offline115': {
-        const url = resolveReference(context, config.url);
+        const url = resolveConfiguredString(context, config.url);
         return {
           active: true,
           tone: url ? 'success' : 'warning',
@@ -321,7 +366,7 @@ const previewNode = (
         };
       }
       case 'offline115_openapi': {
-        const url = resolveReference(context, config.url);
+        const url = resolveConfiguredString(context, config.url);
         return {
           active: true,
           tone: url ? 'success' : 'warning',
@@ -331,13 +376,269 @@ const previewNode = (
           output: url,
         };
       }
+      case 'wait115':
+        return {
+          active: true,
+          tone: 'success',
+          label: '运行时等待 115 下载真正完成',
+          detail: '样本预览不会查询真实 115 任务',
+          selectedPorts: ['success'],
+          output: {
+            completed: true,
+            percent: 100,
+            file_id: '运行时返回',
+            file_name: '运行时返回',
+          },
+        };
+      case 'wait_qbittorrent':
+        return {
+          active: true,
+          tone: 'success',
+          label: '运行时等待 qBittorrent 下载完成',
+          detail: '样本预览不会连接真实 qBittorrent',
+          selectedPorts: ['success'],
+          output: {
+            completed: true,
+            progress: 100,
+            state: 'uploading',
+            hash: '运行时返回',
+            name: '运行时返回',
+            save_path: '运行时返回',
+            content_path: '运行时返回',
+          },
+        };
+      case 'moviepilot_recognize': {
+        const configuredTMDB = String(config.tmdb_id || '').trim();
+        const tmdbID = resolveConfiguredString(context, configuredTMDB);
+        return {
+          active: true,
+          tone: 'success',
+          label: tmdbID
+            ? `将用 TMDB ${String(tmdbID)} 辅助 MP 识别`
+            : '将调用 MP 自动识别下载媒体',
+          detail: '样本预览不会调用真实 MoviePilot',
+          selectedPorts: ['success'],
+          output: {
+            tmdb_id: tmdbID || '运行时识别',
+            title: '运行时识别',
+            year: '运行时识别',
+            media_type: '运行时识别',
+            season_episode: '运行时识别',
+            category: '运行时识别',
+            rating: '运行时识别',
+            quality: '运行时识别',
+            poster_url: '运行时识别',
+            recognized_count: 1,
+          },
+        };
+      }
+      case 'moviepilot_title_recognize': {
+        const input = resolveConfiguredString(context, config.input);
+        const configuredTMDB = String(config.tmdb_id || '').trim();
+        const tmdbID = resolveConfiguredString(context, configuredTMDB);
+        return {
+          active: true,
+          tone: input ? 'success' : 'warning',
+          label: tmdbID
+            ? `将用 TMDB ${String(tmdbID)} 辅助识别 RSS 标题`
+            : '将调用 MP 识别 RSS 标题',
+          detail: String(input || '标题尚未解析'),
+          selectedPorts: [input ? 'success' : 'failure'],
+          output: {
+            tmdb_id: tmdbID || '运行时识别',
+            title: '运行时识别',
+            year: '运行时识别',
+            media_type: '运行时识别',
+            season_episode: '运行时识别',
+            category: '运行时识别',
+            rating: '运行时识别',
+            quality: '运行时识别',
+            poster_url: '运行时识别',
+          },
+        };
+      }
+      case 'media_exists': {
+        const tmdbID = resolveConfiguredString(context, config.tmdb_id);
+        const directoryID = Number(config.cloud_directory_id || 0);
+        return {
+          active: true,
+          tone: directoryID > 0 && tmdbID ? 'success' : 'warning',
+          label:
+            directoryID > 0 && tmdbID
+              ? `将检查 TMDB ${tmdbID} 是否已在本地 / Emby 中`
+              : '请选择目录配置并提供 TMDB ID',
+          detail:
+            '样本预览默认演示“未存在”分支，不会查询真实 Emby 或本地媒体库',
+          selectedPorts: [directoryID > 0 && tmdbID ? 'missing' : 'failure'],
+          output: {
+            exists: false,
+            local_exists: false,
+            target_dir: '运行时计算',
+            existing_seasons: [],
+          },
+        };
+      }
+      case 'hdhive_query': {
+        const tmdbID = resolveConfiguredString(context, config.tmdb_id);
+        return {
+          active: true,
+          tone: tmdbID ? 'success' : 'warning',
+          label: tmdbID
+            ? `将在 HDHive 查询 TMDB ${tmdbID} 资源`
+            : 'TMDB ID 尚未解析',
+          detail: '样本预览不会查询真实 HDHive',
+          selectedPorts: [tmdbID ? 'found' : 'failure'],
+          output: {
+            resource_count: tmdbID ? 1 : 0,
+            selected_slug: tmdbID ? 'runtime-resource' : '',
+            selected_title: '运行时返回',
+            selected_size: '运行时返回',
+            selected_resolution: [],
+            is_unlocked: false,
+            resources: [],
+          },
+        };
+      }
+      case 'hdhive_unlock': {
+        const slug = resolveConfiguredString(context, config.slug);
+        return {
+          active: true,
+          tone: slug ? 'success' : 'warning',
+          label: slug ? `将解锁 HDHive 资源 ${slug}` : '资源 slug 尚未解析',
+          detail: '样本预览不会解锁真实 HDHive 资源',
+          selectedPorts: [slug ? 'success' : 'failure'],
+          output: {
+            download_url: slug
+              ? 'https://example.invalid/runtime-resource'
+              : '',
+            url: slug ? 'https://example.invalid/runtime-resource' : '',
+            access_code: '',
+            already_owned: false,
+          },
+        };
+      }
+      case 'organize_strm': {
+        const directoryID = Number(config.cloud_directory_id || 0);
+        return {
+          active: true,
+          tone: directoryID > 0 ? 'success' : 'warning',
+          label:
+            directoryID > 0
+              ? `将使用目录配置 #${directoryID} 整理并生成 STRM`
+              : '尚未选择整理目录配置',
+          detail:
+            '样本预览不会查询、重命名或移动真实 115 文件，也不会写入 STRM',
+          selectedPorts: [directoryID > 0 ? 'success' : 'failure'],
+          output: {
+            organized_count: directoryID > 0 ? 1 : 0,
+            strm_count: directoryID > 0 ? 1 : 0,
+            failed_count: 0,
+            target_path: '运行时整理目标路径',
+            strm_path: '运行时生成的 STRM 路径',
+            strm_content: '运行时生成的 STRM 内容',
+            cloud_directory_name: '运行时目录配置',
+            source_folder_ids: ['运行时下载结果'],
+            source_folder_deleted: false,
+            source_folder_delete_pending: false,
+          },
+        };
+      }
+      case 'strm_verify': {
+        const directoryID = Number(config.cloud_directory_id || 0);
+        return {
+          active: true,
+          tone: directoryID > 0 ? 'success' : 'warning',
+          label:
+            directoryID > 0 ? '将校验上游生成的 STRM 文件' : '尚未选择目录配置',
+          detail: '样本预览不会读取真实 STRM 文件',
+          selectedPorts: [directoryID > 0 ? 'valid' : 'failure'],
+          output: {
+            valid: directoryID > 0,
+            checked_count: directoryID > 0 ? 1 : 0,
+            valid_count: directoryID > 0 ? 1 : 0,
+            invalid_count: 0,
+            strm_path: '运行时校验',
+            strm_content: '运行时校验',
+            errors: [],
+          },
+        };
+      }
+      case 'strm_regenerate': {
+        const directoryID = Number(config.cloud_directory_id || 0);
+        return {
+          active: true,
+          tone: directoryID > 0 ? 'success' : 'warning',
+          label:
+            directoryID > 0
+              ? '将按上游整理结果重生成 STRM'
+              : '尚未选择目录配置',
+          detail: '样本预览不会写入真实 STRM，也不会请求 115',
+          selectedPorts: [directoryID > 0 ? 'success' : 'failure'],
+          output: {
+            regenerated_count: directoryID > 0 ? 1 : 0,
+            failed_count: 0,
+            strm_path: '运行时重写',
+            strm_paths: directoryID > 0 ? ['运行时重写'] : [],
+            errors: [],
+          },
+        };
+      }
+      case 'emby_refresh_wait': {
+        const tmdbID = resolveConfiguredString(context, config.tmdb_id);
+        return {
+          active: true,
+          tone: tmdbID ? 'success' : 'warning',
+          label: tmdbID
+            ? `将刷新 Emby 并等待 TMDB ${tmdbID} 入库`
+            : 'TMDB ID 尚未解析',
+          detail: '样本预览不会请求真实 Emby',
+          selectedPorts: [tmdbID ? 'success' : 'failure'],
+          output: {
+            found: Boolean(tmdbID),
+            emby_item_id: '运行时返回',
+            emby_url: '运行时返回',
+            refresh_requested: Boolean(tmdbID),
+            waiting_seconds: 0,
+          },
+        };
+      }
+      case 'http_request': {
+        const requestURL = resolveConfiguredString(context, config.url);
+        let host = '';
+        try {
+          host = new URL(requestURL).hostname;
+        } catch {
+          // The warning branch below explains an unresolved or invalid URL.
+        }
+        return {
+          active: true,
+          tone: host ? 'success' : 'warning',
+          label: host
+            ? `将请求 ${String(config.method || 'POST').toUpperCase()} ${host}`
+            : 'HTTP 请求地址尚未解析',
+          detail: '样本预览不会发起真实 HTTP 请求',
+          selectedPorts: [host ? 'success' : 'failure'],
+          output: {
+            status_code: 200,
+            content_type: 'application/json',
+            body: '{"preview":true}',
+            json: { preview: true },
+            request_host: host,
+            duration_ms: 0,
+          },
+        };
+      }
       case 'notification': {
         const message = renderTemplate(config.message, context);
+        const imageURL = renderTemplate(config.image_url, context);
         return {
           active: true,
           tone: message ? 'success' : 'warning',
           label: '将发送通知',
-          detail: message || '通知内容为空',
+          detail:
+            [message, imageURL ? `图片：${imageURL}` : '']
+              .filter(Boolean)
+              .join('\n') || '通知内容为空',
           selectedPorts: [message ? 'success' : 'failure'],
           output: message,
         };
@@ -403,7 +704,9 @@ export const simulateRSSAutomation = (
     const preview = previewNode(node, context, activeIncoming.length);
     previews[nodeId] = preview;
     selectedPorts.set(nodeId, preview.selectedPorts);
-    (context.nodes as Record<string, unknown>)[nodeId] = preview.output;
+    (context.nodes as Record<string, unknown>)[nodeId] = {
+      output: preview.output,
+    };
   }
 
   return {

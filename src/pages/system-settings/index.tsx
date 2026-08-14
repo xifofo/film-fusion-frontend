@@ -685,7 +685,7 @@ const SystemSettingsPage: React.FC = () => {
 
                         <SettingsSection
                           title="登录与访问保护"
-                          description="限制连续失败请求；经过反向代理时再填写可信代理网段。"
+                          description="限制连续失败请求；可信代理配置也用于识别 RSS 局域网免 Token 请求。"
                         >
                           <div className={styles.toggleGrid}>
                             <SettingsToggle
@@ -742,7 +742,7 @@ const SystemSettingsPage: React.FC = () => {
                               fieldProps={{
                                 mode: 'tags',
                                 tokenSeparators: [',', ' '],
-                                placeholder: '直接对外开放时保持为空',
+                                placeholder: '直连时留空，仅填写实际代理地址',
                               }}
                             />
                           </div>

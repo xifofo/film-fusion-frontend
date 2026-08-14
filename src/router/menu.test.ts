@@ -44,11 +44,20 @@ describe('findMenuTrail', () => {
     ]);
   });
 
-  it('groups RSS monitoring under the RSS menu', () => {
-    expect(findMenuTrail('/rss-monitor').map((item) => item.name)).toEqual([
-      'RSS',
-      'RSS 监控',
+  it('exposes downloader account settings', () => {
+    expect(findMenuTrail('/downloaders').map((item) => item.name)).toEqual([
+      '下载器设置',
     ]);
+  });
+
+  it('exposes the system information page', () => {
+    expect(findMenuTrail('/system-info').map((item) => item.name)).toEqual([
+      '系统信息',
+    ]);
+  });
+
+  it('does not expose the retired RSS monitoring entry', () => {
+    expect(findMenuTrail('/rss-monitor')).toEqual([]);
   });
 
   it('returns an empty trail for an unknown route', () => {

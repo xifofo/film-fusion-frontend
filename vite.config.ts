@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
           target: apiTarget,
           changeOrigin: true,
         },
+        '/rss': {
+          target: apiTarget,
+          changeOrigin: true,
+        },
       },
     },
     preview: {

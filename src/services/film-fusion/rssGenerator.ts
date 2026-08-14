@@ -52,7 +52,7 @@ export type RSSGeneratorFeedInput = {
 
 export type RSSGeneratorFeed = RSSGeneratorFeedInput & {
   id: number;
-  public_id?: string;
+  public_id: string;
   created_at: string;
   updated_at: string;
   last_generated_at?: string;
@@ -63,20 +63,24 @@ export type RSSGeneratorFeed = RSSGeneratorFeedInput & {
   version: number;
 };
 
+export type RSSGeneratorWorkerStatus = {
+  available: boolean;
+  status: string;
+  healthy?: boolean;
+  service?: string;
+  version?: string;
+  auth_configured?: boolean;
+  error?: string;
+  [key: string]: unknown;
+};
+
 export type RSSGeneratorDashboard = {
   total_feeds: number;
   enabled_feeds: number;
   total_tokens: number;
   active_tokens: number;
   feeds: RSSGeneratorFeed[];
-  worker_status?:
-    | string
-    | {
-        status?: string;
-        healthy?: boolean;
-        error?: string;
-        [key: string]: unknown;
-      };
+  worker_status?: string | RSSGeneratorWorkerStatus;
   worker_health?: string | Record<string, unknown>;
 };
 

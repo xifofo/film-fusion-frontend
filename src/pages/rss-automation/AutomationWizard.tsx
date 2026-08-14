@@ -29,6 +29,7 @@ import type {
   RSSAutomationCreateResult,
   RSSAutomationDefinition,
   RSSAutomationMapping,
+  RSSAutomationNodeProtocol,
   RSSAutomationParsedFeed,
   RSSAutomationSourceInput,
   RSSAutomationTarget,
@@ -40,6 +41,7 @@ import {
   DEFAULT_RSS_AUTOMATION_MAPPING,
   sampleRSSAutomationSource,
 } from '@/services/film-fusion';
+import { ACTION_NODE_TYPES } from './flow';
 import styles from './index.module.less';
 import WorkflowPanel from './WorkflowPanel';
 
@@ -63,6 +65,8 @@ type PublishStepValues = {
 type AutomationWizardProps = {
   targets: RSSAutomationTarget[];
   cloudStorages: API.CloudStorage[];
+  cloudDirectories: API.CloudDirectory[];
+  nodeProtocols?: RSSAutomationNodeProtocol[];
   onCancel: () => void;
   onCreated: (result: RSSAutomationCreateResult) => Promise<void> | void;
 };
@@ -81,6 +85,8 @@ const mappingsForPreset = (preset: FeedPreset): RSSAutomationMapping[] => {
 const AutomationWizard = ({
   targets,
   cloudStorages,
+  cloudDirectories,
+  nodeProtocols = [],
   onCancel,
   onCreated,
 }: AutomationWizardProps) => {
@@ -108,14 +114,8 @@ const AutomationWizard = ({
   const selectedFields = sample?.items[selectedSample]?.fields || {};
   const actionCount = useMemo(
     () =>
-      definition.nodes.filter((node) =>
-        [
-          'qbittorrent',
-          'offline115',
-          'offline115_openapi',
-          'notification',
-        ].includes(node.type),
-      ).length,
+      definition.nodes.filter((node) => ACTION_NODE_TYPES.includes(node.type))
+        .length,
     [definition],
   );
 
@@ -389,10 +389,12 @@ const AutomationWizard = ({
 
       {step === 1 && sample && (
         <WorkflowPanel
+          cloudDirectories={cloudDirectories}
           cloudStorages={cloudStorages}
           initialDefinition={definition}
           loading={false}
           mode="wizard"
+          nodeProtocols={nodeProtocols}
           onChanged={() => undefined}
           onWizardBack={(nextDefinition) => {
             setDefinition(nextDefinition);
