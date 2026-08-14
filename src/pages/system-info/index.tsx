@@ -154,7 +154,10 @@ const SystemInfoPage = () => {
               ) : (
                 <Alert
                   message="Worker Token 暂不可用"
-                  description={worker.token_error || '部署层尚未生成内部密钥'}
+                  description={
+                    worker.token_error ||
+                    '请在“系统设置 → RSS 生成器”中设置内部 Token'
+                  }
                   showIcon
                   type="error"
                 />
@@ -162,7 +165,7 @@ const SystemInfoPage = () => {
             </div>
 
             <Alert
-              description="该 Token 用于 FilmFusion 调用内部 Worker。请勿公开；默认部署会自动生成并持久化，无需写入 .env 或 config.yaml。"
+              description="该 Token 用于 FilmFusion 调用内部 Worker。请勿公开，并确保它与 Worker 容器的 WORKER_AUTH_TOKEN 完全一致。"
               message="内部服务凭证"
               showIcon
               style={{ marginTop: 24 }}

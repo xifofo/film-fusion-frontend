@@ -1542,6 +1542,12 @@ declare namespace API {
     rss_automation: {
       user_agent: string;
     };
+    rss_generator: {
+      worker_url: string;
+      worker_token?: string;
+      public_base_url: string;
+      request_timeout_seconds: number;
+    };
     site: {
       login_title: string;
       login_subtitle: string;

@@ -468,6 +468,7 @@ const SystemSettingsPage: React.FC = () => {
       const res = await saveAppConfig(values);
       if (res.code === 0) {
         const restart = res.data?.restart_fields || [];
+        form.setFieldValue(['rss_generator', 'worker_token'], '');
         if (restart.length > 0) {
           Modal.warning({
             title: '已保存（部分项需重启生效）',
@@ -811,6 +812,82 @@ const SystemSettingsPage: React.FC = () => {
                               150；自定义值只保存在数据库。
                             </Typography.Text>
                           </div>
+                        </SettingsSection>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'rss-generator',
+                    label: 'RSS 生成器',
+                    forceRender: true,
+                    children: (
+                      <div className={styles.tabPanel}>
+                        <SettingsSection
+                          title="Worker 鉴权"
+                          description="设置 FilmFusion 调用 RSS Generator Worker 使用的内部凭证。"
+                        >
+                          <Alert
+                            className={styles.sectionAlert}
+                            type="warning"
+                            showIcon
+                            message="需要在两处手工填写完全相同的 Token"
+                            description="先在 Worker 的 Compose 环境变量 WORKER_AUTH_TOKEN 中填写，再在下方填写相同值。保存后 FilmFusion 立即使用新 Token；修改 Compose 后需要重建 Worker 容器。"
+                          />
+                          <div className={styles.fieldGrid}>
+                            <ProFormText.Password
+                              width="xl"
+                              name={['rss_generator', 'worker_token']}
+                              label="Worker Token"
+                              extra="至少 32 个字符。后台不会回显明文，留空保存表示保持现值。"
+                              fieldProps={{
+                                autoComplete: 'new-password',
+                                placeholder: secretPlaceholder(
+                                  'rss_generator.worker_token',
+                                ),
+                              }}
+                              rules={[
+                                {
+                                  validator: async (_, value?: string) => {
+                                    const raw = value || '';
+                                    const token = raw.trim();
+                                    if (!token) {
+                                      if (
+                                        secrets['rss_generator.worker_token']
+                                      ) {
+                                        return;
+                                      }
+                                      throw new Error('请输入 Worker Token');
+                                    }
+                                    if (/[\r\n]/.test(raw)) {
+                                      throw new Error(
+                                        'Worker Token 不能包含换行',
+                                      );
+                                    }
+                                    const length = new TextEncoder().encode(
+                                      token,
+                                    ).length;
+                                    if (length < 32) {
+                                      throw new Error(
+                                        'Worker Token 至少需要 32 个字符',
+                                      );
+                                    }
+                                    if (length > 512) {
+                                      throw new Error(
+                                        'Worker Token 不能超过 512 个字符',
+                                      );
+                                    }
+                                  },
+                                },
+                              ]}
+                            />
+                          </div>
+                          <Typography.Text type="secondary">
+                            当前内部地址：
+                            <Typography.Text code>
+                              {config.rss_generator?.worker_url ||
+                                'http://rss-generator-worker:8787'}
+                            </Typography.Text>
+                          </Typography.Text>
                         </SettingsSection>
                       </div>
                     ),
