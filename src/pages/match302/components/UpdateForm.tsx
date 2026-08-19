@@ -111,7 +111,7 @@ const UpdateForm: FC<UpdateFormProps> = (props) => {
           if (visible) setActiveTab('basic');
         }}
         modalProps={{
-          destroyOnClose: true,
+          destroyOnHidden: true,
         }}
         initialValues={{
           id: record.id,

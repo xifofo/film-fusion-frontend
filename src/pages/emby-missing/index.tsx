@@ -1,5 +1,7 @@
 import {
+  DownOutlined,
   EnvironmentOutlined,
+  MoreOutlined,
   ReloadOutlined,
   ScanOutlined,
   SettingOutlined,
@@ -9,22 +11,25 @@ import {
 } from '@ant-design/icons';
 import {
   ModalForm,
-  PageContainer,
   ProFormDigit,
   ProFormSelect,
   ProFormSwitch,
   ProFormText,
 } from '@ant-design/pro-components';
+import type { MenuProps } from 'antd';
 import {
-  Alert,
   Button,
   Card,
   Col,
+  Dropdown,
   Modal,
   message,
+  Pagination,
   Popconfirm,
+  Popover,
   Progress,
   Row,
+  Select,
   Space,
   Spin,
   Statistic,
@@ -32,12 +37,12 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import {
   addEmbyMissingBlacklist,
+  embyWatchImageUrl,
   getEmbyMissing,
   getEmbyMissingBlacklist,
   getEmbyMissingLibraries,
@@ -49,10 +54,19 @@ import {
 } from '@/services/film-fusion';
 import ExternalLinksButton from './components/ExternalLinksButton';
 import RegenerateStrmModal from './components/RegenerateStrmModal';
+import styles from './index.module.less';
 
 const { Text } = Typography;
 
 const POLL_MS = 3000;
+
+type MissingSortMode = 'name' | 'missing_desc' | 'missing_asc';
+
+const SORT_OPTIONS: { label: string; value: MissingSortMode }[] = [
+  { label: '按剧名', value: 'name' },
+  { label: '缺集从多到少', value: 'missing_desc' },
+  { label: '缺集从少到多', value: 'missing_asc' },
+];
 
 const fmtEp = (s: number, e: number) =>
   `S${String(s).padStart(2, '0')}E${String(e).padStart(2, '0')}`;
@@ -89,12 +103,265 @@ const describeProgress = (p?: API.EmbyMissingScanProgress): string => {
   }
 };
 
+const SeriesBackdrop: React.FC<{
+  seriesId: string;
+  seriesName: string;
+}> = ({ seriesId, seriesName }) => {
+  const [source, setSource] = useState<'backdrop' | 'primary' | 'failed'>(
+    'backdrop',
+  );
+
+  useEffect(() => setSource('backdrop'), [seriesId]);
+
+  const imageUrl =
+    source === 'failed'
+      ? ''
+      : embyWatchImageUrl(
+          seriesId,
+          source === 'backdrop' ? 1200 : 720,
+          source === 'backdrop' ? 'Backdrop' : 'Primary',
+        );
+
+  return (
+    <div aria-hidden="true" className={styles.backdropFrame}>
+      {imageUrl ? (
+        <img
+          alt=""
+          className={styles.backdropImage}
+          decoding="async"
+          loading="lazy"
+          onError={() =>
+            setSource((current) =>
+              current === 'backdrop' ? 'primary' : 'failed',
+            )
+          }
+          src={imageUrl}
+        />
+      ) : (
+        <div className={styles.backdropFallback}>
+          <span>{Array.from(seriesName.trim())[0] || '剧'}</span>
+        </div>
+      )}
+      <div className={styles.backdropScrim} />
+    </div>
+  );
+};
+
+const SeriesPoster: React.FC<{
+  seriesId: string;
+  seriesName: string;
+}> = ({ seriesId, seriesName }) => {
+  const [failed, setFailed] = useState(false);
+  const imageUrl = embyWatchImageUrl(seriesId, 360, 'Primary');
+
+  useEffect(() => setFailed(false), [seriesId]);
+
+  return (
+    <div className={styles.posterFrame}>
+      {imageUrl && !failed ? (
+        <img
+          alt={`${seriesName} 海报`}
+          className={styles.posterImage}
+          decoding="async"
+          loading="lazy"
+          onError={() => setFailed(true)}
+          src={imageUrl}
+        />
+      ) : (
+        <div className={styles.posterFallback}>
+          <span>{Array.from(seriesName.trim())[0] || '剧'}</span>
+          <small>EMBY</small>
+        </div>
+      )}
+    </div>
+  );
+};
+
+type MissingSeriesCardProps = {
+  record: API.EmbyMissingSeriesGroup;
+  scanning: boolean;
+  rescanningSeriesId: string;
+  onAddBlacklist: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
+  onRescan: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
+  onViewPath: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
+};
+
+const MissingSeriesCard: React.FC<MissingSeriesCardProps> = ({
+  record,
+  scanning,
+  rescanningSeriesId,
+  onAddBlacklist,
+  onRescan,
+  onViewPath,
+}) => {
+  const episodes = record.episodes || [];
+  const previewEpisodes = episodes.slice(0, 6);
+  const remainingCount = Math.max(episodes.length - previewEpisodes.length, 0);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  return (
+    <Card className={styles.seriesCard} variant="borderless">
+      <div className={styles.cardVisual}>
+        <SeriesBackdrop
+          seriesId={record.series_id}
+          seriesName={record.series_name}
+        />
+
+        <div className={styles.cardTopline}>
+          <span className={styles.libraryBadge}>
+            {record.library_name || 'Emby 媒体库'}
+          </span>
+          <span className={styles.missingBadge}>
+            <strong>{record.missing_count}</strong>
+            <span>集缺失</span>
+          </span>
+        </div>
+
+        <div className={styles.cardMain}>
+          <SeriesPoster
+            seriesId={record.series_id}
+            seriesName={record.series_name}
+          />
+          <div className={styles.seriesCopy}>
+            <p>EMBY MISSING</p>
+            <h2 title={record.series_name}>{record.series_name || '-'}</h2>
+            <div className={styles.episodePreview}>
+              {previewEpisodes.map((episode) => {
+                const code = fmtEp(
+                  episode.season_number,
+                  episode.episode_number,
+                );
+                return <span key={code}>{code}</span>;
+              })}
+              {remainingCount > 0 && <span>+{remainingCount}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.cardFooter}>
+        <details className={styles.episodeDetails}>
+          <summary>
+            <span>查看缺失明细</span>
+            <span>{episodes.length} 集</span>
+          </summary>
+          <div className={styles.episodeList}>
+            {episodes.map((episode) => {
+              const code = fmtEp(episode.season_number, episode.episode_number);
+              return (
+                <div className={styles.episodeRow} key={code}>
+                  <strong>{code}</strong>
+                  <span title={episode.episode_name || ''}>
+                    {episode.episode_name || '未命名剧集'}
+                  </span>
+                  <time>{fmtDate(episode.premiere_date)}</time>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+
+        <div className={styles.actionRow}>
+          <Popconfirm
+            title="只重新检查这部剧？"
+            description="请先确保 Emby 已完成媒体库扫描并识别新补齐的剧集。"
+            okText="开始重扫"
+            cancelText="取消"
+            disabled={scanning || !!rescanningSeriesId}
+            onConfirm={() => onRescan(record)}
+          >
+            <Button
+              type="link"
+              size="small"
+              icon={<SyncOutlined />}
+              loading={rescanningSeriesId === record.series_id}
+              disabled={
+                scanning ||
+                (!!rescanningSeriesId &&
+                  rescanningSeriesId !== record.series_id)
+              }
+            >
+              重扫此剧
+            </Button>
+          </Popconfirm>
+          <Popover
+            arrow={false}
+            content={
+              <div className={styles.cardActionMenu}>
+                <Button
+                  icon={<EnvironmentOutlined />}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void onViewPath(record);
+                  }}
+                  size="small"
+                  type="text"
+                >
+                  查看位置
+                </Button>
+                <ExternalLinksButton seriesId={record.series_id} />
+                <div
+                  className={styles.cardActionMenuItem}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <HDHiveResourcesButton seriesId={record.series_id} />
+                </div>
+                <div
+                  className={styles.cardActionMenuItem}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <RegenerateStrmModal record={record} />
+                </div>
+                <div className={styles.cardActionMenuDivider} />
+                <Popconfirm
+                  title="加入黑名单后将跳过该剧的缺集检查"
+                  onConfirm={() => {
+                    setMoreOpen(false);
+                    return onAddBlacklist(record);
+                  }}
+                >
+                  <Button
+                    danger
+                    icon={<StopOutlined />}
+                    size="small"
+                    type="text"
+                  >
+                    加入黑名单
+                  </Button>
+                </Popconfirm>
+              </div>
+            }
+            onOpenChange={setMoreOpen}
+            open={moreOpen}
+            placement="bottomRight"
+            styles={{ content: { padding: 6 } }}
+            trigger="click"
+          >
+            <Button
+              aria-label={`${record.series_name} 更多操作`}
+              icon={<MoreOutlined />}
+              size="small"
+              type="link"
+            >
+              更多操作 <DownOutlined className="text-[9px]" />
+            </Button>
+          </Popover>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 const EmbyMissingPage: React.FC = () => {
   const [data, setData] = useState<API.EmbyMissingListResult>();
   const [loading, setLoading] = useState(false);
   const [blacklistOpen, setBlacklistOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [blacklist, setBlacklist] = useState<API.EmbyMissingBlacklist[]>([]);
   const [rescanningSeriesId, setRescanningSeriesId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const [sortMode, setSortMode] = useState<MissingSortMode>('name');
   const [pathModal, setPathModal] = useState<{
     open: boolean;
     loading: boolean;
@@ -119,6 +386,7 @@ const EmbyMissingPage: React.FC = () => {
     strmContent: '',
   });
   const [messageApi, contextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = useCallback(async () => {
@@ -148,6 +416,13 @@ const EmbyMissingPage: React.FC = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [data?.setting?.scanning, load]);
+
+  const groupCount = data?.groups?.length ?? 0;
+
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(groupCount / pageSize));
+    setCurrentPage((page) => Math.min(page, lastPage));
+  }, [groupCount, pageSize]);
 
   const handleScan = async (forceFull = false) => {
     try {
@@ -273,130 +548,109 @@ const EmbyMissingPage: React.FC = () => {
 
   const setting = data?.setting;
   const scanning = !!setting?.scanning;
-
-  const columns: ColumnsType<API.EmbyMissingSeriesGroup> = [
+  const groups = data?.groups || [];
+  const sortedGroups =
+    sortMode === 'name'
+      ? groups
+      : [...groups].sort((left, right) => {
+          const countDiff = left.missing_count - right.missing_count;
+          if (countDiff !== 0) {
+            return sortMode === 'missing_desc' ? -countDiff : countDiff;
+          }
+          return left.series_name.localeCompare(right.series_name, 'zh-CN');
+        });
+  const visibleGroups = sortedGroups.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const moreActionItems: MenuProps['items'] = [
     {
-      title: '剧名',
-      dataIndex: 'series_name',
-      ellipsis: true,
-      render: (v: string) => <Text strong>{v || '-'}</Text>,
+      key: 'force-full',
+      icon: <ThunderboltOutlined />,
+      label: '强制全扫',
+      disabled: scanning,
+    },
+    { type: 'divider' },
+    {
+      key: 'schedule',
+      icon: <SettingOutlined />,
+      label: '定时设置',
     },
     {
-      title: '媒体库',
-      dataIndex: 'library_name',
-      width: 160,
-      ellipsis: true,
-      render: (v: string) => <Tag color="geekblue">{v || '-'}</Tag>,
-    },
-    {
-      title: '缺集数',
-      dataIndex: 'missing_count',
-      width: 100,
-      sorter: (a, b) => a.missing_count - b.missing_count,
-      render: (v: number) => <Tag color="red">{v}</Tag>,
-    },
-    {
-      title: '缺失明细',
-      key: 'preview',
-      render: (_, record) => {
-        const items = record.episodes || [];
-        const head = items
-          .slice(0, 8)
-          .map((e) => fmtEp(e.season_number, e.episode_number));
-        return (
-          <Space size={[4, 4]} wrap>
-            {head.map((t) => (
-              <Tag key={t}>{t}</Tag>
-            ))}
-            {items.length > 8 && (
-              <Text type="secondary">等 {items.length} 集</Text>
-            )}
-          </Space>
-        );
-      },
-    },
-    {
-      title: '操作',
-      key: 'option',
-      width: 550,
-      render: (_, record) => (
-        <Space size={0} wrap>
-          <Popconfirm
-            title="只重新检查这部剧？"
-            description="请先确保 Emby 已完成媒体库扫描并识别新补齐的剧集。"
-            okText="开始重扫"
-            cancelText="取消"
-            disabled={scanning || !!rescanningSeriesId}
-            onConfirm={() => handleRescanSeries(record)}
-          >
-            <Button
-              type="link"
-              size="small"
-              icon={<SyncOutlined />}
-              loading={rescanningSeriesId === record.series_id}
-              disabled={
-                scanning ||
-                (!!rescanningSeriesId &&
-                  rescanningSeriesId !== record.series_id)
-              }
-            >
-              重扫此剧
-            </Button>
-          </Popconfirm>
-          <Button
-            type="link"
-            size="small"
-            icon={<EnvironmentOutlined />}
-            onClick={() => handleViewPath(record)}
-          >
-            查看位置
-          </Button>
-          <ExternalLinksButton seriesId={record.series_id} />
-          <HDHiveResourcesButton seriesId={record.series_id} />
-          <RegenerateStrmModal record={record} />
-          <Popconfirm
-            title="加入黑名单后将跳过该剧的缺集检查"
-            onConfirm={() => handleAddBlacklist(record)}
-          >
-            <Button type="link" size="small" danger icon={<StopOutlined />}>
-              加入黑名单
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      key: 'blacklist',
+      icon: <StopOutlined />,
+      label: '黑名单管理',
     },
   ];
 
-  const episodeColumns: ColumnsType<API.EmbyMissingEpisode> = [
-    {
-      title: '剧集',
-      key: 'ep',
-      width: 120,
-      render: (_, e) => fmtEp(e.season_number, e.episode_number),
-    },
-    {
-      title: '集名',
-      dataIndex: 'episode_name',
-      ellipsis: true,
-      render: (v) => v || '-',
-    },
-    {
-      title: '首播日期',
-      dataIndex: 'premiere_date',
-      width: 140,
-      render: (v) => fmtDate(v),
-    },
-  ];
+  const handleMoreAction: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'force-full') {
+      modalApi.confirm({
+        title: '强制全量扫描',
+        content:
+          '将逐剧重新检查全部剧集，忽略「近期已扫」窗口，耗时较长。确定继续？',
+        okText: '开始全扫',
+        cancelText: '取消',
+        onOk: () => handleScan(true),
+      });
+      return;
+    }
+    if (key === 'schedule') {
+      setScheduleOpen(true);
+      return;
+    }
+    if (key === 'blacklist') {
+      void openBlacklist();
+    }
+  };
 
   return (
-    <PageContainer header={{ title: '缺集扫描' }}>
+    <div className="mx-auto box-border w-full max-w-[1680px] px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
       {contextHolder}
-      <Alert
-        style={{ marginBottom: 16 }}
-        type="info"
-        showIcon
-        message="基于 Emby /Shows/Missing 按剧扫描缺失剧集。「增量扫描」只重查距上次检查超过设定天数的剧（其余沿用已有结果），首次/「强制全扫」会逐剧全量重查；结果持久化，加入黑名单的剧会被跳过。"
-      />
+      {modalContextHolder}
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="m-0 text-[11px] font-semibold tracking-[0.18em] text-neutral-400 uppercase dark:text-white/35">
+            Emby tools
+          </p>
+          <h1 className="mt-2 mb-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
+            缺集扫描
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button
+            className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-3.5 !text-neutral-600 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={load}
+            type="text"
+          >
+            刷新
+          </Button>
+          <Button
+            className="!h-9 !rounded-xl !px-4"
+            icon={<ScanOutlined />}
+            loading={scanning}
+            onClick={() => handleScan(false)}
+            type="primary"
+          >
+            {scanning ? '扫描中…' : '增量扫描'}
+          </Button>
+          <Dropdown
+            menu={{ items: moreActionItems, onClick: handleMoreAction }}
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Button
+              className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-3.5 !text-neutral-600 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
+              type="text"
+            >
+              更多 <DownOutlined className="text-[10px]" />
+            </Button>
+          </Dropdown>
+        </div>
+      </header>
 
       <Card style={{ marginBottom: 16 }}>
         <Row gutter={16} align="middle">
@@ -426,7 +680,7 @@ const EmbyMissingPage: React.FC = () => {
             )}
           </Col>
           <Col xs={24} sm={6}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Space wrap>
                 <Tag color={setting?.schedule_enabled ? 'green' : 'default'}>
                   定时
@@ -445,56 +699,72 @@ const EmbyMissingPage: React.FC = () => {
             </Text>
           </div>
         )}
-        <Space style={{ marginTop: 16 }} wrap>
-          <Button
-            type="primary"
-            icon={<ScanOutlined />}
-            loading={scanning}
-            onClick={() => handleScan(false)}
-          >
-            {scanning ? '扫描中…' : '增量扫描'}
-          </Button>
-          <Popconfirm
-            title="强制全量扫描会逐剧重新检查全部剧集，忽略「近期已扫」窗口，耗时较长，确定继续？"
-            okText="开始全扫"
-            cancelText="取消"
-            disabled={scanning}
-            onConfirm={() => handleScan(true)}
-          >
-            <Button icon={<ThunderboltOutlined />} disabled={scanning}>
-              强制全扫
-            </Button>
-          </Popconfirm>
-          <Button icon={<ReloadOutlined />} onClick={load}>
-            刷新
-          </Button>
-          <ScheduleSettingForm setting={setting} onSaved={load} />
-          <Button icon={<StopOutlined />} onClick={openBlacklist}>
-            黑名单管理
-          </Button>
-        </Space>
       </Card>
 
-      <Table<API.EmbyMissingSeriesGroup>
-        rowKey="series_id"
-        loading={loading}
-        columns={columns}
-        dataSource={data?.groups || []}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
-        expandable={{
-          expandedRowRender: (record) => (
-            <Table<API.EmbyMissingEpisode>
+      <Spin spinning={loading}>
+        <section
+          aria-busy={loading}
+          aria-label="缺集剧集"
+          className={styles.seriesList}
+        >
+          <header className={styles.resultToolbar}>
+            <div>
+              <strong>缺集剧集</strong>
+              <span>共 {groups.length} 部</span>
+            </div>
+            <Select
+              aria-label="缺集剧集排序"
+              onChange={(value) => {
+                setSortMode(value);
+                setCurrentPage(1);
+              }}
+              options={SORT_OPTIONS}
               size="small"
-              rowKey={(e) =>
-                `${record.series_id}-${e.season_number}-${e.episode_number}`
-              }
-              columns={episodeColumns}
-              dataSource={record.episodes || []}
-              pagination={false}
+              value={sortMode}
+              variant="filled"
             />
-          ),
-        }}
-      />
+          </header>
+
+          {groups.length > 0 ? (
+            <div className={styles.seriesGrid}>
+              {visibleGroups.map((record) => (
+                <MissingSeriesCard
+                  key={record.series_id}
+                  record={record}
+                  scanning={scanning}
+                  rescanningSeriesId={rescanningSeriesId}
+                  onAddBlacklist={handleAddBlacklist}
+                  onRescan={handleRescanSeries}
+                  onViewPath={handleViewPath}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyState}>暂无缺集记录</div>
+          )}
+
+          {groups.length > 0 && (
+            <Pagination
+              align="center"
+              className={styles.pagination}
+              current={currentPage}
+              onChange={(nextPage, nextPageSize) => {
+                if (nextPageSize !== pageSize) {
+                  setPageSize(nextPageSize);
+                  setCurrentPage(1);
+                  return;
+                }
+                setCurrentPage(nextPage);
+              }}
+              pageSize={pageSize}
+              pageSizeOptions={[8, 16, 24]}
+              responsive
+              showSizeChanger
+              total={groups.length}
+            />
+          )}
+        </section>
+      </Spin>
 
       <Modal
         title={`剧集位置 - ${pathModal.seriesName || ''}`}
@@ -638,16 +908,27 @@ const EmbyMissingPage: React.FC = () => {
           ]}
         />
       </Modal>
-    </PageContainer>
+
+      <ScheduleSettingForm
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        setting={setting}
+        onSaved={load}
+      />
+    </div>
   );
 };
 
 type ScheduleSettingFormProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   setting?: API.EmbyMissingSetting;
   onSaved: () => void;
 };
 
 const ScheduleSettingForm: React.FC<ScheduleSettingFormProps> = ({
+  open,
+  onOpenChange,
   setting,
   onSaved,
 }) => {
@@ -658,8 +939,9 @@ const ScheduleSettingForm: React.FC<ScheduleSettingFormProps> = ({
       <ModalForm
         title="定时扫描设置"
         width={520}
-        trigger={<Button icon={<SettingOutlined />}>定时设置</Button>}
-        modalProps={{ destroyOnClose: true }}
+        open={open}
+        onOpenChange={onOpenChange}
+        modalProps={{ destroyOnHidden: true }}
         initialValues={{
           schedule_enabled: setting?.schedule_enabled ?? false,
           cron: setting?.cron ?? '0 4 * * *',

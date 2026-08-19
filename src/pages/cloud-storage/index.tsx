@@ -111,7 +111,7 @@ const CloudStorageList: React.FC = () => {
       title: 'ID',
       dataIndex: 'id',
       width: 80,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '存储名称',
@@ -149,7 +149,7 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'provider_uid',
       width: 140,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => record.provider_uid || '-',
     },
     {
@@ -157,14 +157,14 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'app_id',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '应用密钥',
       dataIndex: 'app_secret',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => (record.app_secret ? '***已配置***' : '未配置'),
     },
     {
@@ -172,7 +172,7 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'access_token',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) =>
         record.access_token
           ? `${record.access_token.substring(0, 10)}...`
@@ -183,7 +183,7 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'refresh_token',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) =>
         record.refresh_token
           ? `${record.refresh_token.substring(0, 10)}...`
@@ -194,14 +194,14 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'token_expires_at',
       width: 160,
       valueType: 'dateTime',
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '最后刷新时间',
       dataIndex: 'last_refresh_at',
       width: 160,
       valueType: 'dateTime',
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '自动刷新',
@@ -221,7 +221,7 @@ const CloudStorageList: React.FC = () => {
       title: '刷新提前时间(分钟)',
       dataIndex: 'refresh_before_min',
       width: 140,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '状态',
@@ -238,7 +238,7 @@ const CloudStorageList: React.FC = () => {
       title: 'Cookie 保活',
       dataIndex: 'cookie_keepalive',
       width: 110,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => (
         <CookieKeepAlive
           record={record}
@@ -252,13 +252,13 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'error_message',
       width: 200,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => record.error_message || '-',
     },
     {
       title: 'Match302',
       width: 250,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => (
         <Space size={4} wrap>
           {getMatch302AccessModeTag(record.match302_access_mode)}
@@ -272,14 +272,14 @@ const CloudStorageList: React.FC = () => {
       dataIndex: 'last_error_at',
       width: 160,
       valueType: 'dateTime',
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '额外配置',
       dataIndex: 'config',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => {
         if (!record.config) return '-';
         try {
@@ -363,7 +363,7 @@ const CloudStorageList: React.FC = () => {
       />
 
       <Drawer
-        width={600}
+        size={600}
         open={showDetail}
         onClose={() => {
           setCurrentRow(undefined);

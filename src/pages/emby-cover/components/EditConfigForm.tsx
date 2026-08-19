@@ -1,12 +1,12 @@
-import { upsertEmbyCoverLibrary } from '@/services/film-fusion';
 import {
   DrawerForm,
   ProFormSelect,
   ProFormSwitch,
   ProFormText,
 } from '@ant-design/pro-components';
-import { message } from 'antd';
+import { App } from 'antd';
 import React from 'react';
+import { upsertEmbyCoverLibrary } from '@/services/film-fusion';
 
 export interface EditConfigFormProps {
   /** 当前库（用来回填表单） */
@@ -29,6 +29,8 @@ const EditConfigForm: React.FC<EditConfigFormProps> = ({
   trigger,
   onSuccess,
 }) => {
+  const { message: messageApi } = App.useApp();
+
   return (
     <DrawerForm<API.UpsertEmbyCoverLibraryParams>
       title={`编辑封面配置 · ${record.emby_name}`}
@@ -53,14 +55,14 @@ const EditConfigForm: React.FC<EditConfigFormProps> = ({
             enabled: values.enabled,
           });
           if (resp.code !== 0) {
-            message.error(resp.message || '保存失败');
+            messageApi.error(resp.message || '保存失败');
             return false;
           }
-          message.success('已保存');
+          messageApi.success('已保存');
           onSuccess?.();
           return true;
         } catch (e: any) {
-          message.error(e?.message || '保存失败');
+          messageApi.error(e?.message || '保存失败');
           return false;
         }
       }}

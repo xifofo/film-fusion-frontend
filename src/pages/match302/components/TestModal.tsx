@@ -1,11 +1,11 @@
 import { ExperimentOutlined } from '@ant-design/icons';
 import {
   Alert,
+  App,
   Button,
   Form,
   Input,
   Modal,
-  message,
   Space,
   Typography,
 } from 'antd';
@@ -24,6 +24,7 @@ interface TestModalProps {
 
 const TestModal: FC<TestModalProps> = (props) => {
   const { open, record, onClose } = props;
+  const { message: messageApi } = App.useApp();
   const [form] = Form.useForm();
   const [testResult, setTestResult] = useState<{
     matched: boolean;
@@ -39,7 +40,7 @@ const TestModal: FC<TestModalProps> = (props) => {
         setTestResult(result.data);
       },
       onError: () => {
-        message.error('测试失败，请重试');
+        messageApi.error('测试失败，请重试');
       },
     },
   );
@@ -79,7 +80,7 @@ const TestModal: FC<TestModalProps> = (props) => {
       width={600}
     >
       {record && (
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <div>
             <Text strong>当前规则：</Text>
             <Paragraph>
@@ -108,9 +109,9 @@ const TestModal: FC<TestModalProps> = (props) => {
           {testResult && (
             <Alert
               type={testResult.matched ? 'success' : 'warning'}
-              message={testResult.matched ? '匹配成功' : '路径不匹配'}
+              title={testResult.matched ? '匹配成功' : '路径不匹配'}
               description={
-                <Space direction="vertical" style={{ width: '100%' }}>
+                <Space orientation="vertical" style={{ width: '100%' }}>
                   <div>
                     <Text strong>匹配结果：</Text>
                     <Text>{testResult.message}</Text>

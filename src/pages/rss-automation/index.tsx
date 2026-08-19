@@ -2,14 +2,13 @@ import '@xyflow/react/dist/style.css';
 
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { PageContainer } from '@ant-design/pro-components';
-import { Alert, Button, message, Popconfirm, Tabs } from 'antd';
+import { Button, message, Tabs } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import {
   getCloudDirectoryList,
   getCloudStorageList,
   getRSSAutomationDashboard,
-  migrateLegacyRSSMonitor,
   setRSSAutomationEnabled,
 } from '@/services/film-fusion';
 import AutomationOverview from './AutomationOverview';
@@ -37,7 +36,6 @@ const RSSAutomationPage = () => {
   >([]);
   const [loading, setLoading] = useState(true);
   const [togglingSourceId, setTogglingSourceId] = useState<number>();
-  const [migratingLegacy, setMigratingLegacy] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
 
   const load = useCallback(
@@ -112,26 +110,6 @@ const RSSAutomationPage = () => {
     [load, messageApi],
   );
 
-  const migrateLegacy = useCallback(async () => {
-    setMigratingLegacy(true);
-    try {
-      const response = await migrateLegacyRSSMonitor();
-      if (response.code !== 0 || !response.data) {
-        throw new Error(response.message || '迁移旧版 RSS 监控失败');
-      }
-      messageApi.success(
-        `已迁移 ${response.data.sources_migrated} 个源、${response.data.entries_migrated} 条历史，并停用旧版监控源`,
-      );
-      await load(true);
-    } catch (error: any) {
-      messageApi.error(
-        error?.data || error?.message || '迁移旧版 RSS 监控失败',
-      );
-    } finally {
-      setMigratingLegacy(false);
-    }
-  }, [load, messageApi]);
-
   useEffect(() => {
     load();
     const timer = window.setInterval(() => load(true), 15_000);
@@ -148,18 +126,6 @@ const RSSAutomationPage = () => {
     running_nodes: 0,
     failed_runs: 0,
     source_running: false,
-    legacy_migration: {
-      available: false,
-      complete: false,
-      source_count: 0,
-      enabled_source_count: 0,
-      migrated_source_count: 0,
-      pending_source_count: 0,
-      rule_count: 0,
-      enabled_rule_count: 0,
-      disabled_rule_count: 0,
-      item_count: 0,
-    },
     node_protocols: [],
   };
   const editingWorkflow = data.workflows.find(
@@ -174,19 +140,6 @@ const RSSAutomationPage = () => {
   const manualWorkflow = data.workflows.find(
     (workflow) => workflow.id === manualWorkflowId,
   );
-  const legacyMigration = data.legacy_migration || {
-    available: false,
-    complete: false,
-    source_count: 0,
-    enabled_source_count: 0,
-    migrated_source_count: 0,
-    pending_source_count: 0,
-    rule_count: 0,
-    enabled_rule_count: 0,
-    disabled_rule_count: 0,
-    item_count: 0,
-  };
-
   const returnToOverview = () => {
     setEditingWorkflowId(undefined);
     setLogWorkflowId(undefined);
@@ -212,73 +165,39 @@ const RSSAutomationPage = () => {
     >
       {contextHolder}
       {view === 'overview' && (
-        <>
-          {legacyMigration.available && (
-            <Alert
-              action={
-                <Popconfirm
-                  cancelText="取消"
-                  description={`将创建 ${legacyMigration.pending_source_count} 个自动化，复制 ${legacyMigration.item_count} 条历史；成功后停用旧源。旧表和数据不会删除。`}
-                  okText="开始迁移"
-                  onConfirm={migrateLegacy}
-                  title="迁移旧版 RSS 监控？"
-                >
-                  <Button loading={migratingLegacy} type="primary">
-                    迁移到 RSS 自动化
-                  </Button>
-                </Popconfirm>
-              }
-              description={`检测到 ${legacyMigration.pending_source_count} 个待迁移源、${legacyMigration.enabled_rule_count} 条已启用规则和 ${legacyMigration.item_count} 条历史。已停用的 ${legacyMigration.disabled_rule_count} 条规则保留在旧表中，不会启用。`}
-              message="可以用 RSS 自动化接管旧版 RSS 监控"
-              showIcon
-              style={{ marginBottom: 16 }}
-              type="info"
-            />
-          )}
-          {legacyMigration.complete && (
-            <Alert
-              closable
-              description="旧版源已停用，旧配置和历史表仍保留；当前由 RSS 自动化负责后续检查。"
-              message="旧版 RSS 监控已完成迁移"
-              showIcon
-              style={{ marginBottom: 16 }}
-              type="success"
-            />
-          )}
-          <Tabs
-            activeKey={overviewTab}
-            items={[
-              {
-                key: 'automations',
-                label: '自动化',
-                children: (
-                  <AutomationOverview
-                    data={data}
-                    loading={loading}
-                    onCreate={() => setView('wizard')}
-                    onEdit={(workflowId) => {
-                      setEditingWorkflowId(workflowId);
-                      setView('editor');
-                    }}
-                    onManualRun={setManualWorkflowId}
-                    onToggle={toggleAutomation}
-                    onViewLogs={(workflowId) => {
-                      setLogWorkflowId(workflowId);
-                      setView('logs');
-                    }}
-                    togglingSourceId={togglingSourceId}
-                  />
-                ),
-              },
-              {
-                key: 'entries',
-                label: 'RSS 条目',
-                children: <EntryHistoryPanel sources={data.sources} />,
-              },
-            ]}
-            onChange={(key) => setOverviewTab(key as 'automations' | 'entries')}
-          />
-        </>
+        <Tabs
+          activeKey={overviewTab}
+          items={[
+            {
+              key: 'automations',
+              label: '自动化',
+              children: (
+                <AutomationOverview
+                  data={data}
+                  loading={loading}
+                  onCreate={() => setView('wizard')}
+                  onEdit={(workflowId) => {
+                    setEditingWorkflowId(workflowId);
+                    setView('editor');
+                  }}
+                  onManualRun={setManualWorkflowId}
+                  onToggle={toggleAutomation}
+                  onViewLogs={(workflowId) => {
+                    setLogWorkflowId(workflowId);
+                    setView('logs');
+                  }}
+                  togglingSourceId={togglingSourceId}
+                />
+              ),
+            },
+            {
+              key: 'entries',
+              label: 'RSS 条目',
+              children: <EntryHistoryPanel sources={data.sources} />,
+            },
+          ]}
+          onChange={(key) => setOverviewTab(key as 'automations' | 'entries')}
+        />
       )}
 
       {view === 'wizard' && (

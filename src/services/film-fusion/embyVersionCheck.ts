@@ -18,3 +18,20 @@ export async function getEmbyVersionCheckStatus() {
     '/api/emby-version-check/status',
   );
 }
+
+/** 获取当前用户的本地多版本定时检查设置。 */
+export async function getEmbyVersionCheckSetting() {
+  return apiClient.get<API.Response<API.EmbyVersionCheckSetting>>(
+    '/api/emby-version-check/setting',
+  );
+}
+
+/** 更新当前用户的本地多版本定时检查设置。 */
+export async function updateEmbyVersionCheckSetting(
+  data: API.EmbyVersionCheckSettingParams,
+) {
+  return apiClient.put<API.Response<API.EmbyVersionCheckSetting>>(
+    '/api/emby-version-check/setting',
+    data,
+  );
+}

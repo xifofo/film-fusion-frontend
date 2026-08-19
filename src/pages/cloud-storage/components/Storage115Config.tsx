@@ -1,7 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Form, Input, QRCode, Steps, Button, Typography, Space, message, Spin, Alert, Progress } from 'antd';
-import { CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { getAuth115QRCode, checkAuth115Status, completeAuth115, Auth115QRCodeData } from '@/services/film-fusion/auth115';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons';
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Modal,
+  message,
+  Progress,
+  QRCode,
+  Space,
+  Spin,
+  Steps,
+  Typography,
+} from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Auth115QRCodeData,
+  checkAuth115Status,
+  completeAuth115,
+  getAuth115QRCode,
+} from '@/services/film-fusion/auth115';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -13,10 +35,10 @@ interface Storage115ConfigProps {
 
 // 授权状态枚举
 enum AuthStatus {
-  WAITING_SCAN = 0,    // 等待扫码
-  SCAN_SUCCESS = 1,    // 扫码成功，等待确认
-  LOGIN_SUCCESS = 2,   // 确认登录成功
-  CANCELLED = -2,      // 已取消登录
+  WAITING_SCAN = 0, // 等待扫码
+  SCAN_SUCCESS = 1, // 扫码成功，等待确认
+  LOGIN_SUCCESS = 2, // 确认登录成功
+  CANCELLED = -2, // 已取消登录
 }
 
 const Storage115Config: React.FC<Storage115ConfigProps> = ({
@@ -28,7 +50,9 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
   const [current, setCurrent] = useState(0);
   const [qrCodeData, setQrCodeData] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.WAITING_SCAN);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(
+    AuthStatus.WAITING_SCAN,
+  );
   const [countdown, setCountdown] = useState(300); // 5分钟倒计时
   const [qrLoading, setQrLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
@@ -134,7 +158,7 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
   const startCountdown = () => {
     setCountdown(300);
     countdownTimer.current = setInterval(() => {
-      setCountdown(prev => {
+      setCountdown((prev) => {
         if (prev <= 1) {
           stopTimers();
           messageApi.error('二维码已过期，请重新获取');
@@ -162,31 +186,31 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
         return {
           icon: <LoadingOutlined style={{ color: '#1890ff' }} />,
           text: '等待扫码...',
-          color: '#1890ff'
+          color: '#1890ff',
         };
       case AuthStatus.SCAN_SUCCESS:
         return {
           icon: <LoadingOutlined style={{ color: '#faad14' }} />,
           text: '扫码成功，请在手机上确认登录',
-          color: '#faad14'
+          color: '#faad14',
         };
       case AuthStatus.LOGIN_SUCCESS:
         return {
           icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
           text: '登录成功！',
-          color: '#52c41a'
+          color: '#52c41a',
         };
       case AuthStatus.CANCELLED:
         return {
           icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
           text: '用户已取消登录',
-          color: '#ff4d4f'
+          color: '#ff4d4f',
         };
       default:
         return {
           icon: <LoadingOutlined style={{ color: '#1890ff' }} />,
           text: '未知状态',
-          color: '#1890ff'
+          color: '#1890ff',
         };
     }
   };
@@ -265,9 +289,12 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
           <div style={{ marginTop: 16 }}>
             <Title level={5}>如何获取应用ID？</Title>
             <Paragraph type="secondary">
-              1. 访问 115 开放平台 (https://open.115.com)<br/>
-              2. 登录您的115账号<br/>
-              3. 创建应用并获取应用ID (Client ID)<br/>
+              1. 访问 115 开放平台 (https://open.115.com)
+              <br />
+              2. 登录您的115账号
+              <br />
+              3. 创建应用并获取应用ID (Client ID)
+              <br />
               4. 将应用ID填入上方输入框
             </Paragraph>
           </div>
@@ -294,7 +321,7 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
           {/* 状态显示 */}
           <div style={{ margin: '20px 0' }}>
             <Alert
-              message={
+              title={
                 <Space>
                   {statusInfo.icon}
                   <span style={{ color: statusInfo.color }}>
@@ -302,8 +329,13 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
                   </span>
                 </Space>
               }
-              type={authStatus === AuthStatus.LOGIN_SUCCESS ? 'success' :
-                    authStatus === AuthStatus.CANCELLED ? 'error' : 'info'}
+              type={
+                authStatus === AuthStatus.LOGIN_SUCCESS
+                  ? 'success'
+                  : authStatus === AuthStatus.CANCELLED
+                    ? 'error'
+                    : 'info'
+              }
               showIcon={false}
             />
           </div>
@@ -342,13 +374,12 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
           </div>
 
           <Alert
-            message="115网盘授权成功"
+            title="115网盘授权成功"
             description="系统已获取到访问令牌，即将为您保存配置并添加到云存储列表中。"
             type="success"
             showIcon
             style={{ marginBottom: 24, textAlign: 'left' }}
           />
-
         </div>
       ),
     },
@@ -369,19 +400,12 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
               <Button onClick={() => setCurrent(current - 1)}>上一步</Button>
             )}
             {current === 0 && (
-              <Button
-                type="primary"
-                onClick={handleNext}
-                loading={qrLoading}
-              >
+              <Button type="primary" onClick={handleNext} loading={qrLoading}>
                 获取授权二维码
               </Button>
             )}
             {current === 1 && authStatus === AuthStatus.LOGIN_SUCCESS && (
-              <Button
-                type="primary"
-                onClick={() => setCurrent(2)}
-              >
+              <Button type="primary" onClick={() => setCurrent(2)}>
                 下一步
               </Button>
             )}
@@ -397,7 +421,7 @@ const Storage115Config: React.FC<Storage115ConfigProps> = ({
           </Space>
         }
         destroyOnHidden
-        maskClosable={false}
+        mask={{ closable: false }}
       >
         <Steps
           current={current}

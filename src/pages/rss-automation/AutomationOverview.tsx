@@ -110,6 +110,8 @@ const AutomationOverview = ({
             const latestStatus = latestRun
               ? runStatus[latestRun.status]
               : undefined;
+            const sourceError =
+              latestRun?.status === 'succeeded' ? '' : source?.last_error;
             return (
               <Card
                 actions={[
@@ -199,10 +201,8 @@ const AutomationOverview = ({
                     )}
                   </span>
                 </div>
-                {source?.last_error && (
-                  <div className={styles.automationError}>
-                    {source.last_error}
-                  </div>
+                {sourceError && (
+                  <div className={styles.automationError}>{sourceError}</div>
                 )}
                 <div className={styles.automationCardFooter}>
                   <Text type="secondary">

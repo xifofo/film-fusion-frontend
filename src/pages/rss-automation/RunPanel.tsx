@@ -179,7 +179,7 @@ const RunPanel = ({ workflowId, workflowName }: RunPanelProps) => {
     {
       title: '流程',
       render: (_, run) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text strong>{run.workflow_name}</Text>
           <Text type="secondary">版本 v{run.workflow_version}</Text>
         </Space>
@@ -249,7 +249,7 @@ const RunPanel = ({ workflowId, workflowName }: RunPanelProps) => {
     {
       title: '节点',
       render: (_, node) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text strong>{node.node_name || node.node_id}</Text>
           <Text type="secondary">
             {NODE_LABELS[node.node_type] || node.node_type}
@@ -393,12 +393,12 @@ const RunPanel = ({ workflowId, workflowName }: RunPanelProps) => {
             ? `运行 #${detail.run.id} · ${detail.run.workflow_name}`
             : '运行详情'
         }
-        width="min(1180px, 92vw)"
+        size="min(1180px, 92vw)"
       >
         {detail && (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             {detail.run.error_message && (
-              <Alert message={detail.run.error_message} showIcon type="error" />
+              <Alert title={detail.run.error_message} showIcon type="error" />
             )}
             <Descriptions bordered column={3} size="small">
               <Descriptions.Item label="状态">

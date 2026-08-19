@@ -12,9 +12,11 @@ import Loading from '@/loading';
 import RequireAuth from '@/router/RequireAuth';
 
 const Login = lazy(() => import('@/pages/user/login'));
+const UserProfile = lazy(() => import('@/pages/account/profile'));
 const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
 const CloudPaths = lazy(() => import('@/pages/cloud-paths'));
 const Directories = lazy(() => import('@/pages/directories'));
+const MediaRecognition = lazy(() => import('@/pages/media-recognition'));
 const DownloadQueue = lazy(() => import('@/pages/download-queue'));
 const Downloaders = lazy(() => import('@/pages/downloaders'));
 const Organize = lazy(() => import('@/pages/directories/Organize'));
@@ -35,10 +37,8 @@ const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
 const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
-const RSSGenerator = lazy(() => import('@/pages/rss-generator'));
 const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
-const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
 const HDHiveCallback = lazy(() => import('@/pages/hdhive-callback'));
 const NotFound = lazy(() => import('@/pages/404'));
@@ -136,12 +136,20 @@ const routes: RouteObject[] = [
         element: <CloudStorage />,
       },
       {
+        path: 'account/profile',
+        element: <UserProfile />,
+      },
+      {
         path: 'cloud-paths',
         element: <CloudPaths />,
       },
       {
         path: 'directories',
         element: <Directories />,
+      },
+      {
+        path: 'media-recognition',
+        element: <MediaRecognition />,
       },
       {
         path: 'download-queue',
@@ -169,10 +177,14 @@ const routes: RouteObject[] = [
       },
       {
         path: 'emby',
-        element: <Navigate replace to="/emby/cover" />,
+        element: <Navigate replace to="/emby/library-tools" />,
       },
       {
         path: 'emby/cover',
+        element: <Navigate replace to="/emby/library-tools" />,
+      },
+      {
+        path: 'emby/library-tools',
         element: <EmbyCover />,
       },
       {
@@ -208,24 +220,12 @@ const routes: RouteObject[] = [
         element: <OrganizeLogs />,
       },
       {
-        path: 'rss-generator',
-        element: <RSSGenerator />,
-      },
-      {
-        path: 'rss-monitor',
-        element: <Navigate replace to="/rss-automation" />,
-      },
-      {
         path: 'rss-automation',
         element: <RSSAutomation />,
       },
       {
         path: 'server-logs',
         element: <ServerLogs />,
-      },
-      {
-        path: 'system-info',
-        element: <SystemInfo />,
       },
       {
         path: 'system-settings',

@@ -130,7 +130,7 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
         okText="开始重生成"
         confirmLoading={submitting}
         width={640}
-        destroyOnClose
+        destroyOnHidden
       >
         <Spin spinning={resolving}>
           {!matched && (
@@ -138,7 +138,7 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
               type="warning"
               showIcon
               style={{ marginBottom: 12 }}
-              message="未自动匹配到云路径映射"
+              title="未自动匹配到云路径映射"
               description="未能从 Emby 路径反推出对应的云路径映射，请手动选择映射并填写/选择云端目录。"
             />
           )}
@@ -186,8 +186,7 @@ const RegenerateStrmModal: React.FC<RegenerateStrmModalProps> = ({
               <Select
                 placeholder="请选择云路径映射"
                 options={optionList}
-                showSearch
-                optionFilterProp="label"
+                showSearch={{ optionFilterProp: 'label' }}
                 notFoundContent={
                   resolving ? <Spin size="small" /> : '暂无可用云路径映射'
                 }

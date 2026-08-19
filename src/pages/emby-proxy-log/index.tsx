@@ -8,11 +8,10 @@ import {
 import { PageContainer } from '@ant-design/pro-components';
 import {
   Alert,
+  App,
   Button,
   Card,
   Col,
-  Modal,
-  message,
   Popover,
   Row,
   Space,
@@ -117,6 +116,7 @@ const LongText: React.FC<{ value: string; maxWidth?: number }> = ({
 };
 
 const EmbyProxyLogPage: React.FC = () => {
+  const { message: messageApi, modal } = App.useApp();
   const [data, setData] = useState<API.EmbyProxy302LogList | null>(null);
   const [balanceStatus, setBalanceStatus] =
     useState<API.EmbyProxyBalanceStatus | null>(null);
@@ -174,17 +174,17 @@ const EmbyProxyLogPage: React.FC = () => {
   }, [autoRefresh, fetchData]);
 
   const handleClear = () => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认清空 302 日志缓冲？',
       content: '该操作仅清空内存缓冲，不影响 Emby 代理运行。',
       okType: 'danger',
       onOk: async () => {
         try {
           await clearEmbyProxy302Logs();
-          message.success('已清空');
+          messageApi.success('已清空');
           fetchData();
         } catch (e: any) {
-          message.error(`清空失败: ${e?.message || e}`);
+          messageApi.error(`清空失败: ${e?.message || e}`);
         }
       },
     });
@@ -193,15 +193,15 @@ const EmbyProxyLogPage: React.FC = () => {
   const handleRetry = async (record: API.BalanceTransferQueueItem) => {
     try {
       await retryMatch302Assignment(record.match302_id, record.id);
-      message.success('已提交重试');
+      messageApi.success('已提交重试');
       fetchData();
     } catch (e: any) {
-      message.error(`重试失败: ${e?.message || e}`);
+      messageApi.error(`重试失败: ${e?.message || e}`);
     }
   };
 
   const handleUnblock = (record: API.EmbyLoginSecurityBlock) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认解除这条登录封禁？',
       content:
         record.scope === 'ip'
@@ -210,10 +210,10 @@ const EmbyProxyLogPage: React.FC = () => {
       onOk: async () => {
         try {
           await unblockEmbyLogin(record);
-          message.success('已解除封禁');
+          messageApi.success('已解除封禁');
           await fetchData();
         } catch (e: any) {
-          message.error(`解除失败: ${e?.message || e}`);
+          messageApi.error(`解除失败: ${e?.message || e}`);
         }
       },
     });
@@ -327,7 +327,7 @@ const EmbyProxyLogPage: React.FC = () => {
       title: '分配 / 实际账号',
       width: 260,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text>{record.assigned_storage_name || '-'}</Text>
           <Text type="secondary">{record.actual_storage_name || '-'}</Text>
         </Space>
@@ -436,7 +436,7 @@ const EmbyProxyLogPage: React.FC = () => {
       title: '源 / 目标账号',
       width: 240,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text>
             {record.source_storage_name || `ID: ${record.source_storage_id}`}
           </Text>
@@ -532,7 +532,7 @@ const EmbyProxyLogPage: React.FC = () => {
       dataIndex: 'actual_storage_name',
       width: 160,
       render: (name: string, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text>{name || '-'}</Text>
           {accountTypeTag(record.account_type)}
         </Space>
@@ -560,7 +560,7 @@ const EmbyProxyLogPage: React.FC = () => {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message={
+        title={
           <Space size="middle" wrap>
             <span>
               当前条数：

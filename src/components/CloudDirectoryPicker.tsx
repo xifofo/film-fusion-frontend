@@ -292,7 +292,7 @@ const CloudDirectoryPicker = ({
           <Empty description="请先选择 115 账号" />
         ) : (
           <Spin spinning={loading}>
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={8} style={{ width: '100%' }}>
               <Input
                 allowClear
                 onChange={(event) => setSearchValue(event.target.value)}
@@ -306,7 +306,7 @@ const CloudDirectoryPicker = ({
               {normalizedSearch ? (
                 searchResults.length > 0 ? (
                   <Space
-                    direction="vertical"
+                    orientation="vertical"
                     size={2}
                     style={{ width: '100%', maxHeight: 410, overflow: 'auto' }}
                   >

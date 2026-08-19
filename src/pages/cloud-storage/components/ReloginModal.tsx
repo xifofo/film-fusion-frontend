@@ -1,8 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Form, Input, QRCode, Steps, Button, Typography, Space, message, Spin, Alert, Progress, Radio, Divider } from 'antd';
-import { CheckCircleOutlined, LoadingOutlined, CloseCircleOutlined, QrcodeOutlined, KeyOutlined } from '@ant-design/icons';
-import { getAuth115QRCode, checkAuth115Status, completeAuth115 } from '@/services/film-fusion/auth115';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  KeyOutlined,
+  LoadingOutlined,
+  QrcodeOutlined,
+} from '@ant-design/icons';
+import {
+  Alert,
+  Button,
+  Divider,
+  Form,
+  Input,
+  Modal,
+  message,
+  Progress,
+  QRCode,
+  Radio,
+  Space,
+  Spin,
+  Steps,
+  Typography,
+} from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
 import { updateCloudStorage } from '@/services/film-fusion';
+import {
+  checkAuth115Status,
+  completeAuth115,
+  getAuth115QRCode,
+} from '@/services/film-fusion/auth115';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -15,16 +40,16 @@ interface ReloginModalProps {
 
 // 授权状态枚举
 enum AuthStatus {
-  WAITING_SCAN = 0,    // 等待扫码
-  SCAN_SUCCESS = 1,    // 扫码成功，等待确认
-  LOGIN_SUCCESS = 2,   // 确认登录成功
-  CANCELLED = -2,      // 已取消登录
+  WAITING_SCAN = 0, // 等待扫码
+  SCAN_SUCCESS = 1, // 扫码成功，等待确认
+  LOGIN_SUCCESS = 2, // 确认登录成功
+  CANCELLED = -2, // 已取消登录
 }
 
 // 重新登录方式
 enum ReloginType {
-  QR_CODE = 'qr_code',  // 扫码登录
-  APP_SECRET = 'app_secret'  // 使用AppID和AppSecret
+  QR_CODE = 'qr_code', // 扫码登录
+  APP_SECRET = 'app_secret', // 使用AppID和AppSecret
 }
 
 const ReloginModal: React.FC<ReloginModalProps> = ({
@@ -34,11 +59,15 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
   cloudStorage,
 }) => {
   const [form] = Form.useForm();
-  const [reloginType, setReloginType] = useState<ReloginType>(ReloginType.QR_CODE);
+  const [reloginType, setReloginType] = useState<ReloginType>(
+    ReloginType.QR_CODE,
+  );
   const [current, setCurrent] = useState(0);
   const [qrCodeData, setQrCodeData] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
-  const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.WAITING_SCAN);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(
+    AuthStatus.WAITING_SCAN,
+  );
   const [countdown, setCountdown] = useState(300); // 5分钟倒计时
   const [qrLoading, setQrLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -73,7 +102,7 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
     } finally {
       setQrLoading(false);
     }
-  };  // 完成扫码授权
+  }; // 完成扫码授权
   const completeQRAuth = async () => {
     setUpdating(true);
     try {
@@ -86,7 +115,7 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
       // 调用完成授权API，传递存储ID进行更新而不是创建新记录
       await completeAuth115({
         session_id: sessionId,
-        storage_id: cloudStorage.id  // 传递存储ID，后端会根据此ID更新现有记录
+        storage_id: cloudStorage.id, // 传递存储ID，后端会根据此ID更新现有记录
       });
 
       messageApi.success('重新登录成功，令牌已更新');
@@ -186,7 +215,7 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
   const startCountdown = () => {
     setCountdown(300);
     countdownTimer.current = setInterval(() => {
-      setCountdown(prev => {
+      setCountdown((prev) => {
         if (prev <= 1) {
           stopTimers();
           messageApi.error('二维码已过期，请重新获取');
@@ -319,9 +348,9 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
     if (current === 1) {
       return (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <Alert
-              message={getStatusText()}
+              title={getStatusText()}
               type={authStatus === AuthStatus.SCAN_SUCCESS ? 'warning' : 'info'}
               showIcon
             />
@@ -347,12 +376,8 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
             )}
 
             <Space>
-              <Button onClick={() => setCurrent(0)}>
-                重新获取
-              </Button>
-              <Button onClick={handleCancel}>
-                取消
-              </Button>
+              <Button onClick={() => setCurrent(0)}>重新获取</Button>
+              <Button onClick={handleCancel}>取消</Button>
             </Space>
           </Space>
         </div>
@@ -362,12 +387,10 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
     if (current === 2) {
       return (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <Space direction="vertical" size="large">
+          <Space orientation="vertical" size="large">
             <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a' }} />
             <Title level={4}>扫码授权成功</Title>
-            <Paragraph>
-              已获取到授权令牌，点击下方按钮完成配置更新
-            </Paragraph>
+            <Paragraph>已获取到授权令牌，点击下方按钮完成配置更新</Paragraph>
             <Space>
               <Button
                 type="primary"
@@ -376,9 +399,7 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
               >
                 完成配置
               </Button>
-              <Button onClick={handleCancel}>
-                取消
-              </Button>
+              <Button onClick={handleCancel}>取消</Button>
             </Space>
           </Space>
         </div>
@@ -411,20 +432,14 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
           <Input.Password placeholder="请输入115网盘应用密钥" />
         </Form.Item>
 
-        <Form.Item
-          label="访问令牌"
-          name="access_token"
-        >
+        <Form.Item label="访问令牌" name="access_token">
           <Input.TextArea
             placeholder="可选：如果已有访问令牌可直接输入"
             rows={3}
           />
         </Form.Item>
 
-        <Form.Item
-          label="刷新令牌"
-          name="refresh_token"
-        >
+        <Form.Item label="刷新令牌" name="refresh_token">
           <Input.TextArea
             placeholder="可选：如果已有刷新令牌可直接输入"
             rows={3}
@@ -440,9 +455,7 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
             >
               更新配置
             </Button>
-            <Button onClick={handleCancel}>
-              取消
-            </Button>
+            <Button onClick={handleCancel}>取消</Button>
           </Space>
         </Form.Item>
       </Form>
@@ -458,8 +471,8 @@ const ReloginModal: React.FC<ReloginModalProps> = ({
         onCancel={handleCancel}
         footer={null}
         width={600}
-        maskClosable={false}
-        destroyOnClose
+        mask={{ closable: false }}
+        destroyOnHidden
       >
         <div style={{ padding: '16px 0' }}>
           <div style={{ marginBottom: 24 }}>

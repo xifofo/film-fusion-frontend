@@ -133,6 +133,27 @@ describe('RSS workflow transfer', () => {
     ).toThrow('指向不存在的节点');
   });
 
+  it('imports workflows containing FilmFusion local recognition nodes', () => {
+    const withLocalRecognition = structuredClone(definition);
+    withLocalRecognition.nodes.splice(-1, 0, {
+      id: 'local-recognition',
+      type: 'filmfusion_recognize',
+      position: { x: 420, y: 80 },
+      config: {
+        recognition_mode: 'title',
+        input: '$item.title',
+        lookup_tmdb: true,
+      },
+    });
+
+    const parsed = parseWorkflowTransferText(
+      JSON.stringify(withLocalRecognition),
+    );
+    expect(
+      parsed.definition.nodes.find((node) => node.id === 'local-recognition'),
+    ).toMatchObject({ type: 'filmfusion_recognize' });
+  });
+
   it('removes local media directory bindings from shared workflows', () => {
     const withOrganize = structuredClone(definition);
     withOrganize.nodes.push(

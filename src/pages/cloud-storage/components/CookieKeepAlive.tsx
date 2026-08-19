@@ -1,9 +1,9 @@
 import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import {
   Alert,
+  App,
   Button,
   Modal,
-  message,
   Popover,
   Select,
   Space,
@@ -44,7 +44,7 @@ const CookieKeepAlive: React.FC<CookieKeepAliveProps> = ({
   }
 
   const detail = (
-    <Space direction="vertical" size={4} style={{ maxWidth: 300 }}>
+    <Space orientation="vertical" size={4} style={{ maxWidth: 300 }}>
       <Text>
         自动续期端：<Text strong>{status.app || '—'}</Text>
       </Text>
@@ -83,6 +83,7 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
   status,
   onChanged,
 }) => {
+  const { message: messageApi } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<
@@ -116,17 +117,17 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
         app: selectedApp,
       });
       if (resp.code === 0) {
-        message.success(
+        messageApi.success(
           selectedApp === WEB115_USE_DEFAULT_APP
             ? 'Cookie 续期成功，后续自动续期将跟随系统默认'
             : `Cookie 续期成功，自动续期端已设为 ${selectedApp}`,
         );
         setOpen(false);
       } else {
-        message.error(resp.message || 'Cookie 续期失败');
+        messageApi.error(resp.message || 'Cookie 续期失败');
       }
     } catch (e: any) {
-      message.error(`Cookie 续期失败：${e?.message || '请重试'}`);
+      messageApi.error(`Cookie 续期失败：${e?.message || '请重试'}`);
     } finally {
       setLoading(false);
       onChanged?.();
@@ -162,7 +163,7 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
         okText="续期并保存"
         cancelText="取消"
         confirmLoading={loading}
-        maskClosable={!loading}
+        mask={{ closable: !loading }}
         keyboard={!loading}
         destroyOnHidden
         onOk={handleRefresh}
@@ -170,7 +171,7 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
           if (!loading) setOpen(false);
         }}
       >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <div>
             <Text strong>自动续期设备端</Text>
             <Select
@@ -190,7 +191,7 @@ export const CookieRefreshAction: React.FC<CookieKeepAliveProps> = ({
           <Alert
             type="info"
             showIcon
-            message="该选择同时用于本次和后续自动续期"
+            title="该选择同时用于本次和后续自动续期"
             description="选择“跟随系统默认”时使用系统设置中的默认设备端；选择具体设备端则保存为此存储的独立设置。确认后系统会立即换发一份新 Cookie。"
           />
         </Space>

@@ -3,10 +3,18 @@ declare namespace API {
   type User = {
     id: number;
     username: string;
+    nickname?: string;
     email?: string;
     avatar?: string;
     createTime?: string;
     updateTime?: string;
+  };
+
+  type UserAvatarUploadResult = {
+    user: User;
+    width: number;
+    height: number;
+    size: number;
   };
 
   /** Ant Design Pro 默认规则 mock 数据 */
@@ -240,6 +248,29 @@ declare namespace API {
   type EmbyVersionCheckStatus = {
     running: boolean;
     job: EmbyVersionCheckJob | null;
+  };
+
+  type EmbyVersionCheckSetting = {
+    id: number;
+    schedule_enabled: boolean;
+    cron: string;
+    cloud_path_ids: number[];
+    media_type: EmbyVersionCheckMediaType;
+    last_scan_at?: string | null;
+    last_status?: 'success' | 'failed' | string;
+    last_error?: string;
+    last_total_files: number;
+    last_duplicate_movies: number;
+    last_duplicate_episodes: number;
+    created_at?: string;
+    updated_at?: string;
+  };
+
+  type EmbyVersionCheckSettingParams = {
+    schedule_enabled?: boolean;
+    cron?: string;
+    cloud_path_ids?: number[];
+    media_type?: EmbyVersionCheckMediaType;
   };
 
   type EmbyVersionScannedPath = {
@@ -584,6 +615,7 @@ declare namespace API {
     }>;
     dry_run?: boolean;
     media_type?: 'movie' | 'tv';
+    recognition_source?: 'moviepilot' | 'local';
     category?: string;
     best_version_enabled?: boolean;
     delete_source_folder?: boolean;
@@ -668,6 +700,7 @@ declare namespace API {
     folder_id: string;
     folder_ids?: string[];
     media_type?: 'movie' | 'tv';
+    recognition_source: 'moviepilot' | 'local';
     category?: string;
     best_version_enabled?: boolean;
     dry_run: boolean;
@@ -722,6 +755,7 @@ declare namespace API {
     depth: number;
     max_depth: number;
     media_type?: 'movie' | 'tv';
+    recognition_source: 'moviepilot' | 'local';
     category?: string;
     tmdb_refs?: OrganizePreviewTmdbRef[];
     multi_episode_count?: number;
@@ -756,6 +790,7 @@ declare namespace API {
     recursive_depth?: number;
     task_limit?: number;
     media_type?: 'movie' | 'tv';
+    recognition_source?: 'moviepilot' | 'local';
     category?: string;
     best_version_enabled?: boolean;
     filename_regex_enabled?: boolean;
@@ -1542,12 +1577,6 @@ declare namespace API {
     rss_automation: {
       user_agent: string;
     };
-    rss_generator: {
-      worker_url: string;
-      worker_token?: string;
-      public_base_url: string;
-      request_timeout_seconds: number;
-    };
     site: {
       login_title: string;
       login_subtitle: string;
@@ -2027,120 +2056,4 @@ declare namespace API {
     keyword?: string;
   };
 
-  type RSSMonitorSettings = {
-    id: number;
-    enabled: boolean;
-    feed_name: string;
-    feed_url: string;
-    interval_minutes: number;
-    initialized: boolean;
-    last_checked_at?: string;
-    last_success_at?: string;
-    last_error?: string;
-    created_at: string;
-    updated_at: string;
-  };
-
-  type RSSMonitorSettingsInput = Pick<
-    RSSMonitorSettings,
-    'enabled' | 'feed_name' | 'feed_url' | 'interval_minutes'
-  >;
-
-  type RSSNotificationRule = {
-    id: number;
-    name: string;
-    enabled: boolean;
-    use_mp2_recognition: boolean;
-    priority: number;
-    title_pattern: string;
-    category_pattern: string;
-    message_template: string;
-    created_at: string;
-    updated_at: string;
-  };
-
-  type RSSNotificationRuleInput = Pick<
-    RSSNotificationRule,
-    | 'name'
-    | 'enabled'
-    | 'use_mp2_recognition'
-    | 'priority'
-    | 'title_pattern'
-    | 'category_pattern'
-    | 'message_template'
-  >;
-
-  type RSSNotificationStatus =
-    | 'baseline'
-    | 'ignored'
-    | 'sent'
-    | 'partial'
-    | 'failed'
-    | 'skipped';
-
-  type RSSMonitorItem = {
-    id: number;
-    source_id: number;
-    source_name?: string;
-    guid?: string;
-    title: string;
-    link?: string;
-    category?: string;
-    published_at?: string;
-    size_bytes?: number;
-    media_title?: string;
-    media_year?: string;
-    media_type?: string;
-    media_category?: string;
-    season_episode?: string;
-    rating?: number;
-    quality?: string;
-    tmdb_id?: string;
-    poster_url?: string;
-    recognition_error?: string;
-    rule_id?: number;
-    rule_name?: string;
-    notification_status: RSSNotificationStatus;
-    notification_error?: string;
-    notified_at?: string;
-    discovered_at: string;
-    created_at: string;
-  };
-
-  type RSSMonitorDashboard = {
-    settings?: RSSMonitorSettings;
-    sources: RSSMonitorSettings[];
-    rules: RSSNotificationRule[];
-    recent_items: RSSMonitorItem[];
-    recent_matched_items: RSSMonitorItem[];
-    retention_limit: number;
-    running: boolean;
-    notification_ready: boolean;
-    /** 旧接口兼容字段。 */
-    telegram_ready: boolean;
-    total_seen: number;
-    total_notified: number;
-  };
-
-  type RSSRefreshResult = {
-    baseline: boolean;
-    fetched: number;
-    new_items: number;
-    matched: number;
-    notified: number;
-    failed: number;
-    not_modified: boolean;
-    completed_at: string;
-    source_feed_name?: string;
-    source_id?: number;
-    source_name?: string;
-    error?: string;
-    failed_sources?: number;
-    source_results?: RSSRefreshResult[];
-  };
-
-  type RSSRuleTestResult = {
-    matched: boolean;
-    preview?: string;
-  };
 }

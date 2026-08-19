@@ -97,7 +97,7 @@ const ManualRunModal = ({
     {
       title: 'RSS 条目',
       render: (_, item, index) => (
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Space size={6}>
             {index === 0 && <Tag color="blue">最新匹配</Tag>}
             {item.detail_url ? (
@@ -155,7 +155,7 @@ const ManualRunModal = ({
       <Modal
         cancelText="取消"
         destroyOnHidden
-        maskClosable={!submitting}
+        mask={{ closable: !submitting }}
         okButtonProps={{ disabled: selectedKeys.length === 0 }}
         okText={
           selectedKeys.length > 0
@@ -169,16 +169,16 @@ const ManualRunModal = ({
         width="min(1120px, 94vw)"
         confirmLoading={submitting}
       >
-        <Space direction="vertical" size={14} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={14} style={{ width: '100%' }}>
           <Alert
             description="这里只展示按当前流程预演后能够到达动作节点、且该流程从未运行过的已有条目。勾选不会执行，点击确认后才会加入真实运行队列。"
-            message="默认不选择任何条目，请确认标题和下载地址后再运行。"
+            title="默认不选择任何条目，请确认标题和下载地址后再运行。"
             showIcon
             type="info"
           />
           {hasMore && (
             <Alert
-              message={`已检查最近 ${scannedEntries} 条记录，当前只展示前 100 个匹配结果。`}
+              title={`已检查最近 ${scannedEntries} 条记录，当前只展示前 100 个匹配结果。`}
               showIcon
               type="warning"
             />

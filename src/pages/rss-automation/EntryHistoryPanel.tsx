@@ -164,7 +164,7 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
                   width={48}
                 />
               )}
-              <Space direction="vertical" size={2}>
+              <Space orientation="vertical" size={2}>
                 {item.entry.detail_url ? (
                   <Link
                     href={item.entry.detail_url}
@@ -197,7 +197,7 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
         dataIndex: 'source_name',
         width: 150,
         render: (value, item) => (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             <Text>{value || `源 #${item.entry.source_id}`}</Text>
             {item.legacy && <Tag>旧版迁移</Tag>}
           </Space>

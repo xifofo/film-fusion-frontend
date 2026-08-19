@@ -289,7 +289,7 @@ const EmbyStatsPage: React.FC = () => {
           <Alert
             className={styles.notice}
             description={(error as Error)?.message || '请检查 Emby 服务连通性'}
-            message="媒体库数据读取失败"
+            title="媒体库数据读取失败"
             showIcon
             type="error"
           />
@@ -300,7 +300,7 @@ const EmbyStatsPage: React.FC = () => {
             className={styles.notice}
             closable
             description={stats.partial_errors.join('；')}
-            message={`有 ${stats.partial_errors.length} 个统计请求未完成，其余数据仍可正常查看`}
+            title={`有 ${stats.partial_errors.length} 个统计请求未完成，其余数据仍可正常查看`}
             showIcon
             type="warning"
           />

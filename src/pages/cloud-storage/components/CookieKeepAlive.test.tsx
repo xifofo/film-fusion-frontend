@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { App } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { refreshWeb115Cookie } from '@/services/film-fusion';
 import { CookieRefreshAction } from './CookieKeepAlive';
@@ -47,11 +48,13 @@ describe('CookieRefreshAction', () => {
   it('submits the selected app for this and future automatic refreshes', async () => {
     const onChanged = vi.fn();
     render(
-      <CookieRefreshAction
-        record={record}
-        status={status}
-        onChanged={onChanged}
-      />,
+      <App>
+        <CookieRefreshAction
+          record={record}
+          status={status}
+          onChanged={onChanged}
+        />
+      </App>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: '立即续期' }));
@@ -72,10 +75,12 @@ describe('CookieRefreshAction', () => {
 
   it('can keep a storage on the global automatic refresh default', async () => {
     render(
-      <CookieRefreshAction
-        record={record}
-        status={{ ...status, app: 'tv', use_default: true }}
-      />,
+      <App>
+        <CookieRefreshAction
+          record={record}
+          status={{ ...status, app: 'tv', use_default: true }}
+        />
+      </App>,
     );
 
     fireEvent.click(screen.getByRole('button', { name: '立即续期' }));

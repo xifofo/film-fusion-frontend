@@ -257,7 +257,7 @@ const CloudPathList: React.FC = () => {
       title: 'ID',
       dataIndex: 'id',
       width: 80,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '云存储',
@@ -283,7 +283,7 @@ const CloudPathList: React.FC = () => {
           </a>
         );
       },
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '云盘源路径',
@@ -307,7 +307,7 @@ const CloudPathList: React.FC = () => {
       ellipsis: true,
       copyable: true,
       render: (text) => text || '-',
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '链接类型',
@@ -353,14 +353,14 @@ const CloudPathList: React.FC = () => {
       dataIndex: 'filter_rules',
       width: 150,
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => formatFilterRules(record.filter_rules),
     },
     {
       title: 'URI编码',
       dataIndex: 'content_encode_uri',
       width: 100,
-      hideInSearch: true,
+      search: false,
       render: (_, record) => {
         return record.content_encode_uri ? (
           <Tag color="green">开启</Tag>
@@ -377,14 +377,14 @@ const CloudPathList: React.FC = () => {
       title: '用户ID',
       dataIndex: 'user_id',
       width: 100,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       width: 160,
       valueType: 'dateTime',
-      hideInSearch: true,
+      search: false,
       sorter: true,
     },
     {
@@ -392,7 +392,7 @@ const CloudPathList: React.FC = () => {
       dataIndex: 'updated_at',
       width: 160,
       valueType: 'dateTime',
-      hideInSearch: true,
+      search: false,
       sorter: true,
     },
     {
@@ -496,7 +496,7 @@ const CloudPathList: React.FC = () => {
       />
 
       <Drawer
-        width={600}
+        size={600}
         open={showDetail}
         onClose={() => {
           setCurrentRow(undefined);
@@ -526,7 +526,7 @@ const CloudPathList: React.FC = () => {
         onOk={handleReplaceOk}
         confirmLoading={replaceLoading}
         onCancel={handleReplaceCancel}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={replaceForm} layout="vertical" preserve={false}>
           <Form.Item
@@ -553,7 +553,7 @@ const CloudPathList: React.FC = () => {
         onOk={handleGenSubmit}
         confirmLoading={genLoading}
         onCancel={handleGenCancel}
-        destroyOnClose
+        destroyOnHidden
         width={800}
       >
         <Form form={genForm} layout="vertical" preserve={false}>
@@ -580,6 +580,11 @@ const CloudPathList: React.FC = () => {
               onRemove={() => {
                 setWorldFile(undefined);
                 genForm.setFieldsValue({ world: undefined });
+              }}
+              onChange={({ fileList }) => {
+                const nextFile = fileList.at(-1)?.originFileObj;
+                setWorldFile(nextFile as File | undefined);
+                genForm.setFieldsValue({ world: nextFile });
               }}
               fileList={
                 worldFile
@@ -615,13 +620,13 @@ const CloudPathList: React.FC = () => {
               placeholder="请选择要映射的云存储"
               options={storageOptions}
               loading={cloudStorageLoading}
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '')
-                  .toString()
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
+              showSearch={{
+                filterOption: (input, option) =>
+                  (option?.label ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .includes(input.toLowerCase()),
+              }}
             />
           </Form.Item>
 

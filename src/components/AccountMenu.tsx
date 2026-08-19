@@ -1,4 +1,4 @@
-import { ChevronUp, LoaderCircle, LogOut } from 'lucide-react';
+import { ChevronUp, LoaderCircle, LogOut, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -29,8 +29,8 @@ export function AccountMenu({ collapsed = false }: AccountMenuProps) {
     return null;
   }
 
-  const initial =
-    Array.from(currentUser.username.trim())[0]?.toUpperCase() || 'F';
+  const displayName = currentUser.nickname?.trim() || currentUser.username;
+  const initial = Array.from(displayName.trim())[0]?.toUpperCase() || 'F';
 
   const loginOut = async () => {
     if (loggingOut) {
@@ -62,7 +62,7 @@ export function AccountMenu({ collapsed = false }: AccountMenuProps) {
           'group flex h-11 w-full min-w-0 items-center gap-2.5 rounded-xl border-0 !bg-transparent px-2 text-left text-neutral-950 shadow-none outline-none transition-colors hover:!bg-black/[0.04] focus-visible:ring-2 focus-visible:ring-black/15 data-popup-open:!bg-black/[0.055] dark:text-white dark:hover:!bg-white/[0.07] dark:focus-visible:ring-white/25 dark:data-popup-open:!bg-white/10',
           collapsed && 'justify-center px-0',
         )}
-        title={collapsed ? currentUser.username : undefined}
+        title={collapsed ? displayName : undefined}
       >
         <Avatar
           className="size-8 rounded-[8px] border-black/10 bg-neutral-950 shadow-[0_5px_14px_rgba(0,0,0,0.14)] dark:border-white/12 dark:bg-white"
@@ -77,7 +77,7 @@ export function AccountMenu({ collapsed = false }: AccountMenuProps) {
         </Avatar>
         <span className={cn('min-w-0 flex-1', collapsed && 'sr-only')}>
           <span className="block truncate text-[13px] font-semibold tracking-[-0.01em]">
-            {currentUser.username}
+            {displayName}
           </span>
         </span>
         {!collapsed && (
@@ -113,12 +113,24 @@ export function AccountMenu({ collapsed = false }: AccountMenuProps) {
                 当前账户
               </span>
               <span className="mt-0.5 block truncate text-sm font-semibold tracking-[-0.01em] text-neutral-950 dark:text-white">
-                {currentUser.username}
+                {displayName}
               </span>
+              {displayName !== currentUser.username && (
+                <span className="mt-0.5 block truncate text-[11px] text-neutral-400 dark:text-white/40">
+                  {currentUser.username}
+                </span>
+              )}
             </span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="h-10 rounded-xl px-2.5"
+          onClick={() => navigate('/account/profile')}
+        >
+          <UserRound aria-hidden="true" />
+          个人资料
+        </DropdownMenuItem>
         <DropdownMenuItem
           className="h-10 rounded-xl px-2.5"
           disabled={loggingOut}

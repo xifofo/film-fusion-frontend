@@ -4,10 +4,9 @@ import { findMenuTrail } from './menu';
 
 describe('findMenuTrail', () => {
   it('finds a nested Emby page', () => {
-    expect(findMenuTrail('/emby/cover').map((item) => item.name)).toEqual([
-      'Emby',
-      '封面生成',
-    ]);
+    expect(
+      findMenuTrail('/emby/library-tools').map((item) => item.name),
+    ).toEqual(['Emby', '媒体库工具']);
   });
 
   it('groups watch history under Emby', () => {
@@ -37,27 +36,16 @@ describe('findMenuTrail', () => {
     ]);
   });
 
-  it('exposes the independent RSS generator module', () => {
-    expect(findMenuTrail('/rss-generator').map((item) => item.name)).toEqual([
-      'RSS',
-      'RSS 生成器',
-    ]);
-  });
-
   it('exposes downloader account settings', () => {
     expect(findMenuTrail('/downloaders').map((item) => item.name)).toEqual([
       '下载器设置',
     ]);
   });
 
-  it('exposes the system information page', () => {
-    expect(findMenuTrail('/system-info').map((item) => item.name)).toEqual([
-      '系统信息',
-    ]);
-  });
-
-  it('does not expose the retired RSS monitoring entry', () => {
-    expect(findMenuTrail('/rss-monitor')).toEqual([]);
+  it('exposes FilmFusion local media recognition', () => {
+    expect(
+      findMenuTrail('/media-recognition').map((item) => item.name),
+    ).toEqual(['媒体识别']);
   });
 
   it('returns an empty trail for an unknown route', () => {

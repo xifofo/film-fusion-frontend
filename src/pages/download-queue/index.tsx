@@ -116,7 +116,7 @@ const createColumns = ({
   {
     title: '保存位置',
     dataIndex: 'save_path',
-    hideInSearch: true,
+    search: false,
     ellipsis: true,
     render: (_, record) => {
       const path = splitPath(record.save_path);
@@ -145,9 +145,9 @@ const createColumns = ({
     title: '云存储',
     dataIndex: ['cloud_storage', 'storage_name'],
     width: 160,
-    hideInSearch: true,
+    search: false,
     render: (_, record) => (
-      <Space direction="vertical" size={0}>
+      <Space orientation="vertical" size={0}>
         <Typography.Text>
           {record.cloud_storage?.storage_name ||
             `存储 #${record.cloud_storage_id}`}
@@ -164,7 +164,7 @@ const createColumns = ({
     title: 'PickCode',
     dataIndex: 'pick_code',
     width: 170,
-    hideInSearch: true,
+    search: false,
     copyable: true,
     ellipsis: true,
   },
@@ -172,7 +172,7 @@ const createColumns = ({
     title: '重试',
     dataIndex: 'retry_count',
     width: 86,
-    hideInSearch: true,
+    search: false,
     align: 'center',
     render: (_, record) => (
       <Typography.Text
@@ -188,7 +188,7 @@ const createColumns = ({
     title: '最后错误',
     dataIndex: 'last_error',
     width: 240,
-    hideInSearch: true,
+    search: false,
     ellipsis: true,
     render: (_, record) =>
       record.last_error ? (
@@ -203,7 +203,7 @@ const createColumns = ({
     title: '入队时间',
     dataIndex: 'created_at',
     width: 170,
-    hideInSearch: true,
+    search: false,
     render: (_, record) =>
       dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
   },
@@ -362,7 +362,7 @@ const DownloadQueuePage: React.FC = () => {
         showIcon
         type="info"
         style={{ marginBottom: 16 }}
-        message="可重试失败任务，也可移除等待中或失败的任务；下载中的任务会在完成后自动出队，不能直接移除。"
+        title="可重试失败任务，也可移除等待中或失败的任务；下载中的任务会在完成后自动出队，不能直接移除。"
         action={<Link to="/organize-logs">查看整理日志</Link>}
       />
 
@@ -381,7 +381,7 @@ const DownloadQueuePage: React.FC = () => {
             <Statistic
               title="下载中"
               value={stats.downloading}
-              valueStyle={{ color: '#1677ff' }}
+              styles={{ content: { color: '#1677ff' } }}
               prefix={<CloudDownloadOutlined />}
             />
           </Card>
@@ -391,7 +391,7 @@ const DownloadQueuePage: React.FC = () => {
             <Statistic
               title="等待中"
               value={stats.pending}
-              valueStyle={{ color: '#d48806' }}
+              styles={{ content: { color: '#d48806' } }}
               prefix={<ClockCircleOutlined />}
             />
           </Card>
@@ -401,7 +401,7 @@ const DownloadQueuePage: React.FC = () => {
             <Statistic
               title="失败"
               value={stats.failed}
-              valueStyle={{ color: '#cf1322' }}
+              styles={{ content: { color: '#cf1322' } }}
               prefix={<ExclamationCircleOutlined />}
             />
           </Card>

@@ -141,4 +141,81 @@ describe('AutomationOverview', () => {
     expect(onManualRun).toHaveBeenCalledWith(11);
     expect(onViewLogs).toHaveBeenCalledWith(11);
   });
+
+  it('hides an earlier source error when the latest run succeeded', () => {
+    render(
+      <AutomationOverview
+        data={{
+          ...dashboard,
+          sources: dashboard.sources.map((source) => ({
+            ...source,
+            last_error: '解析 RSS XML 失败: XML syntax error',
+          })),
+          recent_runs: [
+            {
+              id: 23,
+              workflow_id: 11,
+              workflow_name: '下载新番',
+              workflow_version: 1,
+              entry_id: 19,
+              definition_json: '{}',
+              context_json: '{}',
+              status: 'succeeded',
+              created_at: '2026-08-18T00:00:00Z',
+              updated_at: '2026-08-18T00:01:00Z',
+            },
+          ],
+        }}
+        loading={false}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onManualRun={vi.fn()}
+        onToggle={vi.fn()}
+        onViewLogs={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('成功')).toBeTruthy();
+    expect(
+      screen.queryByText('解析 RSS XML 失败: XML syntax error'),
+    ).toBeNull();
+  });
+
+  it('keeps the source error when the latest run did not succeed', () => {
+    render(
+      <AutomationOverview
+        data={{
+          ...dashboard,
+          sources: dashboard.sources.map((source) => ({
+            ...source,
+            last_error: '解析 RSS XML 失败: XML syntax error',
+          })),
+          recent_runs: [
+            {
+              id: 23,
+              workflow_id: 11,
+              workflow_name: '下载新番',
+              workflow_version: 1,
+              entry_id: 19,
+              definition_json: '{}',
+              context_json: '{}',
+              status: 'failed',
+              created_at: '2026-08-18T00:00:00Z',
+              updated_at: '2026-08-18T00:01:00Z',
+            },
+          ],
+        }}
+        loading={false}
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onManualRun={vi.fn()}
+        onToggle={vi.fn()}
+        onViewLogs={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('解析 RSS XML 失败: XML syntax error'),
+    ).toBeTruthy();
+  });
 });

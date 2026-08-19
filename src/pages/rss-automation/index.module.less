@@ -255,7 +255,8 @@
   }
 
   .flowSpin,
-  .flowSpin > :global(.ant-spin-container) {
+  .flowSpin > :global(.ant-spin),
+  .flowSpin :global(.ant-spin-container) {
     min-height: 650px;
   }
 }
@@ -270,6 +271,81 @@
   :global(.ant-modal-body) {
     overflow: hidden;
   }
+}
+
+.sourceEditorModal {
+  :global(.ant-modal-body) {
+    max-height: calc(100vh - 230px);
+    max-height: calc(100dvh - 230px);
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+}
+
+.mappingFieldList {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.nodePickerModal {
+  padding-bottom: 0;
+
+  :global(.ant-modal-content) {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :global(.ant-modal-header) {
+    margin: 0;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  :global(.ant-modal-body) {
+    max-height: min(72vh, 640px);
+    overflow-y: auto;
+    padding: 18px 20px 20px;
+  }
+}
+
+.nodePickerIntro {
+  display: block;
+  margin-bottom: 18px;
+}
+
+.nodePickerGroups {
+  display: grid;
+  gap: 20px;
+}
+
+.nodePickerGroup {
+  display: grid;
+  gap: 9px;
+}
+
+.nodePickerGroupTitle {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.nodePickerOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.nodePickerOption:global(.ant-btn) {
+  display: flex;
+  min-height: 40px;
+  height: auto;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
 }
 
 .previewModeTag {
@@ -465,6 +541,26 @@
 
 .templateVariableControl {
   position: relative;
+
+  :global(.ant-input) {
+    padding-right: 94px;
+  }
+}
+
+.templateVariableButton {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 5px;
+  height: 22px;
+  padding: 0 6px;
+  color: #1677ff;
+  font-size: 12px;
+
+  &:hover {
+    color: #0958d9 !important;
+    background: #e6f4ff !important;
+  }
 }
 
 .templateVariableSuggestions {
@@ -491,6 +587,12 @@
   padding: 8px 10px;
   border-bottom: 1px solid #edf0f4;
   background: #f8fafc;
+
+  > div {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+  }
 
   :global(.ant-typography) {
     margin: 0;
@@ -529,26 +631,52 @@
   background: transparent;
   cursor: pointer;
 
-  code {
-    overflow: hidden;
-    color: #0958d9;
-    font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  span {
-    overflow: hidden;
-    color: #64748b;
-    font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   &:hover,
   &[aria-selected='true'] {
     background: #e6f4ff;
   }
+}
+
+.templateVariableOptionIdentity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+
+  > span {
+    display: flex;
+    min-width: 0;
+    gap: 6px;
+    align-items: baseline;
+  }
+
+  strong {
+    overflow: hidden;
+    color: #1f2937;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: #94a3b8;
+    font-size: 10px;
+  }
+
+  code {
+    overflow: hidden;
+    color: #0958d9;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.templateVariableOptionPreview {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .templateVariableEmpty {
@@ -656,7 +784,8 @@
 }
 
 .flowSpin,
-.flowSpin > :global(.ant-spin-container) {
+.flowSpin > :global(.ant-spin),
+.flowSpin :global(.ant-spin-container) {
   width: 100%;
   height: 100%;
   min-height: 590px;
@@ -818,10 +947,13 @@
 }
 .node_qbittorrent,
 .node_wait_qbittorrent,
+.node_moviepilot_transfer,
+.node_delete_qbittorrent,
 .node_offline115,
 .node_offline115_openapi,
 .node_wait115,
 .node_moviepilot_title_recognize,
+.node_filmfusion_recognize,
 .node_media_exists,
 .node_hdhive_query,
 .node_hdhive_unlock,
@@ -862,6 +994,284 @@
   opacity: 0.56;
 }
 
+.downloaderSection {
+  overflow: hidden;
+  border-color: rgba(148, 163, 184, 0.24);
+
+  > :global(.ant-card-body) {
+    padding: 18px;
+    background: #f8fafc;
+  }
+}
+
+.downloaderSection.downloaderSectionUnframed {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+
+  > :global(.ant-card-body) {
+    padding: 0;
+    background: transparent;
+  }
+}
+
+.downloaderToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.downloaderStatusAlert {
+  margin-bottom: 16px;
+}
+
+.downloaderCardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.downloaderCard {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid rgba(114, 180, 245, 0.34);
+  border-radius: 16px;
+  background: #07172c;
+  box-shadow:
+    0 14px 34px rgba(15, 36, 64, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+
+  &:hover {
+    transform: translateY(-2px);
+
+    > :global(.ant-card-body)::before {
+      opacity: 0.28;
+      transform: translate3d(-8px, 0, 0) rotate(-7deg) scale(1.035);
+    }
+  }
+
+  > :global(.ant-card-body) {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+    flex: 1;
+    flex-direction: column;
+    padding: 20px 20px 16px;
+    isolation: isolate;
+
+    &::before,
+    &::after {
+      position: absolute;
+      inset: 0;
+      content: '';
+      pointer-events: none;
+    }
+
+    &::before {
+      z-index: 0;
+      width: 260px;
+      height: 260px;
+      margin: auto -42px auto auto;
+      opacity: 0.28;
+      background: url('/qbittorrent-logo.svg') center / contain no-repeat;
+      filter: brightness(0.62) saturate(0.72) contrast(0.94);
+      transform: rotate(-9deg);
+      transition:
+        opacity 220ms ease,
+        transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    &::after {
+      z-index: 1;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      background:
+        radial-gradient(
+          circle at 78% 12%,
+          rgba(65, 145, 230, 0.018),
+          transparent 34%
+        ),
+        linear-gradient(
+          96deg,
+          rgb(3, 13, 28) 0%,
+          rgba(4, 19, 39, 0.999) 48%,
+          rgba(4, 22, 45, 0.995) 74%,
+          rgba(2, 14, 31, 0.99) 100%
+        );
+    }
+  }
+
+  > :global(.ant-card-actions) {
+    border-top-color: rgba(148, 196, 245, 0.12);
+    background: rgba(3, 13, 27, 0.98);
+
+    > li {
+      margin: 7px 0;
+    }
+
+    > li:not(:last-child) {
+      border-inline-end-color: rgba(148, 196, 245, 0.12);
+    }
+  }
+}
+
+.downloaderCardDisabled {
+  border-color: rgba(148, 163, 184, 0.24);
+  filter: saturate(0.58);
+
+  .downloaderSpeedGrid {
+    opacity: 0.62;
+  }
+}
+
+.downloaderCardContent {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.downloaderCardHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.downloaderIdentity {
+  min-width: 0;
+  flex: 1;
+}
+
+.downloaderNameLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+
+  h5:global(.ant-typography) {
+    min-width: 0;
+    margin: 0;
+    color: #f8fbff;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+  }
+
+  :global(.ant-badge-status-text) {
+    color: rgba(231, 242, 255, 0.86) !important;
+  }
+}
+
+.downloaderEnable {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+
+  > :global(.ant-typography) {
+    color: rgba(217, 232, 249, 0.7);
+  }
+}
+
+.downloaderSpeedGrid {
+  display: grid;
+  width: min(100%, 460px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 36px;
+  margin-top: 24px;
+}
+
+.downloaderSpeedDownload,
+.downloaderSpeedUpload {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 8px;
+
+  > span {
+    font-size: 12px;
+  }
+
+  > strong {
+    overflow: hidden;
+    color: #f8fbff;
+    font-size: clamp(18px, 1.7vw, 22px);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.downloaderSpeedDownload {
+  > span {
+    color: #78bdff;
+  }
+}
+
+.downloaderSpeedUpload {
+  > span {
+    color: #66e3bd;
+  }
+}
+
+.downloaderError {
+  overflow: hidden;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 120, 117, 0.2);
+  color: #ffb3ae;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(108, 20, 28, 0.36);
+  backdrop-filter: blur(10px);
+}
+
+.downloaderCheckedAt {
+  margin-top: auto;
+  padding-top: 8px;
+  color: rgba(183, 207, 234, 0.58);
+  font-size: 11px;
+  text-align: right;
+}
+
+.downloaderCardAction:global(.ant-btn) {
+  width: calc(100% - 12px);
+  height: 32px;
+  padding-inline: 8px;
+  border-radius: 7px;
+  color: rgba(232, 243, 255, 0.82);
+  font-size: 13px;
+
+  &:hover {
+    color: #fff !important;
+    background: rgba(79, 157, 239, 0.14) !important;
+  }
+
+  &:global(.ant-btn-dangerous) {
+    color: #ff8580;
+
+    &:hover {
+      color: #ffaaa6 !important;
+      background: rgba(255, 77, 79, 0.12) !important;
+    }
+  }
+}
+
 .panelAlert {
   margin-bottom: 16px;
 }
@@ -892,7 +1302,17 @@
   background: #f8fafc;
 }
 
+@media (max-width: 1500px) {
+  .downloaderCardGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1100px) {
+  .downloaderCardGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .workflowShell {
     grid-template-columns: 1fr;
   }
@@ -949,6 +1369,73 @@
     grid-template-columns: 1fr;
   }
 
+  .downloaderSection {
+    > :global(.ant-card-head) {
+      padding-inline: 16px;
+
+      :global(.ant-card-head-wrapper) {
+        align-items: flex-start;
+        flex-direction: column;
+        padding-block: 12px;
+      }
+
+      :global(.ant-card-extra) {
+        width: 100%;
+        margin-inline-start: 0;
+      }
+    }
+
+    > :global(.ant-card-body) {
+      padding: 12px;
+    }
+  }
+
+  .downloaderToolbar {
+    width: 100%;
+    flex-wrap: wrap;
+
+    > :global(.ant-typography) {
+      width: 100%;
+    }
+
+    :global(.ant-btn) {
+      flex: 1;
+    }
+  }
+
+  .downloaderCardGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .downloaderCardHeading {
+    gap: 10px;
+  }
+
+  .downloaderCard {
+    border-radius: 16px;
+
+    > :global(.ant-card-body) {
+      min-height: 0;
+      padding: 20px 18px 16px;
+
+      &::before {
+        width: 260px;
+        height: 260px;
+        margin-right: -85px;
+        opacity: 0.44;
+      }
+    }
+  }
+
+  .downloaderCardContent {
+    min-height: 0;
+  }
+
+  .downloaderSpeedDownload,
+  .downloaderSpeedUpload {
+    gap: 6px;
+  }
+
   .wizardSteps {
     :global(.ant-steps-item-description) {
       display: none;
@@ -1001,7 +1488,8 @@
   }
 
   .flowSpin,
-  .flowSpin > :global(.ant-spin-container) {
+  .flowSpin > :global(.ant-spin),
+  .flowSpin :global(.ant-spin-container) {
     width: 100%;
     height: 680px;
     min-height: 680px;

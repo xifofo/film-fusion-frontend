@@ -1,4 +1,5 @@
-import { Input, Popover, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Button, Input, Popover, Typography } from 'antd';
 import {
   type ChangeEvent,
   type KeyboardEvent,
@@ -20,13 +21,15 @@ type TemplateVariableInputProps = {
   onChange?: (value: string) => void;
   references: NodeFieldReference[];
   multiline?: boolean;
+  insertMode?: 'reference' | 'template';
   placeholder?: string;
   ariaLabel: string;
 };
 
 type TemplateOption = NodeFieldReference & {
   path: string;
-  token: string;
+  referenceToken: string;
+  templateToken: string;
 };
 
 type ActiveTemplate = {
@@ -49,8 +52,28 @@ const activeTemplateAt = (
 
 const templateOption = (reference: NodeFieldReference): TemplateOption => {
   const path = reference.value.replace(/^\$/, '');
-  return { ...reference, path, token: `{{${path}}}` };
+  return {
+    ...reference,
+    path,
+    referenceToken: reference.value,
+    templateToken: `{{${path}}}`,
+  };
 };
+
+const rssFieldLabels: Record<string, string> = {
+  category: '分类',
+  detail_url: '详情链接',
+  download_url: '下载地址',
+  guid: '唯一标识',
+  published_at: '发布时间',
+  size_bytes: '文件大小',
+  title: '标题',
+};
+
+const optionLabel = (option: TemplateOption) =>
+  option.kind === 'item'
+    ? rssFieldLabels[option.name] || option.name
+    : option.name;
 
 const TemplateVariableInput = ({
   id,
@@ -58,6 +81,7 @@ const TemplateVariableInput = ({
   onChange,
   references,
   multiline = false,
+  insertMode = 'reference',
   placeholder,
   ariaLabel,
 }: TemplateVariableInputProps) => {
@@ -65,6 +89,8 @@ const TemplateVariableInput = ({
   const inputElement = useRef<
     HTMLInputElement | HTMLTextAreaElement | undefined
   >(undefined);
+  const controlElement = useRef<HTMLDivElement>(null);
+  const selectionRange = useRef({ start: value.length, end: value.length });
   const ignoreNextSelection = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -119,6 +145,10 @@ const TemplateVariableInput = ({
     element: HTMLInputElement | HTMLTextAreaElement,
   ) => {
     inputElement.current = element;
+    selectionRange.current = {
+      start: element.selectionStart ?? nextValue.length,
+      end: element.selectionEnd ?? nextValue.length,
+    };
     const active = activeTemplateAt(
       nextValue,
       element.selectionStart ?? nextValue.length,
@@ -144,21 +174,31 @@ const TemplateVariableInput = ({
 
   const insertOption = (option: TemplateOption) => {
     const element = inputElement.current;
-    const cursor = element?.selectionStart ?? value.length;
+    const cursor = Math.min(
+      element?.selectionStart ?? selectionRange.current.start,
+      value.length,
+    );
+    const selectionEnd = Math.min(
+      element?.selectionEnd ?? selectionRange.current.end,
+      value.length,
+    );
     const active = activeTemplateAt(value, cursor);
     const start = active?.start ?? cursor;
-    let end = cursor;
-    const closingBraces = active ? value.indexOf('}}', cursor) : -1;
-    if (closingBraces >= 0) {
-      end = closingBraces + 2;
-    } else if (value.slice(end, end + 2) === '}}') {
+    let end = Math.max(cursor, selectionEnd);
+    if (active && value.slice(end, end + 2) === '}}') {
       end += 2;
     }
-    const nextValue = `${value.slice(0, start)}${option.token}${value.slice(end)}`;
-    const nextCursor = start + option.token.length;
+    const token = active
+      ? option.templateToken
+      : insertMode === 'template'
+        ? option.templateToken
+        : option.referenceToken;
+    const nextValue = `${value.slice(0, start)}${token}${value.slice(end)}`;
+    const nextCursor = start + token.length;
 
     onChange?.(nextValue);
     setOpen(false);
+    selectionRange.current = { start: nextCursor, end: nextCursor };
     ignoreNextSelection.current = true;
     window.requestAnimationFrame(() => {
       element?.focus();
@@ -167,6 +207,19 @@ const TemplateVariableInput = ({
         ignoreNextSelection.current = false;
       }, 0);
     });
+  };
+
+  const openVariablePicker = () => {
+    const element = inputElement.current;
+    if (element) {
+      selectionRange.current = {
+        start: element.selectionStart ?? value.length,
+        end: element.selectionEnd ?? value.length,
+      };
+    }
+    setQuery('');
+    setActiveIndex(0);
+    setOpen(true);
   };
 
   const handleKeyDown = (
@@ -225,12 +278,20 @@ const TemplateVariableInput = ({
       id={listboxId}
       role="listbox"
       style={{
-        width: inputElement.current?.getBoundingClientRect().width || 640,
+        width:
+          inputElement.current?.getBoundingClientRect().width ||
+          controlElement.current?.getBoundingClientRect().width ||
+          520,
       }}
     >
       <div className={styles.templateVariableSuggestionHeader}>
-        <Text strong>插入模板变量</Text>
-        <Text type="secondary">↑↓ 选择 · Enter 插入 · Esc 关闭</Text>
+        <div>
+          <Text strong>选择要插入的内容</Text>
+          <Text type="secondary">
+            点选后会插入到当前光标处，不会改动后面的文字
+          </Text>
+        </div>
+        <Text type="secondary">↑↓ 选择 · Enter 插入</Text>
       </div>
       {groupedOptions.length > 0 ? (
         <div className={styles.templateVariableSuggestionBody}>
@@ -245,7 +306,7 @@ const TemplateVariableInput = ({
                     aria-selected={index === activeIndex}
                     className={styles.templateVariableOption}
                     id={`${listboxId}-${index}`}
-                    key={option.token}
+                    key={option.value}
                     onMouseDown={(event) => {
                       event.preventDefault();
                       insertOption(option);
@@ -253,12 +314,22 @@ const TemplateVariableInput = ({
                     role="option"
                     type="button"
                   >
-                    <span>
-                      <code>{option.token}</code>
-                      {option.dataType && <small>{option.dataType}</small>}
+                    <span className={styles.templateVariableOptionIdentity}>
+                      <span>
+                        <strong>{optionLabel(option)}</strong>
+                        {option.kind === 'item' &&
+                          optionLabel(option) !== option.name && (
+                            <small>{option.name}</small>
+                          )}
+                        {option.dataType && <small>{option.dataType}</small>}
+                      </span>
+                      <code>{option.value}</code>
                     </span>
                     {(option.preview || option.description) && (
-                      <span title={option.description || option.preview}>
+                      <span
+                        className={styles.templateVariableOptionPreview}
+                        title={option.description || option.preview}
+                      >
                         {option.preview || option.description}
                       </span>
                     )}
@@ -288,7 +359,7 @@ const TemplateVariableInput = ({
       placement={multiline ? 'topLeft' : 'bottomLeft'}
       trigger="click"
     >
-      <div className={styles.templateVariableControl}>
+      <div className={styles.templateVariableControl} ref={controlElement}>
         {multiline ? (
           <Input.TextArea
             {...inputProps}
@@ -297,6 +368,17 @@ const TemplateVariableInput = ({
         ) : (
           <Input {...inputProps} />
         )}
+        <Button
+          aria-label={`为${ariaLabel}插入变量`}
+          className={styles.templateVariableButton}
+          icon={<PlusOutlined />}
+          onClick={openVariablePicker}
+          onMouseDown={(event) => event.preventDefault()}
+          size="small"
+          type="text"
+        >
+          插入变量
+        </Button>
       </div>
     </Popover>
   );

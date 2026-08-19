@@ -40,6 +40,8 @@ export * from './hdhive';
 export * from './match302';
 // 媒体相关API
 export * from './media';
+// FilmFusion 本地媒体识别与识别词
+export * from './mediaRecognition';
 // 整理处理相关API
 export * from './organize';
 // 整理日志（STRM 生成 / 文件下载等业务事件）
@@ -48,16 +50,10 @@ export * from './organizeLog';
 export * from './pickcodeCache';
 // 独立 RSS 自动化流程
 export * from './rssAutomation';
-// RSS 生成器（抓取源 -> RSS / Atom）
-export * from './rssGenerator';
-// RSS 增量监控与通知路由规则
-export * from './rssMonitor';
 // 扫描任务相关API
 export * from './scanTask';
 // 运行日志（server 进程日志文件查看）
 export * from './serverLog';
 // STRM 相关API
 export * from './strm';
-// 管理员只读系统信息
-export * from './systemInfo';
 export * from './user';

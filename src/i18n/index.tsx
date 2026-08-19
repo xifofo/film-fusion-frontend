@@ -118,7 +118,6 @@ export function AppLocaleProvider({ children }: { children: ReactNode }) {
           direction={locale === 'fa-IR' ? 'rtl' : 'ltr'}
           locale={antdLocales[locale]}
           theme={{
-            cssVar: true,
             token: {
               fontFamily: 'AlibabaSans, sans-serif',
             },

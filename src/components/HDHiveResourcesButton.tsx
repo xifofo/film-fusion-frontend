@@ -107,7 +107,7 @@ function renderShareUser(user: any) {
   const id = getShareUserID(user);
   if (!name && !id) return '-';
   return (
-    <Space direction="vertical" size={0}>
+    <Space orientation="vertical" size={0}>
       <Text>{name || `用户 ${id}`}</Text>
       {id && (
         <Text type="secondary" style={{ fontSize: 12 }}>
@@ -228,7 +228,7 @@ const HDHiveResourcesButton: React.FC<HDHiveResourcesButtonProps> = ({
         dataIndex: 'title',
         ellipsis: true,
         render: (value: string | null | undefined, record) => (
-          <Space direction="vertical" size={2}>
+          <Space orientation="vertical" size={2}>
             <Text strong>{value || record.slug}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {record.share_size || '-'}

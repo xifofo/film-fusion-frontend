@@ -1,0 +1,564 @@
+.libraryList {
+  margin-top: 2px;
+  container-type: inline-size;
+}
+
+.libraryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.emptyState {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: rgba(17, 24, 39, 0.42);
+  font-size: 13px;
+  border: 1px dashed rgba(17, 24, 39, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.jobStatus {
+  display: flex;
+  min-height: 66px;
+  margin-bottom: 18px;
+  padding: 13px 16px;
+  align-items: flex-start;
+  color: rgba(17, 24, 39, 0.76);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 15px;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 24px rgba(24, 31, 45, 0.045);
+}
+
+.jobStatusDot {
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #4f7fe8;
+  box-shadow: 0 0 0 5px rgba(79, 127, 232, 0.12);
+}
+
+.jobStatusTitle {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jobStatusTitle strong {
+  color: rgba(17, 24, 39, 0.88);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.jobStatusTitle span,
+.jobStatus p {
+  color: rgba(17, 24, 39, 0.48);
+  font-size: 11px;
+}
+
+.jobStatus p {
+  margin: 4px 0 0;
+  line-height: 1.55;
+}
+
+.jobStatus-success .jobStatusDot {
+  background: #38a169;
+  box-shadow: 0 0 0 5px rgba(56, 161, 105, 0.12);
+}
+
+.jobStatus-warning .jobStatusDot {
+  background: #d69e2e;
+  box-shadow: 0 0 0 5px rgba(214, 158, 46, 0.13);
+}
+
+.jobStatus-error .jobStatusDot {
+  background: #dc5a5a;
+  box-shadow: 0 0 0 5px rgba(220, 90, 90, 0.12);
+}
+
+.libraryCard {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(20, 24, 32, 0.08);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 16px 44px rgba(24, 31, 45, 0.09);
+  transform: translateZ(0);
+  transition:
+    border-color 220ms ease,
+    box-shadow 280ms ease,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.libraryCard:hover {
+  border-color: rgba(73, 113, 196, 0.2);
+  box-shadow: 0 24px 58px rgba(24, 31, 45, 0.15);
+  transform: translateY(-4px);
+}
+
+.libraryCard :global(.ant-card-body) {
+  height: 100%;
+  padding: 0;
+}
+
+.cardVisual {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  color: #fff;
+  background: #151922;
+  isolation: isolate;
+}
+
+.backdropFrame {
+  position: absolute;
+  z-index: 0;
+  overflow: hidden;
+  inset: 0;
+}
+
+.backdropImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+  filter: saturate(0.82) contrast(1.04) brightness(0.9);
+  transform: scale(1.018);
+  transition:
+    filter 360ms ease,
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.libraryCard:hover .backdropImage {
+  filter: saturate(0.94) contrast(1.04) brightness(0.94);
+  transform: scale(1.055);
+}
+
+.backdropFallback {
+  position: absolute;
+  display: grid;
+  overflow: hidden;
+  inset: 0;
+  place-items: center;
+  background:
+    radial-gradient(
+      circle at 78% 18%,
+      rgba(96, 145, 238, 0.36),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 12% 90%,
+      rgba(122, 86, 214, 0.26),
+      transparent 38%
+    ),
+    linear-gradient(145deg, #242b38, #11151d 72%);
+}
+
+.backdropFallback::before,
+.backdropFallback::after {
+  position: absolute;
+  width: 280px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  content: '';
+}
+
+.backdropFallback::before {
+  top: -120px;
+  right: -70px;
+  box-shadow:
+    0 0 0 32px rgba(255, 255, 255, 0.018),
+    0 0 0 70px rgba(255, 255, 255, 0.012);
+}
+
+.backdropFallback::after {
+  bottom: -210px;
+  left: -30px;
+  box-shadow: 0 0 0 42px rgba(255, 255, 255, 0.012);
+}
+
+.backdropFallback span {
+  color: rgba(255, 255, 255, 0.11);
+  font-size: 132px;
+  font-weight: 760;
+  line-height: 1;
+  text-shadow: 0 18px 52px rgba(0, 0, 0, 0.26);
+}
+
+.backdropScrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(7, 9, 14, 0.56) 0%,
+      rgba(7, 9, 14, 0.06) 30%,
+      rgba(7, 9, 14, 0.5) 58%,
+      rgba(7, 9, 14, 0.96) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(7, 9, 14, 0.58) 0%,
+      rgba(7, 9, 14, 0.14) 58%,
+      rgba(7, 9, 14, 0.3) 100%
+    );
+  pointer-events: none;
+}
+
+.cardTopline {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  padding: 18px 20px 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.collectionBadge,
+.enabledBadge {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(7, 10, 16, 0.47);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+
+.collectionBadge {
+  max-width: 62%;
+  padding: 7px 11px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1;
+  border-radius: 999px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enabledBadge {
+  padding: 7px 10px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.enabledBadgeOn {
+  color: rgba(229, 255, 238, 0.96);
+  border-color: rgba(151, 236, 178, 0.28);
+  background: rgba(20, 92, 48, 0.48);
+}
+
+.enabledBadgeOff {
+  color: rgba(255, 255, 255, 0.62);
+  background: rgba(34, 37, 44, 0.52);
+}
+
+.cardMain {
+  position: absolute;
+  z-index: 2;
+  right: 20px;
+  bottom: 20px;
+  left: 20px;
+  min-width: 0;
+}
+
+.libraryCopy {
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 2px;
+  flex: 1;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.58);
+}
+
+.libraryCopy p {
+  margin: 0 0 8px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 680;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.libraryCopy h2 {
+  display: -webkit-box;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 680;
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.librarySubtitle {
+  margin-top: 7px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardChips {
+  display: flex;
+  margin-top: 13px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cardChips span {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0 8px;
+  align-items: center;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  font-weight: 620;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 13, 19, 0.44);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFooter {
+  padding: 0 17px 14px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.metadataList {
+  padding: 9px 2px 8px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.07);
+}
+
+.metadataList > div {
+  display: grid;
+  min-height: 29px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.metadataList span {
+  color: rgba(17, 24, 39, 0.4);
+}
+
+.metadataList strong,
+.metadataList time {
+  overflow: hidden;
+  color: rgba(17, 24, 39, 0.72);
+  font-weight: 560;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadataList time {
+  font-variant-numeric: tabular-nums;
+}
+
+.metadataError strong {
+  color: #d84a4a;
+}
+
+.actionRow {
+  display: flex;
+  padding-top: 11px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.actionRow :global(.ant-btn) {
+  border-radius: 9px;
+}
+
+.cardActionMenu {
+  display: grid;
+  width: 190px;
+  gap: 2px;
+}
+
+.cardActionMenu :global(.ant-btn) {
+  width: 100%;
+  height: 34px;
+  padding-inline: 10px;
+  justify-content: flex-start;
+  color: rgba(17, 24, 39, 0.74);
+  border-radius: 8px;
+}
+
+.cardActionMenu :global(.ant-btn:hover) {
+  color: rgba(17, 24, 39, 0.92);
+  background: rgba(17, 24, 39, 0.05);
+}
+
+.cardActionMenu :global(.ant-btn-dangerous) {
+  color: #d84a4a;
+}
+
+.cardActionMenuDivider {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(17, 24, 39, 0.08);
+}
+
+:global(.dark) .jobStatus {
+  color: rgba(255, 255, 255, 0.74);
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+:global(.dark) .jobStatusTitle strong {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+:global(.dark) .jobStatusTitle span,
+:global(.dark) .jobStatus p {
+  color: rgba(255, 255, 255, 0.46);
+}
+
+:global(.dark) .libraryCard {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: #181b22;
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.25);
+}
+
+:global(.dark) .libraryCard:hover {
+  border-color: rgba(126, 164, 238, 0.24);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.38);
+}
+
+:global(.dark) .cardFooter {
+  background: rgba(24, 27, 34, 0.98);
+}
+
+:global(.dark) .metadataList {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(.dark) .metadataList span {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+:global(.dark) .metadataList strong,
+:global(.dark) .metadataList time {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+:global(.dark) .metadataError strong {
+  color: #ff7875;
+}
+
+:global(.dark) .cardActionMenu :global(.ant-btn) {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+:global(.dark) .cardActionMenu :global(.ant-btn:hover) {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+:global(.dark) .cardActionMenu :global(.ant-btn-dangerous) {
+  color: #ff7875;
+}
+
+:global(.dark) .cardActionMenuDivider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:global(.dark) .emptyState {
+  color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+@container (max-width: 699px) {
+  .libraryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .libraryGrid {
+    gap: 14px;
+  }
+
+  .jobStatus {
+    padding: 12px 13px;
+    border-radius: 13px;
+  }
+
+  .libraryCard {
+    border-radius: 19px;
+  }
+
+  .libraryCard:hover {
+    transform: none;
+  }
+
+  .cardTopline {
+    padding: 14px 14px 0;
+  }
+
+  .cardMain {
+    right: 14px;
+    bottom: 15px;
+    left: 14px;
+  }
+
+  .libraryCopy h2 {
+    font-size: 20px;
+  }
+
+  .cardChips {
+    margin-top: 10px;
+    gap: 4px;
+  }
+
+  .cardFooter {
+    padding-inline: 12px;
+  }
+
+  .actionRow :global(.ant-btn) {
+    padding-inline: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .libraryCard,
+  .backdropImage {
+    transition: none;
+  }
+}

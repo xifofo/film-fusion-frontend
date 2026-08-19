@@ -261,7 +261,7 @@ const previewNode = (
           active: true,
           tone: 'success',
           label: `${variable} = ${String(value)}`,
-          detail: `从“${input}”提取`,
+          detail: `匹配内容：${match[0]}`,
           selectedPorts: ['success'],
           output: value,
         };
@@ -405,8 +405,121 @@ const previewNode = (
             name: '运行时返回',
             save_path: '运行时返回',
             content_path: '运行时返回',
+            content_type: 'dir',
+            file_count: 1,
           },
         };
+      case 'moviepilot_transfer': {
+        const sourcePath = resolveConfiguredString(context, config.source_path);
+        const tmdbID = resolveConfiguredString(context, config.tmdb_id);
+        return {
+          active: true,
+          tone: 'success',
+          label: tmdbID
+            ? `下载完成后将用 TMDB ${tmdbID} 辅助 MP2 整理`
+            : '下载完成后将交给 MP2 整理入库',
+          detail: sourcePath
+            ? `MP2 可见路径：${sourcePath}`
+            : '运行时使用上游 qBittorrent 完成路径；样本预览不会整理真实文件',
+          selectedPorts: ['success'],
+          output: {
+            organized: true,
+            source_path: sourcePath || '运行时使用 qB 完成路径',
+            content_type: String(config.file_type || 'auto'),
+            tmdb_id: tmdbID || '',
+            media_type: String(config.media_type || 'auto'),
+            hash: '运行时透传',
+            target_id: '运行时透传',
+            target_name: '运行时透传',
+            message: '运行时返回',
+          },
+        };
+      }
+      case 'delete_qbittorrent': {
+        const deleteFiles = Boolean(config.delete_files);
+        return {
+          active: true,
+          tone: deleteFiles ? 'warning' : 'success',
+          label: deleteFiles
+            ? 'MP2 整理成功后将删除 qB 任务和下载文件'
+            : '将删除 qB 做种任务并保留下载文件',
+          detail: deleteFiles
+            ? '只有直接连接 MP2 整理成功出口才能保存并执行'
+            : '样本预览不会删除真实 qBittorrent 任务',
+          selectedPorts: ['success'],
+          output: {
+            deleted: true,
+            already_missing: false,
+            delete_files: deleteFiles,
+            hash: '运行时透传',
+            target_id: '运行时透传',
+            target_name: '运行时透传',
+          },
+        };
+      }
+      case 'filmfusion_recognize': {
+        const mode = String(config.recognition_mode || 'title');
+        const configuredTMDB = String(config.tmdb_id || '').trim();
+        const tmdbID = resolveConfiguredString(context, configuredTMDB);
+        const lookupTMDB = config.lookup_tmdb !== false;
+        if (mode === 'file') {
+          return {
+            active: true,
+            tone: 'success',
+            label: tmdbID
+              ? `将用 TMDB ${tmdbID} 辅助本地识别 115 文件`
+              : '将用 FilmFusion 本地词表识别 115 文件',
+            detail: `${lookupTMDB ? '本地解析后查询 TMDB' : '仅执行本地解析'}；样本预览不会读取真实 115 文件或调用 MP2`,
+            selectedPorts: ['success'],
+            output: {
+              engine: 'local',
+              mode: 'file',
+              requested_tmdb_id: tmdbID,
+              tmdb_id: tmdbID || '本地解析或运行时匹配',
+              title: '运行时本地识别',
+              media_type: '运行时本地识别',
+              tmdb_status: lookupTMDB ? '运行时查询' : 'skipped',
+              applied_words: [],
+              total_files: 1,
+              recognized_count: 1,
+              failed_count: 0,
+              items: [],
+              failed_items: [],
+              partial: false,
+            },
+          };
+        }
+
+        const input = resolveConfiguredString(context, config.input);
+        return {
+          active: true,
+          tone: input ? 'success' : 'warning',
+          label: tmdbID
+            ? `将用 TMDB ${tmdbID} 辅助 FilmFusion 本地识别`
+            : '将用 FilmFusion 本地词表识别标题',
+          detail: `${String(input || '标题尚未解析')} · ${lookupTMDB ? '查询 TMDB' : '仅本地解析'} · 不调用 MP2`,
+          selectedPorts: [input ? 'success' : 'failure'],
+          output: {
+            engine: 'local',
+            mode: 'title',
+            input,
+            recognize_input: input,
+            processed_input: input,
+            requested_tmdb_id: tmdbID,
+            tmdb_id: tmdbID || '本地解析或运行时匹配',
+            title: '运行时本地识别',
+            year: '运行时本地识别',
+            media_type: '运行时本地识别',
+            season_episode: '运行时本地识别',
+            category: '运行时匹配',
+            rating: '运行时匹配',
+            quality: '运行时本地识别',
+            poster_url: '运行时匹配',
+            tmdb_status: lookupTMDB ? '运行时查询' : 'skipped',
+            applied_words: [],
+          },
+        };
+      }
       case 'moviepilot_recognize': {
         const configuredTMDB = String(config.tmdb_id || '').trim();
         const tmdbID = resolveConfiguredString(context, configuredTMDB);

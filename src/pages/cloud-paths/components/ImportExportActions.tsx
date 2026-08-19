@@ -4,7 +4,7 @@ import {
   UploadOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
-import { Button, Modal, message, Space, Upload } from 'antd';
+import { App, Button, message, Space, Upload } from 'antd';
 import React, { useState } from 'react';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import { exportCloudPaths, importCloudPaths } from '@/services/film-fusion';
@@ -16,6 +16,7 @@ interface ImportExportActionsProps {
 const ImportExportActions: React.FC<ImportExportActionsProps> = ({
   onSuccess,
 }) => {
+  const { modal } = App.useApp();
   const [messageApi, contextHolder] = message.useMessage();
 
   // 导出
@@ -80,7 +81,7 @@ const ImportExportActions: React.FC<ImportExportActionsProps> = ({
             return;
           }
 
-          Modal.confirm({
+          modal.confirm({
             title: '确认导入',
             icon: <ExclamationCircleOutlined />,
             content: `即将导入 ${data.paths.length} 个路径配置，是否继续？`,

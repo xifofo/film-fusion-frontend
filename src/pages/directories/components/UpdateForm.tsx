@@ -112,7 +112,7 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
         width="640px"
         onOpenChange={setOpen}
         modalProps={{
-          destroyOnClose: true,
+          destroyOnHidden: true,
         }}
         submitter={{
           submitButtonProps: { loading },

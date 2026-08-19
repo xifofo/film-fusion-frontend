@@ -265,7 +265,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
         confirmLoading={saving}
         width={780}
       >
-        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={12}>
           <span style={{ color: '#888' }}>
             勾选需要统计观看数据的 Emby 用户并保存；可对单个用户「回填历史」拉取
             Emby 已观看记录。新增观看会由播放 webhook 自动记录。
@@ -282,7 +282,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             }}
           />
 
-          <Divider style={{ margin: '8px 0' }} orientation="left">
+          <Divider style={{ margin: '8px 0' }} titlePlacement="start">
             采集规则
           </Divider>
           <div style={{ color: '#888' }}>

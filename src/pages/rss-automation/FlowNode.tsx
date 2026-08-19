@@ -20,6 +20,8 @@ import {
   ScanSearch,
   Search,
   ShieldCheck,
+  Sparkles,
+  Trash2,
   Webhook,
 } from 'lucide-react';
 import type { RSSAutomationNodeType } from '@/services/film-fusion';
@@ -41,10 +43,13 @@ const icons: Record<RSSAutomationNodeType, React.ReactNode> = {
   join: <RefreshCcwDot size={17} />,
   qbittorrent: <Download size={17} />,
   wait_qbittorrent: <Gauge size={17} />,
+  moviepilot_transfer: <FolderCog size={17} />,
+  delete_qbittorrent: <Trash2 size={17} />,
   offline115: <CloudDownload size={17} />,
   offline115_openapi: <CloudDownload size={17} />,
   wait115: <Clock size={17} />,
   moviepilot_title_recognize: <ScanSearch size={17} />,
+  filmfusion_recognize: <Sparkles size={17} />,
   media_exists: <Library size={17} />,
   hdhive_query: <Search size={17} />,
   hdhive_unlock: <Link2 size={17} />,

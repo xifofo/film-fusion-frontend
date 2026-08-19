@@ -44,10 +44,35 @@ describe('RSS automation sample preview', () => {
     });
 
     expect(preview.variables.episode).toBe(1001);
+    expect(preview.nodes.regex.detail).toBe('匹配内容：1001集');
     expect(preview.nodes.if.label).toContain('条件成立');
     expect(preview.nodes.pass.active).toBe(true);
     expect(preview.nodes.reject.active).toBe(false);
     expect(preview.activeEdgeIds).toEqual(['e1', 'e2', 'e3']);
+  });
+
+  it('shows the full regex match when the selected capture group is empty', () => {
+    const noCaptureDefinition = structuredClone(definition);
+    const regexNode = noCaptureDefinition.nodes.find(
+      (node) => node.id === 'regex',
+    );
+    if (!regexNode) throw new Error('regex node is missing');
+    regexNode.config = {
+      input: '$item.title',
+      pattern: '^[^\\[]+',
+      group: '1',
+      variable: 'title',
+      value_type: 'string',
+    };
+
+    const preview = simulateRSSAutomation(noCaptureDefinition, {
+      title: 'Lanterns 2026 S01E01 2160p HMAX WEB-DL[绿灯军团]',
+    });
+
+    expect(preview.variables.title).toBe('');
+    expect(preview.nodes.regex.detail).toBe(
+      '匹配内容：Lanterns 2026 S01E01 2160p HMAX WEB-DL',
+    );
   });
 
   it('shows a failed regex path without executing downstream nodes', () => {
@@ -245,6 +270,78 @@ describe('RSS automation sample preview', () => {
     expect(preview.nodes.end.active).toBe(true);
   });
 
+  it('previews FilmFusion title and 115 file recognition without MP2', () => {
+    const localDefinition: RSSAutomationDefinition = {
+      schema_version: 1,
+      nodes: [
+        { id: 'trigger', type: 'trigger', position: { x: 0, y: 0 } },
+        {
+          id: 'local_title',
+          type: 'filmfusion_recognize',
+          position: { x: 200, y: 0 },
+          config: {
+            recognition_mode: 'title',
+            input: '$item.title',
+            tmdb_id: '{{item.tmdb_id}}',
+            lookup_tmdb: true,
+          },
+        },
+        {
+          id: 'local_file',
+          type: 'filmfusion_recognize',
+          position: { x: 400, y: 0 },
+          config: {
+            recognition_mode: 'file',
+            tmdb_id: '{{nodes.local_title.output.tmdb_id}}',
+            lookup_tmdb: false,
+          },
+        },
+        { id: 'end', type: 'end', position: { x: 600, y: 0 } },
+      ],
+      edges: [
+        {
+          id: 'l1',
+          source: 'trigger',
+          source_port: 'next',
+          target: 'local_title',
+        },
+        {
+          id: 'l2',
+          source: 'local_title',
+          source_port: 'success',
+          target: 'local_file',
+        },
+        {
+          id: 'l3',
+          source: 'local_file',
+          source_port: 'success',
+          target: 'end',
+        },
+      ],
+    };
+
+    const preview = simulateRSSAutomation(localDefinition, {
+      title: '示例剧.S01E01.2160p',
+      tmdb_id: '1396',
+    });
+
+    expect(preview.nodes.local_title.label).toContain('TMDB 1396');
+    expect(preview.nodes.local_title.detail).toContain('不调用 MP2');
+    expect(preview.nodes.local_title.output).toMatchObject({
+      engine: 'local',
+      mode: 'title',
+      tmdb_id: '1396',
+    });
+    expect(preview.nodes.local_file.label).toContain('本地识别 115 文件');
+    expect(preview.nodes.local_file.detail).toContain('不会读取真实 115 文件');
+    expect(preview.nodes.local_file.output).toMatchObject({
+      engine: 'local',
+      mode: 'file',
+      recognized_count: 1,
+    });
+    expect(preview.nodes.end.active).toBe(true);
+  });
+
   it('previews the new media pipeline without calling external services', () => {
     const mediaPipeline: RSSAutomationDefinition = {
       schema_version: 1,
@@ -279,7 +376,19 @@ describe('RSS automation sample preview', () => {
           type: 'wait_qbittorrent',
           position: { x: 1000, y: 0 },
         },
-        { id: 'end', type: 'end', position: { x: 1200, y: 0 } },
+        {
+          id: 'mp_transfer',
+          type: 'moviepilot_transfer',
+          position: { x: 1200, y: 0 },
+          config: { file_type: 'auto', media_type: 'tv', scrape: false },
+        },
+        {
+          id: 'delete_qb',
+          type: 'delete_qbittorrent',
+          position: { x: 1400, y: 0 },
+          config: { delete_files: false },
+        },
+        { id: 'end', type: 'end', position: { x: 1600, y: 0 } },
       ],
       edges: [
         { id: 'p1', source: 'trigger', source_port: 'next', target: 'dedupe' },
@@ -287,7 +396,24 @@ describe('RSS automation sample preview', () => {
         { id: 'p3', source: 'query', source_port: 'found', target: 'unlock' },
         { id: 'p4', source: 'unlock', source_port: 'success', target: 'qb' },
         { id: 'p5', source: 'qb', source_port: 'success', target: 'wait_qb' },
-        { id: 'p6', source: 'wait_qb', source_port: 'success', target: 'end' },
+        {
+          id: 'p6',
+          source: 'wait_qb',
+          source_port: 'success',
+          target: 'mp_transfer',
+        },
+        {
+          id: 'p7',
+          source: 'mp_transfer',
+          source_port: 'success',
+          target: 'delete_qb',
+        },
+        {
+          id: 'p8',
+          source: 'delete_qb',
+          source_port: 'success',
+          target: 'end',
+        },
       ],
     };
 
@@ -298,6 +424,8 @@ describe('RSS automation sample preview', () => {
     expect(preview.nodes.query.detail).toContain('不会查询真实 HDHive');
     expect(preview.nodes.unlock.detail).toContain('不会解锁真实 HDHive');
     expect(preview.nodes.wait_qb.detail).toContain('不会连接真实 qBittorrent');
+    expect(preview.nodes.mp_transfer.label).toContain('MP2 整理');
+    expect(preview.nodes.delete_qb.label).toContain('保留下载文件');
     expect(preview.nodes.end.active).toBe(true);
   });
 

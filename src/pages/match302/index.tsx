@@ -141,7 +141,7 @@ const Match302List: React.FC = () => {
             `ID: ${record.cloud_storage_id}`}
         </Tag>
       ),
-      renderFormItem: () => {
+      formItemRender: () => {
         // 这里可以添加云存储选择器组件
         return <div>云存储选择器</div>;
       },
@@ -280,7 +280,7 @@ const Match302List: React.FC = () => {
           const members = record.pool_members || [];
           if (!members.length) return '-';
           return (
-            <Space direction="vertical" size={2}>
+            <Space orientation="vertical" size={2}>
               {members.map((member) => (
                 <Text key={`${member.cloud_storage_id}-${member.id || ''}`}>
                   {member.cloud_storage?.storage_name ||
@@ -468,7 +468,7 @@ const Match302List: React.FC = () => {
       />
 
       <Drawer
-        width={1000}
+        size={1000}
         open={showDetail}
         onClose={() => {
           setCurrentRow(undefined);
@@ -477,7 +477,7 @@ const Match302List: React.FC = () => {
         closable={false}
       >
         {currentRow?.id && (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
             <ProDescriptions<API.Match302>
               column={1}
               title="Match302 详细信息"

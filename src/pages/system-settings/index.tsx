@@ -15,9 +15,9 @@ import {
 } from '@ant-design/pro-components';
 import {
   Alert,
+  App,
   Button,
   Form,
-  Modal,
   message,
   Space,
   Spin,
@@ -32,6 +32,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { WEB115_RELOGIN_APP_OPTIONS } from '@/constants/web115';
 import { SettingsToggle } from '@/pages/system-settings/components/SettingsToggle';
 import {
+  buildScopedAppConfig,
+  getConfigFieldValue,
+  SETTINGS_TAB_SCOPES,
+  type SettingsTabKey,
+} from '@/pages/system-settings/settingsScope';
+import {
   getAppConfig,
   getHDHiveAuthorizeURL,
   refreshHDHiveToken,
@@ -41,7 +47,7 @@ import {
 } from '@/services/film-fusion';
 
 const restartTag = (
-  <Tag color="orange" bordered={false} style={{ marginInlineStart: 6 }}>
+  <Tag color="orange" variant="filled" style={{ marginInlineStart: 6 }}>
     需重启
   </Tag>
 );
@@ -366,8 +372,11 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 
 const SystemSettingsPage: React.FC = () => {
   const { styles } = useStyles();
+  const { modal } = App.useApp();
   const [form] = Form.useForm<API.AppConfig>();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>('server');
+  const [savingTab, setSavingTab] = useState<SettingsTabKey>();
   const [config, setConfig] = useState<API.AppConfig>();
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
   const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
@@ -463,32 +472,86 @@ const SystemSettingsPage: React.FC = () => {
     ? `authorization = "Bearer ${webhookToken}"`
     : '';
 
-  const onFinish = async (values: API.AppConfig) => {
+  const applyTabConfigToForm = (
+    source: API.AppConfig,
+    tabKey: SettingsTabKey,
+  ) => {
+    form.setFields(
+      SETTINGS_TAB_SCOPES[tabKey].fields.map((name) => ({
+        name,
+        value: getConfigFieldValue(source, name),
+        errors: [],
+        warnings: [],
+        touched: false,
+      })),
+    );
+  };
+
+  const handleResetActiveTab = () => {
+    if (!config) {
+      return;
+    }
+    applyTabConfigToForm(config, activeTab);
+    messageApi.success(
+      `已重置「${SETTINGS_TAB_SCOPES[activeTab].label}」中的修改`,
+    );
+  };
+
+  const handleSaveActiveTab = async () => {
+    if (!config || savingTab) {
+      return;
+    }
+
+    const tabKey = activeTab;
+    const tabScope = SETTINGS_TAB_SCOPES[tabKey];
+    try {
+      await form.validateFields(tabScope.fields, { recursive: true });
+    } catch {
+      messageApi.error(`请先修正「${tabScope.label}」中标红的字段`);
+      return;
+    }
+
+    const values = buildScopedAppConfig(config, tabKey, (fieldPath) =>
+      form.getFieldValue(fieldPath),
+    );
+
+    setSavingTab(tabKey);
     try {
       const res = await saveAppConfig(values);
       if (res.code === 0) {
         const restart = res.data?.restart_fields || [];
-        form.setFieldValue(['rss_generator', 'worker_token'], '');
         if (restart.length > 0) {
-          Modal.warning({
-            title: '已保存（部分项需重启生效）',
+          modal.warning({
+            title: `「${tabScope.label}」已保存（部分项需重启生效）`,
             content: `多数改动已即时生效；以下需重启后端后生效：${restart.join('、')}`,
           });
         } else {
-          messageApi.success('保存成功，已即时生效');
+          messageApi.success(`「${tabScope.label}」保存成功，已即时生效`);
         }
-        // 刷新脱敏占位状态
-        const fresh = await getAppConfig();
-        if (fresh.code === 0 && fresh.data) {
-          setSecrets(fresh.data.secrets || {});
+
+        try {
+          const fresh = await getAppConfig();
+          if (fresh.code === 0 && fresh.data) {
+            setConfig(fresh.data.config);
+            setSecrets(fresh.data.secrets || {});
+            applyTabConfigToForm(fresh.data.config, tabKey);
+          } else {
+            messageApi.warning(
+              fresh.message || '配置已保存，但最新状态刷新失败，请重新打开页面',
+            );
+          }
+        } catch (error: any) {
+          messageApi.warning(
+            error?.message || '配置已保存，但最新状态刷新失败，请重新打开页面',
+          );
         }
-        return true;
+        return;
       }
       messageApi.error(res.message || '保存失败');
-      return false;
     } catch (error: any) {
       messageApi.error(error?.message || '保存失败');
-      return false;
+    } finally {
+      setSavingTab(undefined);
     }
   };
 
@@ -572,7 +635,7 @@ const SystemSettingsPage: React.FC = () => {
       form.setFieldValue(['site', 'login_background_url'], response.data.url);
       form.setFieldValue(['site', 'login_background_source'], 'custom');
       messageApi.success(
-        `上传完成（${response.data.width} × ${response.data.height}），点击“保存配置”后生效`,
+        `上传完成（${response.data.width} × ${response.data.height}），请保存当前 Tab 后生效`,
       );
     } catch (error: any) {
       messageApi.error(error?.message || '背景图片上传失败');
@@ -588,7 +651,7 @@ const SystemSettingsPage: React.FC = () => {
     }
 
     form.setFieldValue(['server', 'web_115_user_agent'], navigator.userAgent);
-    messageApi.success('已获取当前浏览器 UA，请点击“保存配置”完成保存');
+    messageApi.success('已获取当前浏览器 UA，请保存当前 Tab 完成保存');
   };
 
   const handleResetRSSAutomationUserAgent = () => {
@@ -596,7 +659,7 @@ const SystemSettingsPage: React.FC = () => {
       ['rss_automation', 'user_agent'],
       DEFAULT_RSS_AUTOMATION_USER_AGENT,
     );
-    messageApi.success('已恢复默认 RSS 自动化 UA，请点击“保存配置”完成保存');
+    messageApi.success('已恢复默认 RSS 自动化 UA，请保存当前 Tab 完成保存');
   };
 
   return (
@@ -612,7 +675,7 @@ const SystemSettingsPage: React.FC = () => {
         className={styles.intro}
         type="info"
         showIcon
-        message={
+        title={
           <span>
             <Typography.Text strong className={styles.introTitle}>
               配置按用途持久化
@@ -630,16 +693,29 @@ const SystemSettingsPage: React.FC = () => {
             <ProForm<API.AppConfig>
               form={form}
               initialValues={config}
-              onFinish={onFinish}
               layout="vertical"
               submitter={{
-                searchConfig: { submitText: '保存配置', resetText: '重置' },
-                render: (_props, doms) => (
+                render: () => (
                   <div className={styles.formActions}>
                     <Typography.Text type="secondary">
-                      修改仅在点击保存后生效
+                      仅保存「{SETTINGS_TAB_SCOPES[activeTab].label}」中的修改
                     </Typography.Text>
-                    <Space>{doms}</Space>
+                    <Space>
+                      <Button
+                        disabled={Boolean(savingTab)}
+                        onClick={handleResetActiveTab}
+                      >
+                        重置当前 Tab
+                      </Button>
+                      <Button
+                        type="primary"
+                        loading={savingTab === activeTab}
+                        disabled={Boolean(savingTab) && savingTab !== activeTab}
+                        onClick={handleSaveActiveTab}
+                      >
+                        保存{SETTINGS_TAB_SCOPES[activeTab].label}配置
+                      </Button>
+                    </Space>
                   </div>
                 ),
               }}
@@ -647,6 +723,8 @@ const SystemSettingsPage: React.FC = () => {
               <Tabs
                 className={styles.settingsTabs}
                 tabBarGutter={28}
+                activeKey={activeTab}
+                onChange={(key) => setActiveTab(key as SettingsTabKey)}
                 items={[
                   {
                     key: 'server',
@@ -780,7 +858,7 @@ const SystemSettingsPage: React.FC = () => {
                               name={['rss_automation', 'user_agent']}
                               label="User-Agent"
                               placeholder="例如：Mozilla/5.0 ..."
-                              extra="保存后立即用于新的 RSS 自动化请求，不影响旧 RSS 监控。"
+                              extra="保存后立即用于新的 RSS 自动化请求。"
                               fieldProps={{
                                 autoSize: { minRows: 3, maxRows: 6 },
                                 maxLength: 2048,
@@ -812,82 +890,6 @@ const SystemSettingsPage: React.FC = () => {
                               150；自定义值只保存在数据库。
                             </Typography.Text>
                           </div>
-                        </SettingsSection>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'rss-generator',
-                    label: 'RSS 生成器',
-                    forceRender: true,
-                    children: (
-                      <div className={styles.tabPanel}>
-                        <SettingsSection
-                          title="Worker 鉴权"
-                          description="设置 FilmFusion 调用 RSS Generator Worker 使用的内部凭证。"
-                        >
-                          <Alert
-                            className={styles.sectionAlert}
-                            type="warning"
-                            showIcon
-                            message="需要在两处手工填写完全相同的 Token"
-                            description="先在 Worker 的 Compose 环境变量 WORKER_AUTH_TOKEN 中填写，再在下方填写相同值。保存后 FilmFusion 立即使用新 Token；修改 Compose 后需要重建 Worker 容器。"
-                          />
-                          <div className={styles.fieldGrid}>
-                            <ProFormText.Password
-                              width="xl"
-                              name={['rss_generator', 'worker_token']}
-                              label="Worker Token"
-                              extra="至少 32 个字符。后台不会回显明文，留空保存表示保持现值。"
-                              fieldProps={{
-                                autoComplete: 'new-password',
-                                placeholder: secretPlaceholder(
-                                  'rss_generator.worker_token',
-                                ),
-                              }}
-                              rules={[
-                                {
-                                  validator: async (_, value?: string) => {
-                                    const raw = value || '';
-                                    const token = raw.trim();
-                                    if (!token) {
-                                      if (
-                                        secrets['rss_generator.worker_token']
-                                      ) {
-                                        return;
-                                      }
-                                      throw new Error('请输入 Worker Token');
-                                    }
-                                    if (/[\r\n]/.test(raw)) {
-                                      throw new Error(
-                                        'Worker Token 不能包含换行',
-                                      );
-                                    }
-                                    const length = new TextEncoder().encode(
-                                      token,
-                                    ).length;
-                                    if (length < 32) {
-                                      throw new Error(
-                                        'Worker Token 至少需要 32 个字符',
-                                      );
-                                    }
-                                    if (length > 512) {
-                                      throw new Error(
-                                        'Worker Token 不能超过 512 个字符',
-                                      );
-                                    }
-                                  },
-                                },
-                              ]}
-                            />
-                          </div>
-                          <Typography.Text type="secondary">
-                            当前内部地址：
-                            <Typography.Text code>
-                              {config.rss_generator?.worker_url ||
-                                'http://rss-generator-worker:8787'}
-                            </Typography.Text>
-                          </Typography.Text>
                         </SettingsSection>
                       </div>
                     ),
@@ -1128,7 +1130,7 @@ const SystemSettingsPage: React.FC = () => {
                                     className={styles.sectionAlert}
                                     type="info"
                                     showIcon
-                                    message={
+                                    title={
                                       loginBackgroundSource === 'emby'
                                         ? '从 Emby 媒体库读取横向 Backdrop'
                                         : '从 TMDB 电影与剧集榜单读取横向 Backdrop'
@@ -1269,7 +1271,7 @@ const SystemSettingsPage: React.FC = () => {
                             }
                             showIcon
                             icon={<SafetyCertificateOutlined />}
-                            message={
+                            title={
                               !webhookAuthEnabled
                                 ? 'Webhook 鉴权已关闭'
                                 : secrets['webhook.clouddrive2.token'] ||
@@ -1300,7 +1302,7 @@ const SystemSettingsPage: React.FC = () => {
                                 placeholder: secretPlaceholder(
                                   'webhook.clouddrive2.token',
                                 ),
-                                addonAfter: (
+                                suffix: (
                                   <Button
                                     type="text"
                                     size="small"
@@ -1505,7 +1507,7 @@ const SystemSettingsPage: React.FC = () => {
                             className={styles.sectionAlert}
                             type="info"
                             showIcon
-                            message="渠道测试使用已保存的配置"
+                            title="渠道测试使用已保存的配置"
                             description="修改下方字段后请先保存，再发送测试消息。"
                             action={
                               <Button
@@ -1593,7 +1595,7 @@ const SystemSettingsPage: React.FC = () => {
                             className={styles.sectionAlert}
                             type="info"
                             showIcon
-                            message="Webhook 收到结构化通知事件"
+                            title="Webhook 收到结构化通知事件"
                             description="POST JSON 包含 instance、event、title、message、image_url、severity、occurred_at 与 metadata。修改后请先保存再测试。"
                             action={
                               <Button
@@ -1840,7 +1842,7 @@ const SystemSettingsPage: React.FC = () => {
                             className={styles.sectionAlert}
                             type="info"
                             showIcon
-                            message="队列会按识别到的季号读取 TMDB 本季集数"
+                            title="队列会按识别到的季号读取 TMDB 本季集数"
                             description="查询结果会按下方缓存时间复用，减少重复请求。"
                           />
                           <div className={styles.toggleGrid}>
@@ -1908,7 +1910,7 @@ const SystemSettingsPage: React.FC = () => {
                             className={styles.sectionAlert}
                             type="warning"
                             showIcon
-                            message="保存配置不会自动获得 Token"
+                            title="保存配置不会自动获得 Token"
                             description="完成应用配置并保存后，打开授权页确认授权；回调页会自动换取并保存 Access Token 与 Refresh Token。"
                             action={
                               <Space wrap>

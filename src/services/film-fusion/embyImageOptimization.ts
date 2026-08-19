@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/api-client';
 export async function getEmbyImageOptimizationSettings() {
   return apiClient.get<API.Response<API.EmbyImageOptimizationSettings>>(
     '/api/emby-image-optimization/settings',
+    { skipErrorHandler: true },
   );
 }
 
@@ -12,12 +13,14 @@ export async function saveEmbyImageOptimizationSettings(
   return apiClient.put<API.Response<API.EmbyImageOptimizationSettings>>(
     '/api/emby-image-optimization/settings',
     { settings },
+    { skipErrorHandler: true },
   );
 }
 
 export async function getEmbyImageOptimizationSamples() {
   return apiClient.get<API.Response<{ samples: API.EmbyImageSample[] }>>(
     '/api/emby-image-optimization/samples',
+    { skipErrorHandler: true },
   );
 }
 
@@ -27,5 +30,6 @@ export async function testEmbyImageOptimization(
   return apiClient.post<API.Response<API.EmbyImageTestResult>>(
     '/api/emby-image-optimization/test',
     data,
+    { skipErrorHandler: true },
   );
 }

@@ -209,11 +209,10 @@ const EmbyWatchPage: React.FC = () => {
                   setActiveUser(value);
                   setSeriesFilter(undefined);
                 }}
-                optionFilterProp="label"
                 options={userOptions}
                 placeholder="请选择 Emby 用户"
                 popupMatchSelectWidth={false}
-                showSearch
+                showSearch={{ optionFilterProp: 'label' }}
                 value={activeUser}
                 variant="borderless"
               />

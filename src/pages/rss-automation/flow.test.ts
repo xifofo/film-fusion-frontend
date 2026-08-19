@@ -91,6 +91,22 @@ describe('RSS automation flow conversion', () => {
     expect(recognize.max_attempts).toBe(3);
   });
 
+  it('creates a FilmFusion local recognition node without MoviePilot', () => {
+    const recognize = createNodeDefinition('filmfusion_recognize', {
+      x: 240,
+      y: 120,
+    });
+
+    expect(recognize.name).toBe('FilmFusion 本地识别');
+    expect(recognize.config).toEqual({
+      recognition_mode: 'title',
+      input: '$item.title',
+      tmdb_id: '',
+      lookup_tmdb: true,
+    });
+    expect(recognize.max_attempts).toBe(3);
+  });
+
   it('creates a single-attempt organize and STRM node', () => {
     const organize = createNodeDefinition('organize_strm', {
       x: 500,
@@ -109,6 +125,14 @@ describe('RSS automation flow conversion', () => {
 
   it('creates the qB wait, lookup, verification and Emby nodes with safe defaults', () => {
     const waitQB = createNodeDefinition('wait_qbittorrent', { x: 0, y: 0 });
+    const mpTransfer = createNodeDefinition('moviepilot_transfer', {
+      x: 0,
+      y: 0,
+    });
+    const deleteQB = createNodeDefinition('delete_qbittorrent', {
+      x: 0,
+      y: 0,
+    });
     const dedupe = createNodeDefinition('media_exists', { x: 0, y: 0 });
     const query = createNodeDefinition('hdhive_query', { x: 0, y: 0 });
     const verify = createNodeDefinition('strm_verify', { x: 0, y: 0 });
@@ -119,6 +143,23 @@ describe('RSS automation flow conversion', () => {
     expect(waitQB.config).toMatchObject({
       poll_interval_seconds: 30,
       max_wait_minutes: 10080,
+    });
+    expect(mpTransfer).toMatchObject({
+      name: 'MP2 整理入库',
+      max_attempts: 1,
+      config: {
+        source_path: '',
+        file_type: 'auto',
+        media_type: 'auto',
+        tmdb_id: '',
+        scrape: false,
+        timeout_seconds: 600,
+      },
+    });
+    expect(deleteQB).toMatchObject({
+      name: '删除 qB 做种任务',
+      max_attempts: 1,
+      config: { delete_files: false, timeout_seconds: 30 },
     });
     expect(dedupe.config).toMatchObject({ tmdb_id: '$item.tmdb_id' });
     expect(query.config).toMatchObject({

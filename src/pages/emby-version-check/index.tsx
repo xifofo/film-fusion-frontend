@@ -4,10 +4,17 @@ import {
   FileSearchOutlined,
   FolderOpenOutlined,
   ReloadOutlined,
+  SettingOutlined,
   VideoCameraOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
+import {
+  ModalForm,
+  PageContainer,
+  ProFormSelect,
+  ProFormSwitch,
+  ProFormText,
+} from '@ant-design/pro-components';
 import {
   Alert,
   Button,
@@ -31,8 +38,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   getCloudPaths,
+  getEmbyVersionCheckSetting,
   getEmbyVersionCheckStatus,
   scanEmbyVersionCheck,
+  updateEmbyVersionCheckSetting,
 } from '@/services/film-fusion';
 
 const { Text, Title } = Typography;
@@ -103,7 +112,7 @@ const SummaryTile: React.FC<{
         align="center"
         style={{ justifyContent: 'space-between', width: '100%' }}
       >
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Text type="secondary">{title}</Text>
           <Title
             level={3}
@@ -143,7 +152,7 @@ const fileColumns: ColumnsType<API.EmbyVersionFile> = [
     dataIndex: 'relative_path',
     ellipsis: true,
     render: (_, file) => (
-      <Space direction="vertical" size={0} style={{ maxWidth: 560 }}>
+      <Space orientation="vertical" size={0} style={{ maxWidth: 560 }}>
         <Typography.Text copyable ellipsis={{ tooltip: file.relative_path }}>
           {file.relative_path}
         </Typography.Text>
@@ -190,6 +199,7 @@ const EmbyVersionCheckPage: React.FC = () => {
   const [selectionReady, setSelectionReady] = useState(false);
   const [result, setResult] = useState<API.EmbyVersionCheckResult>();
   const [job, setJob] = useState<API.EmbyVersionCheckJob | null>(null);
+  const [setting, setSetting] = useState<API.EmbyVersionCheckSetting>();
 
   const {
     data: cloudPathPage,
@@ -221,6 +231,17 @@ const EmbyVersionCheckPage: React.FC = () => {
     setSelectionReady(true);
   }, [cloudPaths, selectionReady]);
 
+  const fetchSetting = useCallback(async () => {
+    try {
+      const response = await getEmbyVersionCheckSetting();
+      if (response.code === 0) {
+        setSetting(response.data);
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '获取定时检查设置失败');
+    }
+  }, [messageApi]);
+
   const fetchStatus = useCallback(async () => {
     try {
       const response = await getEmbyVersionCheckStatus();
@@ -229,14 +250,18 @@ const EmbyVersionCheckPage: React.FC = () => {
       if (nextJob?.result) {
         setResult(nextJob.result);
       }
+      if (nextJob && !nextJob.running) {
+        void fetchSetting();
+      }
     } catch {
       // 状态轮询失败不影响后端任务，下一轮继续查询。
     }
-  }, []);
+  }, [fetchSetting]);
 
   useEffect(() => {
     fetchStatus();
-  }, [fetchStatus]);
+    fetchSetting();
+  }, [fetchSetting, fetchStatus]);
 
   useEffect(() => {
     if (!job?.running) return undefined;
@@ -276,7 +301,7 @@ const EmbyVersionCheckPage: React.FC = () => {
       title: '媒体',
       dataIndex: 'title',
       render: (_, item) => (
-        <Space direction="vertical" size={2} style={{ minWidth: 0 }}>
+        <Space orientation="vertical" size={2} style={{ minWidth: 0 }}>
           <Space size={6} wrap>
             <Tag color={item.media_type === 'movie' ? 'blue' : 'geekblue'}>
               {item.media_type === 'movie' ? '电影' : '剧集'}
@@ -353,6 +378,14 @@ const EmbyVersionCheckPage: React.FC = () => {
         title: '本地多版本检查',
         subTitle: '电影与剧集单集版本巡检',
         extra: [
+          <VersionCheckScheduleForm
+            key={setting?.updated_at || 'schedule'}
+            setting={setting}
+            pathOptions={pathOptions}
+            defaultPathIds={selectedPathIds}
+            defaultMediaType={mediaType}
+            onSaved={setSetting}
+          />,
           <Button
             key="reload"
             icon={<ReloadOutlined />}
@@ -393,8 +426,7 @@ const EmbyVersionCheckPage: React.FC = () => {
           <Select
             mode="multiple"
             allowClear
-            showSearch
-            optionFilterProp="label"
+            showSearch={{ optionFilterProp: 'label' }}
             maxTagCount="responsive"
             placeholder="选择云路径映射"
             value={selectedPathIds}
@@ -412,6 +444,20 @@ const EmbyVersionCheckPage: React.FC = () => {
             全选
           </Button>
         </Space>
+        <Space size={8} wrap style={{ marginTop: 12 }}>
+          <Tag color={setting?.schedule_enabled ? 'green' : 'default'}>
+            定时检查
+            {setting?.schedule_enabled ? `已开启 ${setting.cron}` : '已关闭'}
+          </Tag>
+          {setting?.last_scan_at && (
+            <Text type="secondary">
+              最近自动/手动检查：{formatDateTime(setting.last_scan_at)}
+            </Text>
+          )}
+          {setting?.last_status === 'failed' && setting.last_error && (
+            <Text type="danger">失败：{setting.last_error}</Text>
+          )}
+        </Space>
       </Card>
 
       {job?.running && (
@@ -419,9 +465,9 @@ const EmbyVersionCheckPage: React.FC = () => {
           showIcon
           type="info"
           style={{ marginBottom: 16 }}
-          message="本地多版本检查正在后台运行"
+          title="本地多版本检查正在后台运行"
           description={
-            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+            <Space orientation="vertical" size={6} style={{ width: '100%' }}>
               <Progress
                 percent={
                   job.progress.paths_total > 0
@@ -457,7 +503,7 @@ const EmbyVersionCheckPage: React.FC = () => {
           showIcon
           type="error"
           style={{ marginBottom: 16 }}
-          message="后台检查失败"
+          title="后台检查失败"
           description={job.error || '后台任务异常结束'}
         />
       )}
@@ -507,9 +553,9 @@ const EmbyVersionCheckPage: React.FC = () => {
           type="warning"
           style={{ marginBottom: 16 }}
           icon={<WarningOutlined />}
-          message={`有 ${result.errors.length} 条扫描提示`}
+          title={`有 ${result.errors.length} 条扫描提示`}
           description={
-            <Space direction="vertical" size={2}>
+            <Space orientation="vertical" size={2}>
               {result.errors.slice(0, 8).map((item) => (
                 <Text key={item} type="warning">
                   {item}
@@ -570,6 +616,97 @@ const EmbyVersionCheckPage: React.FC = () => {
         </Card>
       </Spin>
     </PageContainer>
+  );
+};
+
+type VersionCheckScheduleFormProps = {
+  setting?: API.EmbyVersionCheckSetting;
+  pathOptions: Array<{ label: string; value: number; title?: string }>;
+  defaultPathIds: number[];
+  defaultMediaType: API.EmbyVersionCheckMediaType;
+  onSaved: (setting: API.EmbyVersionCheckSetting) => void;
+};
+
+const VersionCheckScheduleForm: React.FC<VersionCheckScheduleFormProps> = ({
+  setting,
+  pathOptions,
+  defaultPathIds,
+  defaultMediaType,
+  onSaved,
+}) => {
+  const [messageApi, contextHolder] = message.useMessage();
+
+  return (
+    <>
+      {contextHolder}
+      <ModalForm
+        title="定时检查设置"
+        width={560}
+        trigger={
+          <Button key="schedule" icon={<SettingOutlined />}>
+            定时设置
+          </Button>
+        }
+        modalProps={{ destroyOnHidden: true }}
+        initialValues={{
+          schedule_enabled: setting?.schedule_enabled ?? false,
+          cron: setting?.cron || '0 4 * * *',
+          media_type: setting?.media_type || defaultMediaType,
+          cloud_path_ids: setting
+            ? setting.cloud_path_ids || []
+            : defaultPathIds,
+        }}
+        onFinish={async (values) => {
+          try {
+            const response = await updateEmbyVersionCheckSetting({
+              schedule_enabled: values.schedule_enabled,
+              cron: values.cron,
+              media_type: values.media_type,
+              cloud_path_ids: values.cloud_path_ids || [],
+            });
+            if (response.code === 0) {
+              onSaved(response.data);
+              messageApi.success('定时检查设置已保存');
+              return true;
+            }
+            messageApi.error(response.message || '保存失败');
+          } catch (error: any) {
+            messageApi.error(error?.message || '保存失败');
+          }
+          return false;
+        }}
+      >
+        <ProFormSwitch name="schedule_enabled" label="开启定时检查" />
+        <ProFormText
+          name="cron"
+          label="cron 表达式"
+          placeholder="如 0 4 * * * 每天 4 点；支持 5/6 段"
+          tooltip="开启定时后必填。例：0 4 * * *（每天 4 点），0 0 */6 * * *（每 6 小时）"
+        />
+        <ProFormSelect
+          name="media_type"
+          label="媒体范围"
+          options={[
+            { label: '全部', value: 'all' },
+            { label: '电影', value: 'movie' },
+            { label: '剧集', value: 'tv' },
+          ]}
+        />
+        <ProFormSelect
+          name="cloud_path_ids"
+          label="云路径映射"
+          tooltip="留空时自动扫描当前用户全部已配置本地路径的映射。"
+          options={pathOptions}
+          fieldProps={{
+            mode: 'multiple',
+            allowClear: true,
+            showSearch: { optionFilterProp: 'label' },
+            maxTagCount: 'responsive',
+            placeholder: '留空扫描全部映射',
+          }}
+        />
+      </ModalForm>
+    </>
   );
 };
 

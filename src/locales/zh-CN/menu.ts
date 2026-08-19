@@ -57,7 +57,7 @@ export default {
   'menu.日志中心': '日志中心',
   'menu.Match302重定向': 'Match302重定向',
   'menu.Pickcode缓存管理': 'Pickcode缓存管理',
-  'menu.Emby封面生成': 'Emby 封面生成',
+  'menu.Emby媒体库工具': '媒体库工具',
   'menu.Emby媒体统计': 'Emby 媒体统计',
   'menu.Emby多版本检查': 'Emby 多版本检查',
   'menu.Emby.图片优化': '图片优化',

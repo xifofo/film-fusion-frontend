@@ -55,8 +55,8 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
         }}
         loading={loading}
         modalProps={{
-          destroyOnClose: true,
-          maskClosable: false,
+          destroyOnHidden: true,
+          mask: { closable: false },
         }}
         layout="vertical"
         width={600}

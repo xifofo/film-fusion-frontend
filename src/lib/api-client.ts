@@ -1,9 +1,9 @@
-import { message } from 'antd';
 import axios, {
   type AxiosRequestConfig,
   type AxiosResponse,
   type InternalAxiosRequestConfig,
 } from 'axios';
+import { showApiError } from '@/lib/antd-feedback';
 
 export type ApiRequestConfig<D = unknown> = AxiosRequestConfig<D> & {
   skipErrorHandler?: boolean;
@@ -40,7 +40,7 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (!axios.isAxiosError(error)) {
-      message.error('请求失败，请重试');
+      showApiError('请求失败，请重试');
       return Promise.reject(error);
     }
 
@@ -51,7 +51,7 @@ axiosInstance.interceptors.response.use(
 
     if (error.response?.status === 401) {
       if (window.location.pathname !== LOGIN_PATH) {
-        message.error('登录已过期，请重新登录');
+        showApiError('登录已过期，请重新登录');
       }
       redirectToLogin();
       return Promise.reject(error);
@@ -61,13 +61,13 @@ axiosInstance.interceptors.response.use(
       const responseData = error.response.data as
         | { message?: string }
         | undefined;
-      message.error(
+      showApiError(
         responseData?.message || `请求失败（HTTP ${error.response.status}）`,
       );
     } else if (error.request) {
-      message.error('服务暂时无响应，请稍后重试');
+      showApiError('服务暂时无响应，请稍后重试');
     } else {
-      message.error(error.message || '请求失败，请重试');
+      showApiError(error.message || '请求失败，请重试');
     }
 
     return Promise.reject(error);

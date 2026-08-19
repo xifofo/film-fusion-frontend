@@ -18,11 +18,11 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import {
+  App,
   Button,
   Card,
   Col,
   Drawer,
-  Modal,
   message,
   Popconfirm,
   Row,
@@ -45,6 +45,7 @@ import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
 
 const PickcodeCacheList: React.FC = () => {
+  const { modal } = App.useApp();
   const actionRef = useRef<ActionType | null>(null);
 
   const [showDetail, setShowDetail] = useState<boolean>(false);
@@ -125,7 +126,7 @@ const PickcodeCacheList: React.FC = () => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: '确认批量删除',
       content: `确定要删除选中的 ${selectedRows.length} 条缓存记录吗？`,
       okText: '确认',
@@ -138,7 +139,7 @@ const PickcodeCacheList: React.FC = () => {
 
   // 处理清空所有缓存
   const handleClearAll = () => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认清空所有缓存',
       content: '此操作将删除所有 Pickcode 缓存记录，且不可恢复。确定继续吗？',
       okText: '确认',
@@ -164,7 +165,7 @@ const PickcodeCacheList: React.FC = () => {
       dataIndex: 'id',
       width: 80,
       sorter: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '文件路径',
@@ -182,7 +183,7 @@ const PickcodeCacheList: React.FC = () => {
       dataIndex: 'pickcode',
       copyable: true,
       render: (text) => <Tag color="blue">{text}</Tag>,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '创建时间',
@@ -190,7 +191,7 @@ const PickcodeCacheList: React.FC = () => {
       width: 180,
       valueType: 'dateTime',
       sorter: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) =>
         dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
     },
@@ -200,7 +201,7 @@ const PickcodeCacheList: React.FC = () => {
       width: 180,
       valueType: 'dateTime',
       sorter: true,
-      hideInSearch: true,
+      search: false,
       render: (_, record) =>
         dayjs(record.updated_at).format('YYYY-MM-DD HH:mm:ss'),
     },
@@ -348,7 +349,7 @@ const PickcodeCacheList: React.FC = () => {
 
       {/* 详情抽屉 */}
       <Drawer
-        width={600}
+        size={600}
         open={showDetail}
         onClose={() => setShowDetail(false)}
         closable={false}

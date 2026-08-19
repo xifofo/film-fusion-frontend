@@ -56,10 +56,13 @@ export type RSSAutomationNodeType =
   | 'join'
   | 'qbittorrent'
   | 'wait_qbittorrent'
+  | 'moviepilot_transfer'
+  | 'delete_qbittorrent'
   | 'offline115'
   | 'offline115_openapi'
   | 'wait115'
   | 'moviepilot_title_recognize'
+  | 'filmfusion_recognize'
   | 'media_exists'
   | 'hdhive_query'
   | 'hdhive_unlock'
@@ -175,6 +178,7 @@ export type RSSAutomationTargetInput = {
     base_url: string;
     username: string;
     password: string;
+    api_key: string;
   };
 };
 
@@ -186,6 +190,21 @@ export type RSSAutomationTarget = {
   config_json: string;
   created_at: string;
   updated_at: string;
+};
+
+export type RSSAutomationTargetStatus = {
+  target_id: number;
+  enabled: boolean;
+  online: boolean;
+  connection_status?: 'connected' | 'firewalled' | 'disconnected' | string;
+  download_speed: number;
+  upload_speed: number;
+  downloaded_session: number;
+  uploaded_session: number;
+  active_torrents?: number;
+  dht_nodes: number;
+  error?: string;
+  checked_at: string;
 };
 
 export type RSSAutomationRunStatus =
@@ -243,29 +262,6 @@ export type RSSAutomationEntry = {
   discovered_at: string;
 };
 
-export type RSSAutomationLegacyMigrationStatus = {
-  available: boolean;
-  complete: boolean;
-  source_count: number;
-  enabled_source_count: number;
-  migrated_source_count: number;
-  pending_source_count: number;
-  rule_count: number;
-  enabled_rule_count: number;
-  disabled_rule_count: number;
-  item_count: number;
-};
-
-export type RSSAutomationLegacyMigrationResult = {
-  sources_migrated: number;
-  workflows_created: number;
-  entries_migrated: number;
-  legacy_sources_stopped: number;
-  enabled_rules_migrated: number;
-  disabled_rules_kept: number;
-  status: RSSAutomationLegacyMigrationStatus;
-};
-
 export type RSSAutomationEntryHistoryItem = {
   entry: RSSAutomationEntry;
   source_name: string;
@@ -302,7 +298,6 @@ export type RSSAutomationDashboard = {
   running_nodes: number;
   failed_runs: number;
   source_running: boolean;
-  legacy_migration?: RSSAutomationLegacyMigrationStatus;
   node_protocols?: RSSAutomationNodeProtocol[];
 };
 
@@ -461,11 +456,6 @@ export const createRSSAutomation = (input: RSSAutomationCreateInput) =>
     input,
   );
 
-export const migrateLegacyRSSMonitor = () =>
-  apiClient.post<API.Response<RSSAutomationLegacyMigrationResult>>(
-    '/api/rss-automation/legacy-migration',
-  );
-
 export const updateRSSAutomationSource = (
   id: number,
   input: RSSAutomationSourceInput,
@@ -556,6 +546,11 @@ export const testRSSAutomationTarget = (id: number) =>
 
 export const getDownloaders = () =>
   apiClient.get<API.Response<RSSAutomationTarget[]>>('/api/downloaders');
+
+export const getDownloaderStatuses = () =>
+  apiClient.get<API.Response<RSSAutomationTargetStatus[]>>(
+    '/api/downloaders/status',
+  );
 
 export const createDownloader = (input: RSSAutomationTargetInput) =>
   apiClient.post<API.Response<RSSAutomationTarget>>('/api/downloaders', input);

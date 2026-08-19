@@ -172,8 +172,7 @@ const ServerLogsPage: React.FC = () => {
                 label: `${f.name}（${formatSize(f.size)}）`,
                 value: f.name,
               }))}
-              showSearch
-              optionFilterProp="label"
+              showSearch={{ optionFilterProp: 'label' }}
             />
           </Space>
           <Space>
@@ -201,7 +200,7 @@ const ServerLogsPage: React.FC = () => {
               step={100}
               value={lines}
               onChange={(v) => setLines(v || 500)}
-              addonAfter="行"
+              suffix="行"
               style={{ width: 130 }}
             />
           </Space>
@@ -233,7 +232,15 @@ const ServerLogsPage: React.FC = () => {
         </Space>
 
         <Table<API.ServerLogEntry>
-          rowKey={(_, index) => String(index)}
+          rowKey={(record) =>
+            [
+              record.timestamp,
+              record.level,
+              record.caller,
+              record.msg,
+              record.raw,
+            ].join('|')
+          }
           size="small"
           loading={loading}
           columns={columns}

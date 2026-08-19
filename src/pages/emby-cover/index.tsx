@@ -1,153 +1,384 @@
 import {
-  CloudUploadOutlined,
+  DownOutlined,
   EditOutlined,
   EyeOutlined,
+  MoreOutlined,
+  ReloadOutlined,
   SortAscendingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import type { ActionType, ProColumns } from '@ant-design/pro-components';
-import { PageContainer, ProTable } from '@ant-design/pro-components';
+import type { MenuProps } from 'antd';
 import {
-  Alert,
+  App,
   Button,
-  Modal,
-  message,
+  Card,
+  Dropdown,
   Popconfirm,
-  Space,
-  Tag,
-  Tooltip,
+  Popover,
+  Spin,
   Typography,
 } from 'antd';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import dayjs from 'dayjs';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   backfillEmbySortName,
   batchGenerateEmbyCovers,
+  embyWatchImageUrl,
   getEmbySortNameStatus,
   listEmbyCoverLibraries,
   listEmbyCoverTemplates,
 } from '@/services/film-fusion';
 import EditConfigForm from './components/EditConfigForm';
 import PreviewModal from './components/PreviewModal';
+import styles from './index.module.less';
 
 const { Text } = Typography;
 
-/** SortName backfill 任务状态条：运行中显示进度，已结束显示最终统计 */
-const SortNameJobAlert: React.FC<{ job: API.EmbySortNameJob }> = ({ job }) => {
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '尚未生成';
+  const date = dayjs(value);
+  return date.isValid() ? date.format('YYYY-MM-DD HH:mm') : value;
+};
+
+const collectionTypeLabel = (type: string) => {
+  const labels: Record<string, string> = {
+    movies: '电影',
+    tvshows: '剧集',
+    boxsets: '合集',
+    music: '音乐',
+    homevideos: '家庭视频',
+    mixed: '混合',
+  };
+  return labels[type] || type || '未知类型';
+};
+
+const LibraryBackdrop: React.FC<{
+  libraryId: string;
+  libraryName: string;
+}> = ({ libraryId, libraryName }) => {
+  const [source, setSource] = useState<'backdrop' | 'primary' | 'failed'>(
+    'backdrop',
+  );
+
+  useEffect(() => setSource('backdrop'), [libraryId]);
+
+  const imageUrl =
+    source === 'failed'
+      ? ''
+      : embyWatchImageUrl(
+          libraryId,
+          source === 'backdrop' ? 1200 : 720,
+          source === 'backdrop' ? 'Backdrop' : 'Primary',
+        );
+
+  return (
+    <div aria-hidden="true" className={styles.backdropFrame}>
+      {imageUrl ? (
+        <img
+          alt=""
+          className={styles.backdropImage}
+          decoding="async"
+          loading="lazy"
+          onError={() =>
+            setSource((current) =>
+              current === 'backdrop' ? 'primary' : 'failed',
+            )
+          }
+          src={imageUrl}
+        />
+      ) : (
+        <div className={styles.backdropFallback}>
+          <span>{Array.from(libraryName.trim())[0] || '库'}</span>
+        </div>
+      )}
+      <div className={styles.backdropScrim} />
+    </div>
+  );
+};
+
+const SortNameJobStatus: React.FC<{ job: API.EmbySortNameJob }> = ({ job }) => {
   const seconds = Math.round((job.duration_ms || 0) / 1000);
   const baseScope =
     job.library_ids && job.library_ids.length > 0
       ? `指定 ${job.library_ids.length} 个库`
-      : '全库';
+      : '全部媒体库';
   const scope = job.force ? `${baseScope} · 强制覆盖` : baseScope;
-
-  if (job.running) {
-    return (
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={`SortName 拼音回填进行中（${scope}）`}
-        description={
-          <Text type="secondary">
-            已处理 <Text strong>{job.total}</Text>，更新 {job.updated}，跳过{' '}
-            {job.skipped}，错误 {job.errors}，已耗时 {seconds}
-            s。后端后台运行，刷新页面不影响。
-          </Text>
-        }
-      />
-    );
-  }
-
-  if (job.error_msg) {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        closable
-        style={{ marginBottom: 16 }}
-        message={`SortName 拼音回填终止（${scope}）`}
-        description={
-          <div>
-            <div>
-              已处理 {job.total}，更新 {job.updated}，跳过 {job.skipped}，错误{' '}
-              {job.errors}，耗时 {seconds}s
-            </div>
-            <Text type="danger">原因：{job.error_msg}</Text>
-          </div>
-        }
-      />
-    );
-  }
+  const tone = job.running
+    ? 'processing'
+    : job.error_msg
+      ? 'error'
+      : job.errors > 0
+        ? 'warning'
+        : 'success';
+  const title = job.running
+    ? 'SortName 拼音回填进行中'
+    : job.error_msg
+      ? 'SortName 拼音回填已终止'
+      : 'SortName 拼音回填已完成';
 
   return (
-    <Alert
-      type={job.errors > 0 ? 'warning' : 'success'}
-      showIcon
-      closable
-      style={{ marginBottom: 16 }}
-      message={`SortName 拼音回填完成（${scope}）`}
-      description={
-        <Text type="secondary">
-          总计 <Text strong>{job.total}</Text>，更新 {job.updated}，跳过{' '}
-          {job.skipped}，错误 {job.errors}，耗时 {seconds}s
-        </Text>
-      }
-    />
+    <output
+      aria-live="polite"
+      className={`${styles.jobStatus} ${styles[`jobStatus-${tone}`]}`}
+    >
+      <span className={styles.jobStatusDot} />
+      <div>
+        <div className={styles.jobStatusTitle}>
+          <strong>{title}</strong>
+          <span>{scope}</span>
+        </div>
+        <p>
+          已处理 {job.total}，更新 {job.updated}，跳过 {job.skipped}，错误{' '}
+          {job.errors}，耗时 {seconds}s
+          {job.error_msg ? ` · ${job.error_msg}` : ''}
+        </p>
+      </div>
+    </output>
   );
 };
 
-/** 媒体库类型标签 */
-const collectionTypeTag = (t: string) => {
-  const map: Record<string, { color: string; label: string }> = {
-    movies: { color: 'blue', label: '电影' },
-    tvshows: { color: 'purple', label: '剧集' },
-    boxsets: { color: 'geekblue', label: '合集' },
-    music: { color: 'cyan', label: '音乐' },
-    homevideos: { color: 'gold', label: '家庭视频' },
-    mixed: { color: 'default', label: '混合' },
-  };
-  const item = map[t] || { color: 'default', label: t || '未知' };
-  return <Tag color={item.color}>{item.label}</Tag>;
+type LibraryCardProps = {
+  record: API.EmbyCoverLibraryView;
+  templateName: string;
+  templates: API.EmbyCoverTemplate[];
+  sortNameRunning: boolean;
+  sortNameStarting: string | null;
+  onPreview: (record: API.EmbyCoverLibraryView) => void;
+  onReload: () => void;
+  onStartSortName: (
+    libraryIds: string[] | undefined,
+    actionKey: string,
+    force?: boolean,
+  ) => Promise<void>;
+};
+
+const LibraryCard: React.FC<LibraryCardProps> = ({
+  record,
+  templateName,
+  templates,
+  sortNameRunning,
+  sortNameStarting,
+  onPreview,
+  onReload,
+  onStartSortName,
+}) => {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const primaryTitle = record.cn_title || record.emby_name;
+  const secondaryTitle =
+    record.en_subtitle ||
+    (primaryTitle !== record.emby_name ? record.emby_name : '');
+  const healthText = record.last_error
+    ? record.last_error
+    : record.last_generated_at
+      ? '运行正常'
+      : '等待首次生成';
+
+  return (
+    <Card className={styles.libraryCard} variant="borderless">
+      <div className={styles.cardVisual}>
+        <LibraryBackdrop
+          libraryId={record.emby_library_id}
+          libraryName={record.emby_name}
+        />
+
+        <div className={styles.cardTopline}>
+          <span className={styles.collectionBadge}>
+            {collectionTypeLabel(record.collection_type)}
+          </span>
+          <span
+            className={`${styles.enabledBadge} ${record.enabled ? styles.enabledBadgeOn : styles.enabledBadgeOff}`}
+          >
+            {record.enabled ? '已启用' : '已停用'}
+          </span>
+        </div>
+
+        <div className={styles.cardMain}>
+          <div className={styles.libraryCopy}>
+            <p>EMBY LIBRARY · {record.emby_library_id}</p>
+            <h2 title={primaryTitle}>{primaryTitle}</h2>
+            {secondaryTitle && (
+              <div className={styles.librarySubtitle} title={secondaryTitle}>
+                {secondaryTitle}
+              </div>
+            )}
+            <div className={styles.cardChips}>
+              <span title={templateName}>{templateName}</span>
+              <span>{record.configured ? '已配置' : '默认配置'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.cardFooter}>
+        <div className={styles.metadataList}>
+          <div>
+            <span>媒体库</span>
+            <strong title={record.emby_name}>{record.emby_name}</strong>
+          </div>
+          <div>
+            <span>上次生成</span>
+            <time>{formatDateTime(record.last_generated_at)}</time>
+          </div>
+          <div className={record.last_error ? styles.metadataError : ''}>
+            <span>最近状态</span>
+            <strong title={healthText}>{healthText}</strong>
+          </div>
+        </div>
+
+        <div className={styles.actionRow}>
+          <Button
+            icon={<EyeOutlined />}
+            onClick={() => onPreview(record)}
+            size="small"
+            type="link"
+          >
+            预览封面
+          </Button>
+          <Popover
+            arrow={false}
+            content={
+              <div className={styles.cardActionMenu}>
+                <EditConfigForm
+                  record={record}
+                  templates={templates}
+                  trigger={
+                    <Button
+                      icon={<EditOutlined />}
+                      onClick={() => setMoreOpen(false)}
+                      size="small"
+                      type="text"
+                    >
+                      编辑配置
+                    </Button>
+                  }
+                  onSuccess={onReload}
+                />
+                <Popconfirm
+                  title={`对「${record.emby_name}」回填拼音 SortName？`}
+                  description="仅扫描本库下 Movie/Series/BoxSet，已锁定的不覆盖。后端后台跑，可关闭页面。"
+                  okText="启动"
+                  cancelText="取消"
+                  onConfirm={() => {
+                    setMoreOpen(false);
+                    return onStartSortName(
+                      [record.emby_library_id],
+                      `row-${record.emby_library_id}`,
+                      false,
+                    );
+                  }}
+                  disabled={sortNameRunning}
+                >
+                  <Button
+                    disabled={sortNameRunning}
+                    icon={<SortAscendingOutlined />}
+                    loading={
+                      sortNameStarting === `row-${record.emby_library_id}`
+                    }
+                    size="small"
+                    type="text"
+                  >
+                    拼音回填
+                  </Button>
+                </Popconfirm>
+                <div className={styles.cardActionMenuDivider} />
+                <Popconfirm
+                  title={`强制覆盖「${record.emby_name}」的 SortName？`}
+                  description={
+                    <div style={{ maxWidth: 320 }}>
+                      <Text type="warning">忽略锁定状态</Text>
+                      ，包括被其它工具锁定的条目也会被覆写。
+                    </div>
+                  }
+                  okText="强制覆盖"
+                  okButtonProps={{ danger: true }}
+                  cancelText="取消"
+                  onConfirm={() => {
+                    setMoreOpen(false);
+                    return onStartSortName(
+                      [record.emby_library_id],
+                      `row-force-${record.emby_library_id}`,
+                      true,
+                    );
+                  }}
+                  disabled={sortNameRunning}
+                >
+                  <Button
+                    danger
+                    disabled={sortNameRunning}
+                    loading={
+                      sortNameStarting === `row-force-${record.emby_library_id}`
+                    }
+                    size="small"
+                    type="text"
+                  >
+                    强制覆盖 SortName
+                  </Button>
+                </Popconfirm>
+              </div>
+            }
+            onOpenChange={setMoreOpen}
+            open={moreOpen}
+            placement="bottomRight"
+            styles={{ content: { padding: 6 } }}
+            trigger="click"
+          >
+            <Button
+              aria-label={`${record.emby_name} 更多操作`}
+              icon={<MoreOutlined />}
+              size="small"
+              type="link"
+            >
+              更多操作 <DownOutlined className="text-[9px]" />
+            </Button>
+          </Popover>
+        </div>
+      </div>
+    </Card>
+  );
 };
 
 const EmbyCoverPage: React.FC = () => {
-  const actionRef = useRef<ActionType | null>(null);
+  const { message: messageApi, modal } = App.useApp();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewRow, setPreviewRow] = useState<API.EmbyCoverLibraryView>();
-  // SortName backfill 全局状态（后端同时只跑一个任务）
   const [sortNameJob, setSortNameJob] = useState<API.EmbySortNameJob | null>(
     null,
   );
-  // 正在启动哪一行的 backfill（仅启动瞬间，为”按下后立即返回“提供视觉反馈）
   const [sortNameStarting, setSortNameStarting] = useState<string | null>(null);
 
-  // 模板列表（全局拉一次）
   const { data: templates = [] } = useApiRequest(listEmbyCoverTemplates, {
     formatResult: (res) => res?.data || [],
   });
+  const {
+    data: libraries = [],
+    loading: librariesLoading,
+    refresh: refreshLibraries,
+  } = useApiRequest(listEmbyCoverLibraries, {
+    formatResult: (res) => res?.data || [],
+    onError: (error) => {
+      messageApi.error(error?.message || '获取媒体库列表失败');
+    },
+  });
+
+  const reloadLibraries = useCallback(async () => {
+    await refreshLibraries().catch(() => undefined);
+  }, [refreshLibraries]);
 
   const templateMap = useMemo(() => {
-    const m: Record<string, string> = {};
+    const map: Record<string, string> = {};
     for (const template of templates) {
-      m[template.id] = template.name;
+      map[template.id] = template.name;
     }
-    return m;
+    return map;
   }, [templates]);
 
-  // SortName 状态轮询：进页拉一次；running 时 3 秒一次
   const fetchSortNameStatus = useCallback(async () => {
     try {
       const resp = await getEmbySortNameStatus();
       setSortNameJob(resp?.data?.job || null);
     } catch {
-      // 静默：状态接口失败不应中断页面
+      // 状态查询失败不阻断媒体库工具页。
     }
   }, []);
 
@@ -161,7 +392,6 @@ const EmbyCoverPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [sortNameJob?.running, sortNameJob?.id, fetchSortNameStatus]);
 
-  // 启动 SortName backfill（后端立即返回，后台跑）
   const startSortNameBackfill = async (
     libraryIds: string[] | undefined,
     actionKey: string,
@@ -172,14 +402,14 @@ const EmbyCoverPage: React.FC = () => {
       const resp = await backfillEmbySortName(libraryIds, force);
       if (resp?.data) {
         setSortNameJob(resp.data);
-        message.success(
+        messageApi.success(
           force
             ? 'SortName 强制覆盖已启动，后端后台执行'
             : 'SortName 回填已启动，后端后台执行，可关闭页面',
         );
       }
-    } catch (e: any) {
-      message.error(e?.message || '启动 SortName 回填失败');
+    } catch (error: any) {
+      messageApi.error(error?.message || '启动 SortName 回填失败');
       fetchSortNameStatus();
     } finally {
       setSortNameStarting(null);
@@ -188,33 +418,31 @@ const EmbyCoverPage: React.FC = () => {
 
   const sortNameRunning = !!sortNameJob?.running;
 
-  // 批量生成
   const { run: batchRun, loading: batchLoading } = useApiRequest(
     batchGenerateEmbyCovers,
     {
       manual: true,
-      onSuccess: (res) => {
-        // useApiRequest 默认已解到内层 data（{ success, failed, errors }）
-        if (!res) {
-          message.success('批量任务完成');
+      onSuccess: (result) => {
+        if (!result) {
+          messageApi.success('批量任务完成');
         } else {
-          const { success, failed, errors } = res as {
+          const { success, failed, errors } = result as {
             success: number;
             failed: number;
             errors: string[];
           };
           if (failed === 0) {
-            message.success(`批量生成完成：成功 ${success}`);
+            messageApi.success(`批量生成完成：成功 ${success}`);
           } else {
-            Modal.warning({
+            modal.warning({
               title: `批量生成完成（成功 ${success} / 失败 ${failed}）`,
               width: 640,
               content: (
                 <div style={{ maxHeight: 320, overflow: 'auto' }}>
                   {errors?.length ? (
-                    errors.map((e: string) => (
-                      <div key={e} style={{ marginBottom: 4 }}>
-                        <Text type="danger">· {e}</Text>
+                    errors.map((error) => (
+                      <div key={error} style={{ marginBottom: 4 }}>
+                        <Text type="danger">· {error}</Text>
                       </div>
                     ))
                   ) : (
@@ -225,297 +453,94 @@ const EmbyCoverPage: React.FC = () => {
             });
           }
         }
-        actionRef.current?.reload?.();
+        void reloadLibraries();
       },
-      onError: (e) => {
-        message.error(e?.message || '批量生成失败');
+      onError: (error) => {
+        messageApi.error(error?.message || '批量生成失败');
       },
     },
   );
 
-  const openPreview = (row: API.EmbyCoverLibraryView) => {
-    setPreviewRow(row);
+  const openPreview = (record: API.EmbyCoverLibraryView) => {
+    setPreviewRow(record);
     setPreviewOpen(true);
   };
 
-  const columns: ProColumns<API.EmbyCoverLibraryView>[] = [
+  const moreActionItems: MenuProps['items'] = [
     {
-      title: 'Emby ID',
-      dataIndex: 'emby_library_id',
-      width: 90,
-      search: false,
-      render: (_, r) => <Text type="secondary">{r.emby_library_id}</Text>,
+      key: 'sortname',
+      icon: <SortAscendingOutlined />,
+      label: '拼音回填 SortName',
+      disabled: sortNameRunning,
     },
+    { type: 'divider' },
     {
-      title: '媒体库',
-      dataIndex: 'emby_name',
-      width: 180,
-      render: (_, r) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{r.emby_name}</Text>
-          {collectionTypeTag(r.collection_type)}
-        </Space>
-      ),
-    },
-    {
-      title: '中文主标',
-      dataIndex: 'cn_title',
-      width: 140,
-      render: (_, r) =>
-        r.cn_title ? (
-          <Text>{r.cn_title}</Text>
-        ) : (
-          <Tooltip title="未配置，将使用 Emby 库名">
-            <Text type="secondary">{r.emby_name}</Text>
-          </Tooltip>
-        ),
-    },
-    {
-      title: '英文副标',
-      dataIndex: 'en_subtitle',
-      width: 140,
-      render: (_, r) => r.en_subtitle || <Text type="secondary">—</Text>,
-    },
-    {
-      title: '模板',
-      dataIndex: 'template_id',
-      width: 180,
-      render: (_, r) => (
-        <Tag color="geekblue">
-          {templateMap[r.template_id] || r.template_id}
-        </Tag>
-      ),
-    },
-    {
-      title: '启用',
-      dataIndex: 'enabled',
-      width: 80,
-      render: (_, r) =>
-        r.enabled ? (
-          <Tag color="green">启用</Tag>
-        ) : (
-          <Tag color="default">禁用</Tag>
-        ),
-    },
-    {
-      title: '上次生成',
-      dataIndex: 'last_generated_at',
-      width: 160,
-      valueType: 'dateTime',
-      search: false,
-      render: (_, r) =>
-        r.last_generated_at ? (
-          <Text>{new Date(r.last_generated_at).toLocaleString()}</Text>
-        ) : (
-          <Text type="secondary">未生成</Text>
-        ),
-    },
-    {
-      title: '最近错误',
-      dataIndex: 'last_error',
-      width: 200,
-      search: false,
-      ellipsis: true,
-      render: (_, r) =>
-        r.last_error ? (
-          <Tooltip title={r.last_error}>
-            <Text type="danger" ellipsis>
-              {r.last_error}
-            </Text>
-          </Tooltip>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
-    },
-    {
-      title: '操作',
-      valueType: 'option',
-      width: 280,
-      fixed: 'right',
-      render: (_, record) => [
-        <Button
-          key="preview"
-          type="link"
-          size="small"
-          icon={<EyeOutlined />}
-          onClick={() => openPreview(record)}
-        >
-          预览
-        </Button>,
-        <EditConfigForm
-          key="edit"
-          record={record}
-          templates={templates}
-          trigger={
-            <Button type="link" size="small" icon={<EditOutlined />}>
-              编辑
-            </Button>
-          }
-          onSuccess={() => actionRef.current?.reload?.()}
-        />,
-        <Popconfirm
-          key="sortname"
-          title={`对「${record.emby_name}」回填拼音 SortName？`}
-          description="仅扫描本库下 Movie/Series/BoxSet，已锁定的不覆盖。后端后台跑，可关闭页面。"
-          okText="启动"
-          cancelText="取消"
-          onConfirm={() =>
-            startSortNameBackfill(
-              [record.emby_library_id],
-              `row-${record.emby_library_id}`,
-              false,
-            )
-          }
-          disabled={sortNameRunning}
-        >
-          <Button
-            type="link"
-            size="small"
-            icon={<SortAscendingOutlined />}
-            loading={sortNameStarting === `row-${record.emby_library_id}`}
-            disabled={sortNameRunning}
-          >
-            拼音回填
-          </Button>
-        </Popconfirm>,
-        <Popconfirm
-          key="sortname-force"
-          title={`强制覆盖「${record.emby_name}」的 SortName？`}
-          description={
-            <div style={{ maxWidth: 320 }}>
-              <Text type="warning">忽略锁定状态</Text>
-              ，包括被其它工具锁定的条目也会被覆写。
-            </div>
-          }
-          okText="强制覆盖"
-          okButtonProps={{ danger: true }}
-          cancelText="取消"
-          onConfirm={() =>
-            startSortNameBackfill(
-              [record.emby_library_id],
-              `row-force-${record.emby_library_id}`,
-              true,
-            )
-          }
-          disabled={sortNameRunning}
-        >
-          <Button
-            type="link"
-            size="small"
-            danger
-            loading={sortNameStarting === `row-force-${record.emby_library_id}`}
-            disabled={sortNameRunning}
-          >
-            强制覆盖
-          </Button>
-        </Popconfirm>,
-      ],
+      key: 'sortname-force',
+      icon: <SortAscendingOutlined />,
+      label: '强制覆盖 SortName',
+      danger: true,
+      disabled: sortNameRunning,
     },
   ];
 
-  return (
-    <PageContainer
-      header={{
-        title: 'Emby 媒体库封面生成',
-        subTitle:
-          '根据媒体库内的最新海报，自动合成带中英文标题的封面图并上传到 Emby',
-      }}
-    >
-      {sortNameJob && <SortNameJobAlert job={sortNameJob} />}
-
-      <Alert
-        type="info"
-        showIcon
-        closable
-        style={{ marginBottom: 16 }}
-        message="使用说明"
-        description={
-          <div>
-            <div>
-              1. 列表展示 Emby 后台所有媒体库；点「编辑」配置中英文标题和模板。
-            </div>
-            <div>
-              2.
-              点「预览」会用最新海报合成一张大图但不上传；确认效果好后在预览页点「上传到
-              Emby」。
-            </div>
-            <div>
-              3. 点右上「批量生成」会为所有<Text code>启用</Text>
-              的媒体库生成并上传封面，用于一次更新全部。
-            </div>
-            <div>
-              4. 可在后端 <Text code>emby.cover.cron</Text>{' '}
-              配置定时任务自动执行批量生成。
-            </div>
+  const handleMoreAction: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'sortname') {
+      modal.confirm({
+        title: '按拼音首字母回填所有媒体的 SortName？',
+        content: (
+          <div style={{ maxWidth: 360 }}>
+            将扫描 Emby 所有
+            Movie/Series/BoxSet，对未锁定的条目写入拼音首字母。已锁定 SortName
+            的条目会被跳过。后端后台执行，可关闭页面或刷新。
           </div>
-        }
-      />
+        ),
+        okText: '启动',
+        cancelText: '取消',
+        onOk: () => startSortNameBackfill(undefined, 'all', false),
+      });
+      return;
+    }
+    if (key === 'sortname-force') {
+      modal.confirm({
+        title: '强制覆盖所有媒体的 SortName？',
+        content: (
+          <div style={{ maxWidth: 360 }}>
+            <Text type="warning">忽略锁定状态</Text>，对所有 Movie/Series/BoxSet
+            强制写入拼音首字母。包括被别的工具（如
+            MoviePilot）锁定过的条目也会被覆写。
+          </div>
+        ),
+        okText: '强制覆盖',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => startSortNameBackfill(undefined, 'all-force', true),
+      });
+    }
+  };
 
-      <ProTable<API.EmbyCoverLibraryView>
-        headerTitle="媒体库列表"
-        actionRef={actionRef}
-        rowKey="emby_library_id"
-        search={false}
-        pagination={false}
-        scroll={{ x: 'max-content' }}
-        options={{
-          reload: true,
-          density: false,
-          setting: false,
-        }}
-        toolBarRender={() => [
-          <Popconfirm
-            key="sortname"
-            title="按拼音首字母回填所有媒体的 SortName？"
-            description={
-              <div style={{ maxWidth: 360 }}>
-                将扫描 Emby 所有
-                Movie/Series/BoxSet，对未锁定的条目写入拼音首字母。已锁定
-                SortName 的条目会被跳过。后端后台执行，可关闭页面或刷新。
-              </div>
-            }
-            okText="启动"
-            cancelText="取消"
-            onConfirm={() => startSortNameBackfill(undefined, 'all', false)}
-            disabled={sortNameRunning}
+  return (
+    <div className="mx-auto box-border w-full max-w-[1680px] px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="m-0 text-[11px] font-semibold tracking-[0.18em] text-neutral-400 uppercase dark:text-white/35">
+            Emby tools
+          </p>
+          <h1 className="mt-2 mb-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
+            媒体库工具
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button
+            className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-3.5 !text-neutral-600 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
+            icon={<ReloadOutlined />}
+            loading={librariesLoading}
+            onClick={() => void reloadLibraries()}
+            type="text"
           >
-            <Button
-              icon={<SortAscendingOutlined />}
-              loading={sortNameStarting === 'all'}
-              disabled={sortNameRunning}
-            >
-              拼音回填 SortName
-            </Button>
-          </Popconfirm>,
+            刷新
+          </Button>
           <Popconfirm
-            key="sortname-force"
-            title="强制覆盖所有媒体的 SortName？"
-            description={
-              <div style={{ maxWidth: 360 }}>
-                <Text type="warning">忽略锁定状态</Text>，对所有
-                Movie/Series/BoxSet 强制写入拼音首字母。包括被别的工具（如
-                MoviePilot）锁定过的条目也会被覆写。适合首次统一设置场景。
-              </div>
-            }
-            okText="强制覆盖"
-            okButtonProps={{ danger: true }}
-            cancelText="取消"
-            onConfirm={() =>
-              startSortNameBackfill(undefined, 'all-force', true)
-            }
-            disabled={sortNameRunning}
-          >
-            <Button
-              danger
-              icon={<SortAscendingOutlined />}
-              loading={sortNameStarting === 'all-force'}
-              disabled={sortNameRunning}
-            >
-              强制覆盖
-            </Button>
-          </Popconfirm>,
-          <Popconfirm
-            key="batch"
             title="批量生成所有启用的媒体库封面？"
             description="将用最新海报为所有启用的库生成并上传，过程可能持续几十秒到几分钟。"
             okText="开始"
@@ -524,32 +549,80 @@ const EmbyCoverPage: React.FC = () => {
             okButtonProps={{ loading: batchLoading }}
           >
             <Button
-              type="primary"
+              className="!h-9 !rounded-xl !px-4"
               icon={<ThunderboltOutlined />}
               loading={batchLoading}
+              type="primary"
             >
               批量生成
             </Button>
-          </Popconfirm>,
-        ]}
-        request={async () => {
-          const resp = await listEmbyCoverLibraries();
-          return {
-            data: resp.data || [],
-            success: resp.code === 0,
-            total: resp.data?.length || 0,
-          };
-        }}
-        columns={columns}
-      />
+          </Popconfirm>
+          <Dropdown
+            classNames={{
+              root: '[&_.ant-dropdown-menu-item-divider]:!my-1 [&_.ant-dropdown-menu-item-divider]:!bg-black/[0.055] [&_.ant-dropdown-menu-item-danger]:!text-rose-500 [&_.ant-dropdown-menu-item-danger:hover]:!bg-rose-500/[0.07] [&_.ant-dropdown-menu-item-danger_.anticon]:!text-rose-400 dark:[&_.ant-dropdown-menu-item-divider]:!bg-white/8 dark:[&_.ant-dropdown-menu-item-danger]:!text-rose-400 dark:[&_.ant-dropdown-menu-item-danger:hover]:!bg-rose-400/10',
+              item: '!min-h-10 !rounded-xl !px-3 !py-2 !text-[13px] !text-neutral-700 transition-colors [&:not(.ant-dropdown-menu-item-danger):hover]:!bg-black/[0.045] dark:!text-white/75 dark:[&:not(.ant-dropdown-menu-item-danger):hover]:!bg-white/[0.07]',
+              itemContent: '!font-medium !tracking-[-0.01em]',
+              itemIcon:
+                '!mr-2.5 !text-[14px] !text-neutral-400 dark:!text-white/35',
+            }}
+            menu={{
+              items: moreActionItems,
+              onClick: handleMoreAction,
+              className:
+                '!min-w-[224px] !rounded-2xl !border-0 !bg-white/88 !p-1.5 !shadow-[0_18px_55px_rgba(0,0,0,0.14)] !backdrop-blur-2xl dark:!bg-neutral-900/88 dark:!shadow-black/35',
+            }}
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Button
+              className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-3.5 !text-neutral-600 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
+              type="text"
+            >
+              更多 <DownOutlined className="text-[10px]" />
+            </Button>
+          </Dropdown>
+        </div>
+      </header>
+
+      {sortNameJob && <SortNameJobStatus job={sortNameJob} />}
+
+      <Spin spinning={librariesLoading}>
+        <section
+          aria-busy={librariesLoading}
+          aria-label="Emby 媒体库"
+          className={styles.libraryList}
+        >
+          {libraries.length > 0 ? (
+            <div className={styles.libraryGrid}>
+              {libraries.map((record) => (
+                <LibraryCard
+                  key={record.emby_library_id}
+                  record={record}
+                  templateName={
+                    templateMap[record.template_id] || record.template_id
+                  }
+                  templates={templates}
+                  sortNameRunning={sortNameRunning}
+                  sortNameStarting={sortNameStarting}
+                  onPreview={openPreview}
+                  onReload={() => void reloadLibraries()}
+                  onStartSortName={startSortNameBackfill}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyState}>暂无媒体库</div>
+          )}
+        </section>
+      </Spin>
 
       <PreviewModal
         open={previewOpen}
         record={previewRow}
         onClose={() => setPreviewOpen(false)}
-        onUploaded={() => actionRef.current?.reload?.()}
+        onUploaded={() => void reloadLibraries()}
       />
-    </PageContainer>
+    </div>
   );
 };
 

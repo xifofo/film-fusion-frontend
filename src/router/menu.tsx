@@ -10,7 +10,6 @@ import {
   Folder,
   GitBranch,
   Images,
-  Info,
   Link2,
   ListRestart,
   Route,
@@ -46,6 +45,11 @@ export const menuItems: AppMenuItem[] = [
     path: '/directories',
   },
   {
+    name: '媒体识别',
+    icon: ScanSearch,
+    path: '/media-recognition',
+  },
+  {
     name: '下载队列',
     icon: Download,
     path: '/download-queue',
@@ -71,9 +75,9 @@ export const menuItems: AppMenuItem[] = [
     path: '/emby',
     children: [
       {
-        name: '封面生成',
+        name: '媒体库工具',
         icon: Images,
-        path: '/emby/cover',
+        path: '/emby/library-tools',
       },
       {
         name: '媒体统计',
@@ -135,21 +139,11 @@ export const menuItems: AppMenuItem[] = [
     path: '/rss',
     children: [
       {
-        name: 'RSS 生成器',
-        icon: Rss,
-        path: '/rss-generator',
-      },
-      {
         name: 'RSS 自动化',
         icon: Route,
         path: '/rss-automation',
       },
     ],
-  },
-  {
-    name: '系统信息',
-    icon: Info,
-    path: '/system-info',
   },
   {
     name: '系统设置',

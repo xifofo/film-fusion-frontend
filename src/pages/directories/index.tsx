@@ -85,7 +85,7 @@ const DirectoryList: React.FC = () => {
       dataIndex: 'id',
       width: 80,
       sorter: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '目录名称',
@@ -139,7 +139,7 @@ const DirectoryList: React.FC = () => {
       width: 200,
       ellipsis: true,
       copyable: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '内容前缀',
@@ -147,41 +147,41 @@ const DirectoryList: React.FC = () => {
       width: 200,
       ellipsis: true,
       copyable: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: 'URI 编码',
       dataIndex: 'content_encode_uri',
       width: 100,
       render: (_, record) => renderEncodeTag(record.content_encode_uri),
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '按分类',
       dataIndex: 'classify_by_category',
       width: 100,
       render: (_, record) => renderEncodeTag(record.classify_by_category),
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '包含后缀',
       dataIndex: 'include_extensions',
       width: 120,
       render: (value) => formatExtensions(value as string),
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '排除后缀',
       dataIndex: 'exclude_extensions',
       width: 120,
       render: (value) => formatExtensions(value as string),
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '排除小于 (MB)',
       dataIndex: 'exclude_smaller_than_mb',
       width: 140,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '创建时间',
@@ -189,7 +189,7 @@ const DirectoryList: React.FC = () => {
       width: 160,
       valueType: 'dateTime',
       sorter: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '更新时间',
@@ -197,7 +197,7 @@ const DirectoryList: React.FC = () => {
       width: 160,
       valueType: 'dateTime',
       sorter: true,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '搜索',
@@ -367,7 +367,7 @@ const DirectoryList: React.FC = () => {
       />
 
       <Drawer
-        width={600}
+        size={600}
         open={showDetail}
         onClose={() => {
           setCurrentRow(undefined);

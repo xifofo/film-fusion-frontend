@@ -26,10 +26,13 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   join: '汇合',
   qbittorrent: 'qBittorrent',
   wait_qbittorrent: '等待 qBittorrent 完成',
+  moviepilot_transfer: 'MP2 整理入库',
+  delete_qbittorrent: '删除 qB 做种任务',
   offline115: '115 Cookie 离线',
   offline115_openapi: '115 OpenAPI 离线',
   wait115: '等待 115 下载完成',
   moviepilot_title_recognize: 'MP 标题识别',
+  filmfusion_recognize: 'FilmFusion 本地识别',
   media_exists: '本地 / Emby 查重',
   hdhive_query: 'HDHive 资源查询',
   hdhive_unlock: 'HDHive 资源解锁',
@@ -46,10 +49,13 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
 export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'qbittorrent',
   'wait_qbittorrent',
+  'moviepilot_transfer',
+  'delete_qbittorrent',
   'offline115',
   'offline115_openapi',
   'wait115',
   'moviepilot_title_recognize',
+  'filmfusion_recognize',
   'media_exists',
   'hdhive_query',
   'hdhive_unlock',
@@ -225,9 +231,31 @@ export const createNodeDefinition = (
       max_wait_minutes: 10080,
     });
   }
+  if (type === 'moviepilot_transfer') {
+    Object.assign(config, {
+      source_path: '',
+      file_type: 'auto',
+      tmdb_id: '',
+      media_type: 'auto',
+      transfer_type: '',
+      scrape: false,
+      timeout_seconds: 600,
+    });
+  }
+  if (type === 'delete_qbittorrent') {
+    Object.assign(config, { delete_files: false, timeout_seconds: 30 });
+  }
   if (type === 'moviepilot_recognize') config.tmdb_id = '';
   if (type === 'moviepilot_title_recognize') {
     Object.assign(config, { input: '$item.title', tmdb_id: '' });
+  }
+  if (type === 'filmfusion_recognize') {
+    Object.assign(config, {
+      recognition_mode: 'title',
+      input: '$item.title',
+      tmdb_id: '',
+      lookup_tmdb: true,
+    });
   }
   if (type === 'media_exists') {
     Object.assign(config, {
@@ -306,6 +334,7 @@ export const createNodeDefinition = (
       type === 'wait_qbittorrent' ||
       type === 'wait115' ||
       type === 'moviepilot_title_recognize' ||
+      type === 'filmfusion_recognize' ||
       type === 'media_exists' ||
       type === 'hdhive_query' ||
       type === 'hdhive_unlock' ||

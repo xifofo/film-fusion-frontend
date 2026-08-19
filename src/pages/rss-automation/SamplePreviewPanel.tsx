@@ -44,12 +44,11 @@ const SamplePreviewPanel = ({
         aria-label="选择流程预览样本"
         className={styles.previewItemSelect}
         onChange={onItemChange}
-        optionFilterProp="label"
         options={feed.items.map((entry, index) => ({
           label: `${index + 1}. ${String(entry.fields.title || `样本 ${index + 1}`)}`,
           value: index,
         }))}
-        showSearch
+        showSearch={{ optionFilterProp: 'label' }}
         value={itemIndex}
       />
 

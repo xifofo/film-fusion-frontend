@@ -109,7 +109,7 @@ const CreateForm: FC<CreateFormProps> = (props) => {
           if (visible) setActiveTab('basic');
         }}
         modalProps={{
-          destroyOnClose: true,
+          destroyOnHidden: true,
         }}
         initialValues={{
           balance_enabled: false,

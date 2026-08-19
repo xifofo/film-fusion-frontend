@@ -109,7 +109,7 @@ const CreateForm: React.FC<CreateFormProps> = ({
         width="640px"
         onOpenChange={setOpen}
         modalProps={{
-          destroyOnClose: true,
+          destroyOnHidden: true,
         }}
         submitter={{
           submitButtonProps: { loading },

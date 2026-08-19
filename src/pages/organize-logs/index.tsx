@@ -9,12 +9,12 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PageContainer, ProTable } from '@ant-design/pro-components';
 import {
+  App,
   Button,
   Card,
   Col,
   Descriptions,
   Drawer,
-  Modal,
   message,
   Row,
   Statistic,
@@ -62,6 +62,7 @@ const formatDuration = (ms?: number) => {
 };
 
 const OrganizeLogList: React.FC = () => {
+  const { modal } = App.useApp();
   const actionRef = useRef<ActionType | null>(null);
   const [detail, setDetail] = useState<API.OrganizeLog | undefined>();
   const [messageApi, contextHolder] = message.useMessage();
@@ -96,7 +97,7 @@ const OrganizeLogList: React.FC = () => {
   );
 
   const handleClearSuccess = () => {
-    Modal.confirm({
+    modal.confirm({
       title: '清理所有成功记录？',
       content:
         '将删除全部 status=success 的整理日志（保留 skipped 与 failed）。',
@@ -108,7 +109,7 @@ const OrganizeLogList: React.FC = () => {
   };
 
   const handleClearOld = () => {
-    Modal.confirm({
+    modal.confirm({
       title: '清理 30 天前的记录？',
       content: '删除 30 天前的所有整理日志（含 failed）。',
       okText: '清理',
@@ -123,7 +124,7 @@ const OrganizeLogList: React.FC = () => {
       title: 'ID',
       dataIndex: 'id',
       width: 80,
-      hideInSearch: true,
+      search: false,
     },
     {
       title: '动作',
@@ -166,7 +167,7 @@ const OrganizeLogList: React.FC = () => {
       title: '触发',
       dataIndex: 'trigger',
       width: 130,
-      hideInSearch: true,
+      search: false,
       render: (text) => text || '-',
     },
     {
@@ -174,7 +175,7 @@ const OrganizeLogList: React.FC = () => {
       dataIndex: 'source',
       ellipsis: true,
       copyable: true,
-      hideInSearch: true,
+      search: false,
       render: (text) => (
         <Tooltip title={text}>
           <div style={{ maxWidth: 320 }}>{text || '-'}</div>
@@ -186,7 +187,7 @@ const OrganizeLogList: React.FC = () => {
       dataIndex: 'target',
       ellipsis: true,
       copyable: true,
-      hideInSearch: true,
+      search: false,
       render: (text) => (
         <Tooltip title={text}>
           <div style={{ maxWidth: 320 }}>{text || '-'}</div>
@@ -202,7 +203,7 @@ const OrganizeLogList: React.FC = () => {
       title: '说明',
       dataIndex: 'message',
       ellipsis: true,
-      hideInSearch: true,
+      search: false,
       render: (text, record) => {
         if (record.status === 'failed' && record.error) {
           return (
@@ -222,14 +223,14 @@ const OrganizeLogList: React.FC = () => {
       title: '大小',
       dataIndex: 'size_bytes',
       width: 90,
-      hideInSearch: true,
+      search: false,
       render: (_, r) => formatSize(r.size_bytes),
     },
     {
       title: '耗时',
       dataIndex: 'duration_ms',
       width: 80,
-      hideInSearch: true,
+      search: false,
       render: (_, r) => formatDuration(r.duration_ms),
     },
     {
@@ -284,7 +285,7 @@ const OrganizeLogList: React.FC = () => {
             <Statistic
               title="成功"
               value={counts.success}
-              valueStyle={{ color: '#3f8600' }}
+              styles={{ content: { color: '#3f8600' } }}
             />
           </Card>
         </Col>
@@ -293,7 +294,7 @@ const OrganizeLogList: React.FC = () => {
             <Statistic
               title="跳过"
               value={counts.skipped}
-              valueStyle={{ color: '#8c8c8c' }}
+              styles={{ content: { color: '#8c8c8c' } }}
             />
           </Card>
         </Col>
@@ -302,7 +303,7 @@ const OrganizeLogList: React.FC = () => {
             <Statistic
               title="失败"
               value={counts.failed}
-              valueStyle={{ color: '#cf1322' }}
+              styles={{ content: { color: '#cf1322' } }}
             />
           </Card>
         </Col>
@@ -364,7 +365,7 @@ const OrganizeLogList: React.FC = () => {
 
       <Drawer
         title={`整理日志 #${detail?.id ?? ''}`}
-        width={640}
+        size={640}
         open={!!detail}
         onClose={() => setDetail(undefined)}
       >

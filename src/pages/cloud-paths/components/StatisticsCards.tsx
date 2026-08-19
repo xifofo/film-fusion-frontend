@@ -30,7 +30,7 @@ const StatisticsCards: React.FC = () => {
           <Statistic
             title="总路径数"
             value={statistics.total_paths}
-            valueStyle={{ color: '#1890ff' }}
+            styles={{ content: { color: '#1890ff' } }}
           />
         </Card>
       </Col>
@@ -39,7 +39,7 @@ const StatisticsCards: React.FC = () => {
           <Statistic
             title="STRM路径"
             value={statistics.strm_paths}
-            valueStyle={{ color: '#52c41a' }}
+            styles={{ content: { color: '#52c41a' } }}
           />
         </Card>
       </Col>
@@ -48,7 +48,7 @@ const StatisticsCards: React.FC = () => {
           <Statistic
             title="软链接路径"
             value={statistics.symlink_paths}
-            valueStyle={{ color: '#722ed1' }}
+            styles={{ content: { color: '#722ed1' } }}
           />
         </Card>
       </Col>
@@ -57,7 +57,7 @@ const StatisticsCards: React.FC = () => {
           <Statistic
             title="存储类型"
             value={statistics.by_storage_type?.length || 0}
-            valueStyle={{ color: '#eb2f96' }}
+            styles={{ content: { color: '#eb2f96' } }}
           />
         </Card>
       </Col>

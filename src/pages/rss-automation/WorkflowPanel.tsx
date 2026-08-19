@@ -25,7 +25,6 @@ import {
   useNodesState,
   type Viewport,
 } from '@xyflow/react';
-import type { MenuProps } from 'antd';
 import {
   Alert,
   Button,
@@ -53,6 +52,7 @@ import {
 } from 'react';
 import type {
   RSSAutomationDefinition,
+  RSSAutomationMapping,
   RSSAutomationNodeDefinition,
   RSSAutomationNodeProtocol,
   RSSAutomationNodeType,
@@ -84,6 +84,10 @@ import {
 import styles from './index.module.less';
 import NodeConfigModal, { type NodeFieldReference } from './NodeConfigDrawer';
 import { simulateRSSAutomation } from './preview';
+import {
+  buildRSSItemReferences,
+  parseRSSSourceMapping,
+} from './rssFieldReferences';
 import SamplePreviewPanel from './SamplePreviewPanel';
 import {
   createWorkflowTransferPackage,
@@ -115,6 +119,7 @@ type WorkflowPanelProps = {
   onCreate?: () => void;
   mode?: 'manage' | 'wizard';
   initialDefinition?: RSSAutomationDefinition;
+  sourceMapping?: RSSAutomationMapping;
   previewFeed?: RSSAutomationParsedFeed;
   onWizardBack?: (definition: RSSAutomationDefinition) => void;
   onWizardNext?: (definition: RSSAutomationDefinition) => Promise<void> | void;
@@ -162,10 +167,13 @@ const palette: Array<{
     types: [
       'qbittorrent',
       'wait_qbittorrent',
+      'moviepilot_transfer',
+      'delete_qbittorrent',
       'offline115_openapi',
       'offline115',
       'wait115',
       'moviepilot_title_recognize',
+      'filmfusion_recognize',
       'media_exists',
       'hdhive_query',
       'hdhive_unlock',
@@ -179,15 +187,6 @@ const palette: Array<{
     ],
   },
 ];
-
-const paletteMenuItems: MenuProps['items'] = palette.map((group) => ({
-  type: 'group',
-  label: group.title,
-  children: group.types.map((type) => ({
-    key: type,
-    label: NODE_LABELS[type],
-  })),
-}));
 
 const emptyMeta = (): WorkflowMeta => ({
   name: '新的 RSS 自动化流程',
@@ -356,6 +355,7 @@ const WorkflowPanelInner = ({
   onCreate,
   mode = 'manage',
   initialDefinition,
+  sourceMapping,
   previewFeed,
   onWizardBack,
   onWizardNext,
@@ -371,6 +371,7 @@ const WorkflowPanelInner = ({
   const [layingOut, setLayingOut] = useState(false);
   const [previewItemIndex, setPreviewItemIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingWorkflowImport>();
   const [viewport, setViewportState] = useState<Viewport>({
     x: 0,
@@ -476,13 +477,11 @@ const WorkflowPanelInner = ({
     const sampleFields =
       previewFeed?.items[previewItemIndex]?.fields ||
       ({} as Record<string, unknown>);
-    for (const [name, value] of Object.entries(sampleFields)) {
-      addReference({
-        kind: 'item',
-        name,
-        value: `$item.${name}`,
-        preview: referencePreview(value),
-      });
+    const mapping =
+      sourceMapping ||
+      parseRSSSourceMapping(sourceByID.get(meta.sourceId)?.mapping_json);
+    for (const reference of buildRSSItemReferences(mapping, sampleFields)) {
+      addReference(reference);
     }
 
     const ancestorIDs = new Set<string>();
@@ -558,6 +557,13 @@ const WorkflowPanelInner = ({
       if (selectedNode.type === 'moviepilot_title_recognize') {
         return String(selectedNode.config?.input || '').trim();
       }
+      if (selectedNode.type === 'filmfusion_recognize') {
+        return String(
+          selectedNode.config?.recognition_mode === 'file'
+            ? selectedNode.config?.tmdb_id || ''
+            : selectedNode.config?.input || '',
+        ).trim();
+      }
       if (selectedNode.type === 'moviepilot_recognize') {
         return String(selectedNode.config?.tmdb_id || '').trim();
       }
@@ -592,6 +598,9 @@ const WorkflowPanelInner = ({
     nodes,
     previewFeed,
     previewItemIndex,
+    sourceByID,
+    sourceMapping,
+    meta.sourceId,
     selectedNode,
     selectedNodeId,
     simulation?.variables,
@@ -1090,7 +1099,7 @@ const WorkflowPanelInner = ({
                 value={meta.name}
               />
               <Input
-                addonBefore="RSS"
+                prefix="RSS"
                 readOnly
                 value={sourceByID.get(meta.sourceId)?.name || 'RSS 源已不存在'}
               />
@@ -1121,7 +1130,7 @@ const WorkflowPanelInner = ({
 
         {validation && !validation.valid && (
           <Alert
-            closable
+            closable={{ onClose: () => setValidation(undefined) }}
             description={
               <ul className={styles.validationList}>
                 {validation.errors.map((error) => (
@@ -1129,8 +1138,7 @@ const WorkflowPanelInner = ({
                 ))}
               </ul>
             }
-            message="流程还不能保存"
-            onClose={() => setValidation(undefined)}
+            title="流程还不能保存"
             showIcon
             type="error"
           />
@@ -1140,202 +1148,245 @@ const WorkflowPanelInner = ({
           className={mode === 'wizard' ? styles.wizardDesignerGrid : undefined}
         >
           <div className={styles.flowWorkspace}>
-            <Spin spinning={layingOut} wrapperClassName={styles.flowSpin}>
-              <ReactFlow<RSSFlowNode, RSSFlowEdge>
-                colorMode="light"
-                deleteKeyCode={['Backspace', 'Delete']}
-                edges={displayEdges}
-                fitView
-                isValidConnection={isValidConnection}
-                minZoom={0.2}
-                nodeTypes={nodeTypes}
-                nodes={displayNodes}
-                onConnect={onConnect}
-                onEdgeClick={(_, edge) => {
-                  setSelectedEdgeId(edge.id);
-                  setSelectedNodeId(undefined);
-                }}
-                onEdgesDelete={() => {
-                  setSelectedEdgeId(undefined);
-                  setValidation(undefined);
-                }}
-                onEdgesChange={(changes) => {
-                  onEdgesChange(changes);
-                  setValidation(undefined);
-                }}
-                onInit={(instance) => {
-                  instanceRef.current = instance;
-                }}
-                onMoveEnd={(_, nextViewport) => setViewportState(nextViewport)}
-                onNodeClick={(_, node) => {
-                  setSelectedNodeId(node.id);
-                  setSelectedEdgeId(undefined);
-                }}
-                onNodesChange={(changes) => {
-                  onNodesChange(changes);
-                  setValidation(undefined);
-                }}
-                onPaneClick={() => {
-                  setSelectedEdgeId(undefined);
-                  setSelectedNodeId(undefined);
-                }}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background gap={22} size={1} />
-                <Panel className={styles.flowCanvasPrimary} position="top-left">
-                  {mode === 'wizard' && (
-                    <Tooltip title="选择模板会替换当前画板，载入后仍可继续修改">
-                      <Dropdown
-                        menu={{
-                          items: wizardTemplates.map((template) => ({
-                            key: template.key,
-                            label: template.label,
-                          })),
-                          onClick: ({ key }) => applyWizardTemplate(key),
-                        }}
-                        placement="bottomLeft"
-                        trigger={['click']}
-                      >
-                        <Button
-                          aria-label="流程模板"
-                          icon={<ThunderboltOutlined />}
-                        >
-                          流程模板
-                        </Button>
-                      </Dropdown>
-                    </Tooltip>
-                  )}
-                  <Dropdown
-                    menu={{
-                      items: paletteMenuItems,
-                      onClick: ({ key }) =>
-                        addNode(key as RSSAutomationNodeType),
-                    }}
-                    placement="bottomLeft"
-                    trigger={['click']}
+            <div className={styles.flowSpin}>
+              <Spin spinning={layingOut}>
+                <ReactFlow<RSSFlowNode, RSSFlowEdge>
+                  colorMode="light"
+                  deleteKeyCode={['Backspace', 'Delete']}
+                  edges={displayEdges}
+                  fitView
+                  isValidConnection={isValidConnection}
+                  minZoom={0.2}
+                  nodeTypes={nodeTypes}
+                  nodes={displayNodes}
+                  onConnect={onConnect}
+                  onEdgeClick={(_, edge) => {
+                    setSelectedEdgeId(edge.id);
+                    setSelectedNodeId(undefined);
+                  }}
+                  onEdgesDelete={() => {
+                    setSelectedEdgeId(undefined);
+                    setValidation(undefined);
+                  }}
+                  onEdgesChange={(changes) => {
+                    onEdgesChange(changes);
+                    setValidation(undefined);
+                  }}
+                  onInit={(instance) => {
+                    instanceRef.current = instance;
+                  }}
+                  onMoveEnd={(_, nextViewport) =>
+                    setViewportState(nextViewport)
+                  }
+                  onNodeClick={(_, node) => {
+                    setSelectedNodeId(node.id);
+                    setSelectedEdgeId(undefined);
+                  }}
+                  onNodesChange={(changes) => {
+                    onNodesChange(changes);
+                    setValidation(undefined);
+                  }}
+                  onPaneClick={() => {
+                    setSelectedEdgeId(undefined);
+                    setSelectedNodeId(undefined);
+                  }}
+                  proOptions={{ hideAttribution: true }}
+                >
+                  <Background gap={22} size={1} />
+                  <Panel
+                    className={styles.flowCanvasPrimary}
+                    position="top-left"
                   >
-                    <Button aria-label="添加节点" icon={<PlusOutlined />}>
+                    {mode === 'wizard' && (
+                      <Tooltip title="选择模板会替换当前画板，载入后仍可继续修改">
+                        <Dropdown
+                          menu={{
+                            items: wizardTemplates.map((template) => ({
+                              key: template.key,
+                              label: template.label,
+                            })),
+                            onClick: ({ key }) => applyWizardTemplate(key),
+                          }}
+                          placement="bottomLeft"
+                          trigger={['click']}
+                        >
+                          <Button
+                            aria-label="流程模板"
+                            icon={<ThunderboltOutlined />}
+                          >
+                            流程模板
+                          </Button>
+                        </Dropdown>
+                      </Tooltip>
+                    )}
+                    <Button
+                      aria-label="添加节点"
+                      icon={<PlusOutlined />}
+                      onClick={() => setNodePickerOpen(true)}
+                    >
                       添加节点
                     </Button>
-                  </Dropdown>
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: 'import',
-                          icon: <ImportOutlined />,
-                          label: '导入流程',
+                    <Dropdown
+                      menu={{
+                        items: [
+                          {
+                            key: 'import',
+                            icon: <ImportOutlined />,
+                            label: '导入流程',
+                          },
+                          {
+                            key: 'export',
+                            icon: <ExportOutlined />,
+                            label: '导出流程',
+                          },
+                        ],
+                        onClick: ({ key }) => {
+                          if (key === 'import') importFileRef.current?.click();
+                          if (key === 'export') exportWorkflow();
                         },
-                        {
-                          key: 'export',
-                          icon: <ExportOutlined />,
-                          label: '导出流程',
-                        },
-                      ],
-                      onClick: ({ key }) => {
-                        if (key === 'import') importFileRef.current?.click();
-                        if (key === 'export') exportWorkflow();
-                      },
-                    }}
-                    placement="bottomLeft"
-                    trigger={['click']}
-                  >
-                    <Button
-                      aria-label="导入或导出流程"
-                      icon={<ExportOutlined />}
+                      }}
+                      placement="bottomLeft"
+                      trigger={['click']}
                     >
-                      导入 / 导出
-                    </Button>
-                  </Dropdown>
-                  {mode === 'wizard' && previewFeed && simulation && (
-                    <Tooltip title="用真实 RSS 样本查看当前流程结果">
                       <Button
-                        aria-label="样本预览"
-                        icon={<EyeOutlined />}
-                        onClick={() => setPreviewOpen(true)}
+                        aria-label="导入或导出流程"
+                        icon={<ExportOutlined />}
                       >
-                        样本预览
+                        导入 / 导出
                       </Button>
-                    </Tooltip>
-                  )}
-                </Panel>
-                <Panel
-                  className={styles.flowCanvasActions}
-                  position="top-right"
-                >
-                  <Tooltip title="自动排版">
-                    <Button
-                      aria-label="自动排版"
-                      icon={<ApartmentOutlined />}
-                      loading={layingOut}
-                      onClick={autoLayout}
-                    />
-                  </Tooltip>
-                  <Tooltip title="校验流程">
-                    <Button
-                      aria-label="校验流程"
-                      icon={<CheckCircleOutlined />}
-                      onClick={check}
-                    />
-                  </Tooltip>
-                  <Tooltip title="居中显示">
-                    <Button
-                      aria-label="居中显示"
-                      icon={<AimOutlined />}
-                      onClick={() =>
-                        instanceRef.current?.fitView({ padding: 0.2 })
-                      }
-                    />
-                  </Tooltip>
-                  <span className={styles.flowCanvasDivider} />
-                  {mode === 'manage' ? (
-                    <Button
-                      aria-label="保存流程"
-                      icon={<SaveOutlined />}
-                      loading={saving}
-                      onClick={save}
-                      type="primary"
-                    >
-                      保存流程
-                    </Button>
-                  ) : (
-                    <>
-                      <Tooltip title="上一步">
+                    </Dropdown>
+                    {mode === 'wizard' && previewFeed && simulation && (
+                      <Tooltip title="用真实 RSS 样本查看当前流程结果">
                         <Button
-                          aria-label="上一步"
-                          icon={<ArrowLeftOutlined />}
-                          onClick={() => onWizardBack?.(currentDefinition())}
-                        />
+                          aria-label="样本预览"
+                          icon={<EyeOutlined />}
+                          onClick={() => setPreviewOpen(true)}
+                        >
+                          样本预览
+                        </Button>
                       </Tooltip>
-                      <Tooltip title="下一步">
-                        <Button
-                          aria-label="下一步"
-                          icon={<ArrowRightOutlined />}
-                          loading={saving}
-                          onClick={continueWizard}
-                          type="primary"
-                        />
-                      </Tooltip>
-                    </>
-                  )}
-                  {selectedEdgeId && (
-                    <Tooltip title="删除连线">
+                    )}
+                  </Panel>
+                  <Panel
+                    className={styles.flowCanvasActions}
+                    position="top-right"
+                  >
+                    <Tooltip title="自动排版">
                       <Button
-                        aria-label="删除连线"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={deleteSelectedEdge}
+                        aria-label="自动排版"
+                        icon={<ApartmentOutlined />}
+                        loading={layingOut}
+                        onClick={autoLayout}
                       />
                     </Tooltip>
-                  )}
-                </Panel>
-                <MiniMap pannable zoomable />
-                <Controls />
-              </ReactFlow>
-            </Spin>
+                    <Tooltip title="校验流程">
+                      <Button
+                        aria-label="校验流程"
+                        icon={<CheckCircleOutlined />}
+                        onClick={check}
+                      />
+                    </Tooltip>
+                    <Tooltip title="居中显示">
+                      <Button
+                        aria-label="居中显示"
+                        icon={<AimOutlined />}
+                        onClick={() =>
+                          instanceRef.current?.fitView({ padding: 0.2 })
+                        }
+                      />
+                    </Tooltip>
+                    <span className={styles.flowCanvasDivider} />
+                    {mode === 'manage' ? (
+                      <Button
+                        aria-label="保存流程"
+                        icon={<SaveOutlined />}
+                        loading={saving}
+                        onClick={save}
+                        type="primary"
+                      >
+                        保存流程
+                      </Button>
+                    ) : (
+                      <>
+                        <Tooltip title="上一步">
+                          <Button
+                            aria-label="上一步"
+                            icon={<ArrowLeftOutlined />}
+                            onClick={() => onWizardBack?.(currentDefinition())}
+                          />
+                        </Tooltip>
+                        <Tooltip title="下一步">
+                          <Button
+                            aria-label="下一步"
+                            icon={<ArrowRightOutlined />}
+                            loading={saving}
+                            onClick={continueWizard}
+                            type="primary"
+                          />
+                        </Tooltip>
+                      </>
+                    )}
+                    {selectedEdgeId && (
+                      <Tooltip title="删除连线">
+                        <Button
+                          aria-label="删除连线"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={deleteSelectedEdge}
+                        />
+                      </Tooltip>
+                    )}
+                  </Panel>
+                  <MiniMap pannable zoomable />
+                  <Controls />
+                </ReactFlow>
+              </Spin>
+            </div>
           </div>
         </div>
       </section>
+
+      <Modal
+        centered
+        className={styles.nodePickerModal}
+        footer={null}
+        onCancel={() => setNodePickerOpen(false)}
+        open={nodePickerOpen}
+        title={
+          <Space>
+            <PlusOutlined />
+            <span>添加节点</span>
+          </Space>
+        }
+        width={760}
+      >
+        <Text className={styles.nodePickerIntro} type="secondary">
+          选择节点类型，添加后将直接打开节点配置。
+        </Text>
+        <div className={styles.nodePickerGroups}>
+          {palette.map((group) => (
+            <section className={styles.nodePickerGroup} key={group.title}>
+              <Text className={styles.nodePickerGroupTitle} strong>
+                {group.title}
+              </Text>
+              <div className={styles.nodePickerOptions}>
+                {group.types.map((type) => (
+                  <Button
+                    className={styles.nodePickerOption}
+                    key={type}
+                    onClick={() => {
+                      setNodePickerOpen(false);
+                      addNode(type);
+                    }}
+                  >
+                    {NODE_LABELS[type]}
+                  </Button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </Modal>
 
       <Modal
         centered
@@ -1378,7 +1429,7 @@ const WorkflowPanelInner = ({
         width={560}
       >
         {pendingImport && (
-          <Space direction="vertical" size={14} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={14} style={{ width: '100%' }}>
             <div>
               <Text strong>{pendingImport.name}</Text>
               <br />
@@ -1397,7 +1448,7 @@ const WorkflowPanelInner = ({
             </Space>
             <Alert
               description="导入只替换当前画板，不会更改正在配置的 RSS 链接；保存或进入下一步之前仍可继续修改。"
-              message="当前画板会被替换"
+              title="当前画板会被替换"
               showIcon
               type="warning"
             />
@@ -1406,7 +1457,7 @@ const WorkflowPanelInner = ({
                 description={`导入后请重新选择：${bindingRequirements(
                   pendingImport.requirements,
                 ).join('、')}。本地目标、账号和目录不会包含在分享文件中。`}
-                message="需要重新绑定本地配置"
+                title="需要重新绑定本地配置"
                 showIcon
                 type="info"
               />

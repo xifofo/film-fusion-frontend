@@ -33,7 +33,7 @@ const DirectoryIdInput = ({
   return (
     <>
       <Input
-        addonAfter={
+        suffix={
           <Button
             disabled={!cloudStorageId}
             onClick={() => setPickerOpen(true)}

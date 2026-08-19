@@ -49,7 +49,7 @@ const BindingModalForm: React.FC<BindingModalFormProps> = ({
       title={title}
       trigger={trigger}
       width={520}
-      modalProps={{ destroyOnClose: true }}
+      modalProps={{ destroyOnHidden: true }}
       initialValues={{
         enabled: initialValues?.enabled ?? true,
         emby_user_id: initialValues?.emby_user_id,
@@ -253,7 +253,7 @@ const EmbyBindingsPage: React.FC = () => {
         style={{ marginBottom: 16 }}
         type="info"
         showIcon
-        message="为某个 Emby 账号指定固定的 115 存储(cookie)。该账号播放命中 Match302 规则时会强制走指定存储（等价于直接指定负载均衡账号，后续走相同的秒传 + 播放流程），不依赖该规则是否开启负载均衡；指定账号不可用 / 并发已满 / 秒传未就绪时自动回退到正常流程。"
+        title="为某个 Emby 账号指定固定的 115 存储(cookie)。该账号播放命中 Match302 规则时会强制走指定存储（等价于直接指定负载均衡账号，后续走相同的秒传 + 播放流程），不依赖该规则是否开启负载均衡；指定账号不可用 / 并发已满 / 秒传未就绪时自动回退到正常流程。"
       />
       <ProTable<API.EmbyAccountBinding>
         headerTitle="Emby 账号 → 115 存储 绑定"

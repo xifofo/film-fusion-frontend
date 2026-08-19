@@ -35,6 +35,7 @@ import {
   message,
   Result,
   Row,
+  Segmented,
   Select,
   Space,
   Spin,
@@ -86,8 +87,10 @@ const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
 const DEFAULT_PREVIEW_TASK_LIMIT = 100;
 const MAX_PREVIEW_TASK_LIMIT = 1000;
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
+type RecognitionSource = 'moviepilot' | 'local';
 type PreviewQueueOptions = {
   mediaType: OrganizeMediaType;
+  recognitionSource: RecognitionSource;
   category?: string;
   bestVersionEnabled: boolean;
   intervalSeconds: number;
@@ -98,6 +101,13 @@ const mediaTypeOptions: Array<{ label: string; value: OrganizeMediaType }> = [
   { label: '自动', value: 'auto' },
   { label: '电影', value: 'movie' },
   { label: '剧集', value: 'tv' },
+];
+const recognitionSourceOptions: Array<{
+  label: string;
+  value: RecognitionSource;
+}> = [
+  { label: 'MoviePilot 识别', value: 'moviepilot' },
+  { label: 'FilmFusion 识别', value: 'local' },
 ];
 type FilenameRegexConfig = {
   enabled: boolean;
@@ -536,11 +546,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [organizeMediaType, setOrganizeMediaType] = useState<OrganizeMediaType>(
     episodeMode ? 'tv' : 'auto',
   );
+  const [organizeRecognitionSource, setOrganizeRecognitionSource] =
+    useState<RecognitionSource>('moviepilot');
   const [organizeCategory, setOrganizeCategory] = useState<string>();
   const [bestVersionEnabled, setBestVersionEnabled] = useState(episodeMode);
   const [previewOptionsOpen, setPreviewOptionsOpen] = useState(false);
   const [previewMediaTypeDraft, setPreviewMediaTypeDraft] =
     useState<OrganizeMediaType>(episodeMode ? 'tv' : 'auto');
+  const [previewRecognitionSourceDraft, setPreviewRecognitionSourceDraft] =
+    useState<RecognitionSource>('moviepilot');
   const [previewCategoryDraft, setPreviewCategoryDraft] = useState<string>();
   const [previewBestVersionDraft, setPreviewBestVersionDraft] =
     useState(episodeMode);
@@ -648,6 +662,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       return;
     }
     setPreviewMediaTypeDraft(effectiveMediaType);
+    setPreviewRecognitionSourceDraft(organizeRecognitionSource);
     setPreviewCategoryDraft(organizeCategory);
     setPreviewBestVersionDraft(bestVersionEnabled);
     setPreviewIntervalDraft(previewIntervalSeconds);
@@ -661,6 +676,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     effectiveMediaType,
     messageApi,
     organizeCategory,
+    organizeRecognitionSource,
     previewIntervalSeconds,
     previewRecursiveDepth,
     previewTaskLimit,
@@ -1159,6 +1175,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         if (!episodeMode) {
           setOrganizeMediaType(payload.task?.media_type || 'auto');
         }
+        setOrganizeRecognitionSource(
+          payload.task?.recognition_source || 'moviepilot',
+        );
         setOrganizeCategory(payload.task?.category || undefined);
         setBestVersionEnabled(!!payload.task?.best_version_enabled);
         const selection = getInitialPreviewSelection(previewResult);
@@ -1418,7 +1437,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       modalApi.confirm({
         title: '删除预整理任务？',
         content: (
-          <Space direction="vertical" size={8}>
+          <Space orientation="vertical" size={8}>
             <Typography.Text>{folderLabel}</Typography.Text>
             <Checkbox
               defaultChecked
@@ -1464,6 +1483,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         folder_contexts: buildFolderContexts(folderIds),
         ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
         dry_run: dryRunValue,
+        recognition_source: organizeRecognitionSource,
         ...(effectiveMediaType !== 'auto'
           ? { media_type: effectiveMediaType }
           : {}),
@@ -1488,6 +1508,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       filenameRegexConfig,
       messageApi,
       organizeCategory,
+      organizeRecognitionSource,
     ],
   );
 
@@ -1513,6 +1534,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         interval_seconds: options.intervalSeconds,
         recursive_depth: options.recursiveDepth,
         task_limit: options.taskLimit,
+        recognition_source: options.recognitionSource,
         ...(options.mediaType !== 'auto'
           ? { media_type: options.mediaType }
           : {}),
@@ -1543,6 +1565,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const confirmPreviewOptions = useCallback(() => {
     const options: PreviewQueueOptions = {
       mediaType: previewMediaTypeDraft,
+      recognitionSource: previewRecognitionSourceDraft,
       category: previewCategoryDraft,
       bestVersionEnabled: previewBestVersionDraft,
       intervalSeconds: previewIntervalDraft,
@@ -1551,6 +1574,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     };
     if (triggerPreviewQueue(options)) {
       setOrganizeMediaType(previewMediaTypeDraft);
+      setOrganizeRecognitionSource(previewRecognitionSourceDraft);
       setOrganizeCategory(previewCategoryDraft);
       setBestVersionEnabled(previewBestVersionDraft);
       setPreviewIntervalSeconds(previewIntervalDraft);
@@ -1563,6 +1587,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     previewCategoryDraft,
     previewIntervalDraft,
     previewMediaTypeDraft,
+    previewRecognitionSourceDraft,
     previewRecursiveDepthDraft,
     previewTaskLimitDraft,
     triggerPreviewQueue,
@@ -1625,7 +1650,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               : `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
             : `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
           content: (
-            <Space direction="vertical" size={8}>
+            <Space orientation="vertical" size={8}>
               {activePreviewTaskLabel ? (
                 <Typography.Text>
                   目录：
@@ -1642,7 +1667,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 <Alert
                   type="info"
                   showIcon
-                  message={`${activeVersionGroup.label}：${
+                  title={`${activeVersionGroup.label}：${
                     activeVersionGroup.episode_count > 0
                       ? `${activeVersionGroup.episode_count} 集`
                       : `${activeVersionGroup.file_count} 个文件`
@@ -1650,7 +1675,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   description={`本次选择 ${selectedItemRowsForApply.length} 个文件，原目录另有 ${unselectedItemCount} 个未选文件。`}
                 />
               ) : null}
-              <Space direction="vertical" size={4}>
+              <Space orientation="vertical" size={4}>
                 <Checkbox
                   defaultChecked
                   onChange={(event) => {
@@ -1701,12 +1726,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       modalApi.confirm({
         title: `确认整理 ${folderIds.length} 个 115 目录？`,
         content: (
-          <Space direction="vertical" size={8}>
+          <Space orientation="vertical" size={8}>
             <Typography.Text>
               将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。
               单个目录失败不会阻断其它，错误会标注在对应分组上。
             </Typography.Text>
-            <Space direction="vertical" size={4}>
+            <Space orientation="vertical" size={4}>
               <Checkbox
                 defaultChecked
                 onChange={(event) => {
@@ -2119,6 +2144,21 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         },
       },
       {
+        title: '识别方式',
+        dataIndex: 'recognition_source',
+        width: 130,
+        render: (_, row) =>
+          row.recognition_source === 'local' ? (
+            <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
+              FilmFusion
+            </Tag>
+          ) : (
+            <Tag color="blue" style={{ marginInlineEnd: 0 }}>
+              MoviePilot
+            </Tag>
+          ),
+      },
+      {
         title: 'TMDB',
         dataIndex: 'tmdb_refs',
         width: 150,
@@ -2162,7 +2202,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               .map((season) => ({ ...season, tmdbId: ref.tmdb_id })),
           );
           return (
-            <Space direction="vertical" size={2}>
+            <Space orientation="vertical" size={2}>
               <Tag style={{ marginInlineEnd: 0 }}>本地 {row.total || 0}</Tag>
               {tmdbSeasons.map((season) => (
                 <Tag
@@ -2542,8 +2582,22 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               type={filenameRegexConfig.enabled ? 'warning' : 'info'}
               showIcon={false}
               style={{ marginBottom: 12 }}
-              message={
+              title={
                 <Space size={[8, 8]} wrap>
+                  <Typography.Text strong>识别方式：</Typography.Text>
+                  <Segmented<RecognitionSource>
+                    name="organize-recognition-source"
+                    size="small"
+                    value={organizeRecognitionSource}
+                    options={recognitionSourceOptions}
+                    disabled={organizeLoading || createPreviewLoading}
+                    onChange={(value) => setOrganizeRecognitionSource(value)}
+                  />
+                  <Typography.Text type="secondary">
+                    {organizeRecognitionSource === 'moviepilot'
+                      ? '仅使用 MoviePilot 识别与转名。'
+                      : '使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
+                  </Typography.Text>
                   <Button
                     size="small"
                     type={filenameRegexConfig.enabled ? 'primary' : 'default'}
@@ -2558,7 +2612,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   </Button>
                   <Input
                     size="small"
-                    addonBefore="正则"
+                    prefix="正则"
                     value={filenameRegexConfig.pattern}
                     onChange={(e) =>
                       updateFilenameRegexConfig({ pattern: e.target.value })
@@ -2567,7 +2621,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   />
                   <Input
                     size="small"
-                    addonBefore="替换为"
+                    prefix="替换为"
                     value={filenameRegexConfig.replacement}
                     onChange={(e) =>
                       updateFilenameRegexConfig({
@@ -2589,7 +2643,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     恢复默认
                   </Button>
                   <Typography.Text type="secondary">
-                    开启后用替换结果调用 MoviePilot 识别/转名。
+                    开启后用替换结果调用当前识别方式。
                   </Typography.Text>
                 </Space>
               }
@@ -2600,7 +2654,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 type="info"
                 showIcon={false}
                 style={{ marginBottom: 12 }}
-                message={
+                title={
                   <Space size={[4, 4]} wrap>
                     <Typography.Text
                       type="secondary"
@@ -2743,7 +2797,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         showIcon
                         icon={<WarningOutlined />}
                         style={{ marginBottom: 12 }}
-                        message={`有 ${errored.length} 个目录整理失败`}
+                        title={`有 ${errored.length} 个目录整理失败`}
                         description={
                           <ul style={{ margin: 0, paddingLeft: 18 }}>
                             {errored.map((g) => {
@@ -2806,7 +2860,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                                         <Space size={4}>
                                           <span>{group.label}</span>
                                           <Tag
-                                            bordered={false}
+                                            variant="filled"
                                             color={
                                               group.recommended
                                                 ? 'success'
@@ -2820,7 +2874,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                                           </Tag>
                                           {group.recommended ? (
                                             <Tag
-                                              bordered={false}
+                                              variant="filled"
                                               color="gold"
                                               style={{ marginInlineEnd: 0 }}
                                             >
@@ -2952,11 +3006,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         }}
         destroyOnHidden
       >
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
           <Alert
             type="info"
             showIcon
-            message="确认后会批量重命名该文件夹内的全部文件，并重新运行预整理"
+            title="确认后会批量重命名该文件夹内的全部文件，并重新运行预整理"
             description="只需填写数字 ID；系统会在每个文件的扩展名前添加 {tmdb-ID} 标记。已有 TMDB 标记时会替换，文件夹名称不会改变。"
           />
           <div>
@@ -2965,7 +3019,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               autoFocus
               inputMode="numeric"
               maxLength={20}
-              addonBefore="TMDB"
+              prefix="TMDB"
               placeholder="例如 603"
               value={assignTMDBID}
               onChange={(event) =>
@@ -3001,10 +3055,29 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         okText="加入队列"
         cancelText="取消"
       >
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+          <div>
+            <Typography.Text type="secondary">识别方式</Typography.Text>
+            <Segmented<RecognitionSource>
+              block
+              name="preview-recognition-source"
+              value={previewRecognitionSourceDraft}
+              options={recognitionSourceOptions}
+              onChange={(value) => setPreviewRecognitionSourceDraft(value)}
+              style={{ marginTop: 6 }}
+            />
+            <Typography.Text
+              type="secondary"
+              style={{ display: 'block', marginTop: 6, fontSize: 12 }}
+            >
+              {previewRecognitionSourceDraft === 'moviepilot'
+                ? '队列任务只调用 MoviePilot 识别与转名。'
+                : '队列任务使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
+            </Typography.Text>
+          </div>
           <Row gutter={12}>
             <Col span={12}>
-              <Typography.Text type="secondary">识别类型</Typography.Text>
+              <Typography.Text type="secondary">媒体类型</Typography.Text>
               <Select<OrganizeMediaType>
                 value={episodeMode ? 'tv' : previewMediaTypeDraft}
                 options={mediaTypeOptions}
@@ -3032,7 +3105,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               <Typography.Text type="secondary">目标分类</Typography.Text>
               <Select
                 allowClear
-                showSearch
+                showSearch={{ optionFilterProp: 'label' }}
                 loading={categoryConfigLoading}
                 placeholder="自动匹配"
                 value={previewCategoryDraft}
@@ -3041,7 +3114,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 notFoundContent={
                   categoryConfigLoading ? '加载中' : '无分类配置'
                 }
-                optionFilterProp="label"
                 style={{ width: '100%', marginTop: 6 }}
               />
             </Col>
@@ -3053,7 +3125,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 min={10}
                 max={300}
                 step={5}
-                addonAfter="秒"
+                suffix="秒"
                 value={previewIntervalDraft}
                 onChange={(value) =>
                   setPreviewIntervalDraft(
@@ -3086,7 +3158,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               max={MAX_PREVIEW_TASK_LIMIT}
               step={10}
               precision={0}
-              addonAfter="个目录"
+              suffix="个目录"
               value={previewTaskLimitDraft}
               onChange={(value) =>
                 setPreviewTaskLimitDraft(

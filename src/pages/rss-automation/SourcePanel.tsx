@@ -178,7 +178,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
       title: '名称',
       dataIndex: 'name',
       render: (_, source) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text strong>{source.name}</Text>
           <Text copyable ellipsis type="secondary">
             {source.feed_url}
@@ -278,7 +278,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
       >
         <Alert
           className={styles.panelAlert}
-          message="RSS 源与流程一一绑定；新建请使用自动化向导。首次刷新只建立基线，之后的新条目才会进入唯一流程。"
+          title="RSS 源与流程一一绑定；新建请使用自动化向导。首次刷新只建立基线，之后的新条目才会进入唯一流程。"
           showIcon
           type="info"
         />
@@ -294,8 +294,9 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
 
       <Modal
         cancelText="取消"
+        className={styles.sourceEditorModal}
         destroyOnHidden
-        maskClosable={false}
+        mask={{ closable: false }}
         okButtonProps={{ loading: saving }}
         okText="保存自动化"
         onCancel={() => setModalOpen(false)}
@@ -330,7 +331,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
                 name="interval_minutes"
                 rules={[{ required: true }]}
               >
-                <InputNumber addonAfter="分钟" max={1440} min={1} />
+                <InputNumber suffix="分钟" max={1440} min={1} />
               </Form.Item>
             </Col>
           </Row>
@@ -360,7 +361,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
             </Form.Item>
             <Form.List name={['mapping', 'fields']}>
               {(fields, { add, remove }) => (
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                <div className={styles.mappingFieldList}>
                   {fields.map((field, index) => (
                     <Card
                       extra={
@@ -468,7 +469,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
                   >
                     添加映射字段
                   </Button>
-                </Space>
+                </div>
               )}
             </Form.List>
           </Card>
@@ -484,7 +485,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
                     <>
                       {(sample.items[0]?.errors?.length || 0) > 0 && (
                         <Alert
-                          message={sample.items[0].errors?.join('；')}
+                          title={sample.items[0].errors?.join('；')}
                           type="warning"
                         />
                       )}

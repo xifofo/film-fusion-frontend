@@ -1,10 +1,10 @@
-import '@ant-design/v5-patch-for-react-19';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntdApp } from 'antd';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router';
 import { AppStateProvider } from '@/contexts/app-state';
 import { AppLocaleProvider } from '@/i18n';
+import { AntdFeedbackBridge } from '@/lib/antd-feedback';
 import { router } from '@/router';
 import '@/styles/globals.css';
 import '@/global.less';
@@ -34,6 +34,7 @@ if (!keepBootLoading) {
   ReactDOM.createRoot(root).render(
     <AppLocaleProvider>
       <AntdApp>
+        <AntdFeedbackBridge />
         <QueryClientProvider client={queryClient}>
           <AppStateProvider>
             <RouterProvider router={router} />

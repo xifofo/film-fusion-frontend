@@ -26,6 +26,24 @@ export async function getCurrentUser() {
   });
 }
 
+/** 更新当前用户资料 */
+export async function updateCurrentUserProfile(params: { nickname: string }) {
+  return apiClient.put<API.Response<API.User>>('/api/me', params, {
+    skipErrorHandler: true,
+  });
+}
+
+/** 上传并更新当前用户头像 */
+export async function uploadCurrentUserAvatar(file: Blob, filename: string) {
+  const formData = new FormData();
+  formData.append('file', file, filename);
+  return apiClient.post<API.Response<API.UserAvatarUploadResult>>(
+    '/api/me/avatar',
+    formData,
+    { skipErrorHandler: true },
+  );
+}
+
 /** 获取用户列表 */
 export async function getUsers(params?: API.PageParams) {
   return apiClient.get<API.Response<API.PageResult<API.User>>>(

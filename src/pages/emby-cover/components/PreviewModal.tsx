@@ -1,10 +1,10 @@
+import { CloudUploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, Button, Modal, Popconfirm, Space, Spin, Typography } from 'antd';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   generateEmbyCoverLibrary,
   previewEmbyCoverLibrary,
 } from '@/services/film-fusion';
-import { CloudUploadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Button, Modal, Popconfirm, Space, Spin, Typography, message } from 'antd';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 const { Text } = Typography;
 
@@ -31,6 +31,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
   onClose,
   onUploaded,
 }) => {
+  const { message: messageApi } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imgUrl, setImgUrl] = useState<string>('');
@@ -52,7 +53,10 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
     try {
       const blob = await previewEmbyCoverLibrary(record.emby_library_id);
       // request 配置了 responseType: 'blob'，但 Umi 可能仍包一层，这里兜底判断
-      const realBlob = blob instanceof Blob ? blob : new Blob([blob as any], { type: 'image/jpeg' });
+      const realBlob =
+        blob instanceof Blob
+          ? blob
+          : new Blob([blob as any], { type: 'image/jpeg' });
       releaseUrl();
       const url = URL.createObjectURL(realBlob);
       currentUrlRef.current = url;
@@ -70,7 +74,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
         }
       }
       setErrMsg(msg);
-      message.error(msg);
+      messageApi.error(msg);
     } finally {
       setLoading(false);
     }
@@ -101,14 +105,14 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
     try {
       const resp = await generateEmbyCoverLibrary(record.emby_library_id);
       if (resp.code !== 0) {
-        message.error(resp.message || '上传失败');
+        messageApi.error(resp.message || '上传失败');
         return;
       }
-      message.success('已生成并上传到 Emby');
+      messageApi.success('已生成并上传到 Emby');
       onUploaded?.();
       onClose();
     } catch (e: any) {
-      message.error(e?.message || '上传失败');
+      messageApi.error(e?.message || '上传失败');
     } finally {
       setUploading(false);
     }
@@ -121,7 +125,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
       width={960}
       title={record ? `封面预览 · ${record.emby_name}` : '封面预览'}
       destroyOnHidden
-      maskClosable={!loading && !uploading}
+      mask={{ closable: !loading && !uploading }}
       footer={
         <Space>
           <Button onClick={onClose} disabled={uploading}>
@@ -156,7 +160,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
         </Space>
       }
     >
-      <Spin spinning={loading} tip="生成中，通常需要 1~3 秒...">
+      <Spin spinning={loading} description="生成中，通常需要 1~3 秒...">
         <div
           style={{
             minHeight: 480,
@@ -184,7 +188,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
         </div>
         {record && (
           <div style={{ marginTop: 12, color: '#666' }}>
-            <Space split={<span>·</span>} size="middle">
+            <Space separator={<span>·</span>} size="middle">
               <span>
                 模板：<Text strong>{record.template_id}</Text>
               </span>

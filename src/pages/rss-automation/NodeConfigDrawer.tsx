@@ -142,6 +142,7 @@ const TemplateConfigField = ({
   protocol,
   placeholder,
   required = false,
+  insertMode = 'reference',
 }: {
   field: string;
   label: string;
@@ -149,6 +150,7 @@ const TemplateConfigField = ({
   protocol?: RSSAutomationNodeProtocol['inputs'][number];
   placeholder?: string;
   required?: boolean;
+  insertMode?: 'reference' | 'template';
 }) => (
   <Form.Item
     className={styles.nodeConfigFull}
@@ -159,7 +161,8 @@ const TemplateConfigField = ({
   >
     <TemplateVariableInput
       ariaLabel={label}
-      placeholder={placeholder || '输入 {{ 选择上游变量'}
+      insertMode={insertMode}
+      placeholder={placeholder || '输入内容，或点击“插入变量”'}
       references={references}
     />
   </Form.Item>
@@ -167,7 +170,11 @@ const TemplateConfigField = ({
 
 const protocolExample = (value: unknown) => {
   if (value == null || value === '') return '';
-  return typeof value === 'string' ? value : JSON.stringify(value);
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  return text.replace(
+    /\{\{([^{}]+)\}\}/g,
+    (_, path: string) => `[变量：$${path}]`,
+  );
 };
 
 const protocolFieldExtra = (
@@ -195,6 +202,7 @@ const NodeConfigModal = ({
   const cloudStorageID = Form.useWatch('cloud_storage_id', form);
   const directoryPath = Form.useWatch('directory_path', form);
   const filenameRegexEnabled = Form.useWatch('filename_regex_enabled', form);
+  const recognitionMode = Form.useWatch('recognition_mode', form);
   const inputProtocols: NodeInputProtocolMap = new Map(
     (nodeProtocol?.inputs || []).map((protocol) => [protocol.name, protocol]),
   );
@@ -250,6 +258,8 @@ const NodeConfigModal = ({
       'max_wait_minutes',
       'image_url',
       'tmdb_id',
+      'recognition_mode',
+      'lookup_tmdb',
       'input',
       'year',
       'resolution',
@@ -337,7 +347,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -385,7 +395,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -443,7 +453,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="输入 {{ 选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -482,7 +492,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="比较字段"
-                placeholder="输入 {{ 选择要判断的字段或变量"
+                placeholder="点击“插入变量”选择要判断的字段或变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -508,7 +518,7 @@ const NodeConfigModal = ({
                   placeholder={
                     operator === 'in'
                       ? '多个值用英文逗号分隔'
-                      : '输入固定值，或输入 {{ 选择变量'
+                      : '输入固定值，或点击“插入变量”'
                   }
                   references={fieldReferences}
                 />
@@ -582,7 +592,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="直接连接 qBittorrent 下载节点的成功出口。FilmFusion 会用提交时附加的内部标签定位任务，服务重启后仍可继续等待。"
-              message="只有 qBittorrent 下载完成后才走成功出口"
+              title="只有 qBittorrent 下载完成后才走成功出口"
               showIcon
               type="info"
             />
@@ -600,6 +610,109 @@ const NodeConfigModal = ({
               rules={[{ required: true }]}
             >
               <InputNumber max={43200} min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </>
+        );
+      case 'moviepilot_transfer':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="直接连接“等待 qBittorrent 完成”的成功出口。节点会同步调用 MP2 手动整理接口；只有 MP2 明确返回成功，后续删种节点才会执行。"
+              title="先完成 MP2 整理，再继续后续操作"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="留空使用 qB 返回的 content_path；如果 qB 与 MP2 的容器挂载路径不同，请填写 MP2 容器内可见的路径或流程变量。"
+              label="MP2 可见源路径（可选）"
+              name="source_path"
+            >
+              <TemplateVariableInput
+                ariaLabel="MP2 可见源路径"
+                placeholder="留空自动使用 qB 完成路径，或点击“插入变量”"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item label="源路径类型" name="file_type">
+              <Select
+                options={[
+                  { label: '自动判断', value: 'auto' },
+                  { label: '单个文件', value: 'file' },
+                  { label: '文件夹', value: 'dir' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="媒体类型" name="media_type">
+              <Select
+                options={[
+                  { label: '自动识别', value: 'auto' },
+                  { label: '电影', value: 'movie' },
+                  { label: '电视剧', value: 'tv' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="可留空让 MP2 自动识别；也可引用下载前的 MP 标题识别结果。"
+              label="辅助 TMDB ID（可选）"
+              name="tmdb_id"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const text = String(value || '').trim();
+                    if (
+                      !text ||
+                      /^[1-9]\d{0,19}$/.test(text) ||
+                      text.startsWith('$') ||
+                      text.includes('{{')
+                    ) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('请输入正整数 TMDB ID 或流程变量'),
+                    );
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="MP2 整理辅助 TMDB ID"
+                placeholder="例如 1396，或点击“插入变量”"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              extra="留空沿用 MP2 目录配置；也可填写 MP2 支持的 copy、move、link 等方式。"
+              label="整理方式（可选）"
+              name="transfer_type"
+            >
+              <Input placeholder="留空沿用 MP2 配置" />
+            </Form.Item>
+            <Form.Item label="刮削元数据" name="scrape" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+          </>
+        );
+      case 'delete_qbittorrent':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="默认只从 qBittorrent 删除任务并停止做种，不删除下载数据。若开启同时删除文件，流程必须直接连接在“MP2 整理入库”成功出口之后。"
+              title="删除操作不会自动重试"
+              showIcon
+              type="warning"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="开启后会让 qBittorrent 删除源下载数据；后端会强制校验 MP2 已整理成功。"
+              label="同时删除下载文件"
+              name="delete_files"
+              valuePropName="checked"
+            >
+              <Switch />
             </Form.Item>
           </>
         );
@@ -662,7 +775,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="直接连接在 115 Cookie/OpenAPI 离线节点的“成功”出口。任务提交后会持久化查询进度，服务重启也会继续等待。"
-              message="只有 115 云下载真正完成后，才会走成功出口。"
+              title="只有 115 云下载真正完成后，才会走成功出口。"
               showIcon
               type="info"
             />
@@ -683,13 +796,100 @@ const NodeConfigModal = ({
             </Form.Item>
           </>
         );
+      case 'filmfusion_recognize':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              {recognitionMode === 'file'
+                ? '直接连接“等待 115 下载完成”的成功出口，递归读取其中的视频文件；不会修改云端文件名，也不会调用 MP2。'
+                : '读取 RSS 标题或任意流程变量，应用“识别词管理”中已保存的词表后，由 FilmFusion 本地内核解析。'}
+            </Text>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={protocolFieldExtra(inputProtocol('recognition_mode'))}
+              label="识别对象"
+              name="recognition_mode"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={[
+                  { label: '发布标题', value: 'title' },
+                  { label: '115 下载文件', value: 'file' },
+                ]}
+              />
+            </Form.Item>
+            {recognitionMode !== 'file' && (
+              <Form.Item
+                className={styles.nodeConfigFull}
+                extra={
+                  protocolFieldExtra(inputProtocol('input')) ||
+                  '通常选择 $item.title，也可以选择上游生成的标题变量。'
+                }
+                label="待识别标题"
+                name="input"
+                rules={[{ required: true }]}
+              >
+                <TemplateVariableInput
+                  ariaLabel="FilmFusion 本地识别标题"
+                  placeholder="点击“插入变量”选择 RSS 标题或上游变量"
+                  references={fieldReferences}
+                />
+              </Form.Item>
+            )}
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('lookup_tmdb')) ||
+                '关闭后仍会执行识别词和本地解析，只是不再向 TMDB 补全海报、评分等信息。'
+              }
+              label="查询 TMDB"
+              name="lookup_tmdb"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="查询" unCheckedChildren="仅本地" />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('tmdb_id')) ||
+                '可留空自动解析；填写后会加入 {tmdb-ID} 标记并校验结果。'
+              }
+              label="辅助 TMDB ID（可选）"
+              name="tmdb_id"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const text = String(value || '').trim();
+                    if (
+                      !text ||
+                      /^[1-9]\d{0,19}$/.test(text) ||
+                      text.startsWith('$') ||
+                      text.includes('{{')
+                    ) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('请输入正整数 TMDB ID 或流程变量'),
+                    );
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="FilmFusion 本地识别辅助 TMDB ID"
+                placeholder="例如 1396，或点击“插入变量”"
+                references={fieldReferences}
+              />
+            </Form.Item>
+          </>
+        );
       case 'moviepilot_recognize':
         return (
           <>
             <Alert
               className={styles.nodeConfigFull}
               description="直接连接在“等待 115 下载完成”节点的成功出口。若下载结果是文件夹，会递归识别其中的视频文件。"
-              message="识别只读取文件名和文件夹上下文，不会修改 115 云端文件名。"
+              title="识别只读取文件名和文件夹上下文，不会修改 115 云端文件名。"
               showIcon
               type="info"
             />
@@ -719,7 +919,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="辅助 TMDB ID"
-                placeholder="例如 1396，或输入 {{ 选择变量"
+                placeholder="例如 1396，或点击“插入变量”"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -731,7 +931,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="可放在关键词或 IF 筛选后、下载节点前。节点会输出 TMDB ID、标题、年份、分类、评分和海报地址，供下载路径或通知继续使用。"
-              message="使用 RSS 标题调用 MoviePilot 识别，不依赖 115 下载。"
+              title="使用 RSS 标题调用 MoviePilot 识别，不依赖 115 下载。"
               showIcon
               type="info"
             />
@@ -747,7 +947,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="待识别标题"
-                placeholder="输入 {{ 选择 RSS 标题或上游变量"
+                placeholder="点击“插入变量”选择 RSS 标题或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -777,7 +977,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="标题识别辅助 TMDB ID"
-                placeholder="例如 1396，或输入 {{ 选择变量"
+                placeholder="例如 1396，或点击“插入变量”"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -789,7 +989,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="按目录配置计算本地目标目录，同时用 TMDB ID 查询 Emby。已存在走“已存在”，不存在走“不存在”。"
-              message="建议放在下载节点之前避免重复下载"
+              title="建议放在下载节点之前避免重复下载"
               showIcon
               type="info"
             />
@@ -815,7 +1015,7 @@ const NodeConfigModal = ({
             <TemplateConfigField
               field="tmdb_id"
               label="TMDB ID"
-              placeholder="输入 {{ 选择 MP 识别结果"
+              placeholder="点击“插入变量”选择 MP 识别结果"
               protocol={inputProtocol('tmdb_id')}
               references={fieldReferences}
               required
@@ -852,7 +1052,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="按 TMDB ID 查询 HDHive，可按分辨率和网盘类型筛选。找到资源走“找到资源”，否则走“没有资源”。"
-              message="这里只查询资源，不会扣积分或解锁"
+              title="这里只查询资源，不会扣积分或解锁"
               showIcon
               type="info"
             />
@@ -893,14 +1093,14 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="连接 HDHive 查询节点的“找到资源”出口。运行时会真实解锁资源，可能消耗 HDHive 积分。"
-              message="这是实际解锁动作"
+              title="这是实际解锁动作"
               showIcon
               type="warning"
             />
             <TemplateConfigField
               field="slug"
               label="资源 slug"
-              placeholder="输入 {{ 选择查询节点的 selected_slug"
+              placeholder="点击“插入变量”选择查询节点的 selected_slug"
               protocol={inputProtocol('slug')}
               references={fieldReferences}
               required
@@ -913,7 +1113,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="运行时会复用“目录配置”里的分类、过滤、保存路径和 STRM 前缀，真实重命名并移动 115 文件，然后写入本地 STRM。默认不删除源目录，也不自动重试。"
-              message="这是实际整理动作"
+              title="这是实际整理动作"
               showIcon
               type="warning"
             />
@@ -926,7 +1126,6 @@ const NodeConfigModal = ({
             >
               <Select
                 aria-label="整理目录配置"
-                optionFilterProp="label"
                 options={cloudDirectories.map((directory) => {
                   const storageType =
                     directory.cloud_storage?.storage_type || '';
@@ -946,7 +1145,7 @@ const NodeConfigModal = ({
                   };
                 })}
                 placeholder="选择现有目录配置"
-                showSearch
+                showSearch={{ optionFilterProp: 'label' }}
               />
             </Form.Item>
             <Form.Item label="媒体类型" name="media_type">
@@ -1010,7 +1209,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="只读取整理节点返回的 STRM 文件，校验路径边界、文件类型、大小和非空内容，不访问 115。"
-              message="只读校验，不会修改或重生成 STRM"
+              title="只读校验，不会修改或重生成 STRM"
               showIcon
               type="info"
             />
@@ -1041,7 +1240,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="只使用上游整理节点已返回的 STRM 路径和内容，在配置的本地根目录内原子重写；不请求 115。"
-              message="只能连接 STRM 校验节点的“无效”出口"
+              title="只能连接 STRM 校验节点的“无效”出口"
               showIcon
               type="warning"
             />
@@ -1072,7 +1271,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="首次执行触发一次 Emby 全库刷新，然后按 TMDB ID 轮询；服务重启后会继续等待且不会重复刷新。"
-              message="用于确认 STRM 已真正进入 Emby 媒体库"
+              title="用于确认 STRM 已真正进入 Emby 媒体库"
               showIcon
               type="info"
             />
@@ -1119,7 +1318,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="预览时不发起请求。真正运行时默认禁止访问内网地址、禁止跳转，响应最多保留 1 MiB。"
-              message="通用 HTTP / Webhook 节点"
+              title="通用 HTTP / Webhook 节点"
               showIcon
               type="info"
             />
@@ -1136,8 +1335,9 @@ const NodeConfigModal = ({
             </Form.Item>
             <TemplateConfigField
               field="url"
+              insertMode="template"
               label="请求地址"
-              placeholder="https://hooks.example/api/{{nodes.mp.output.tmdb_id}}"
+              placeholder="例如 https://hooks.example/api/media，也可插入变量"
               protocol={inputProtocol('url')}
               references={fieldReferences}
               required
@@ -1167,10 +1367,9 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="HTTP 请求头 JSON"
+                insertMode="template"
                 multiline
-                placeholder={
-                  '{\n  "X-Media-Type": "{{nodes.mp.output.media_type}}"\n}'
-                }
+                placeholder={'{\n  "X-Media-Type": "movie"\n}'}
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1178,15 +1377,16 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('body')) ||
-                '最大 1 MiB；可输入 {{ 插入 RSS 字段或上游输出。'
+                '最大 1 MiB；点击“插入变量”可选择 RSS 字段或上游输出。'
               }
               label="请求体（可选）"
               name="body"
             >
               <TemplateVariableInput
                 ariaLabel="HTTP 请求体"
+                insertMode="template"
                 multiline
-                placeholder={'{\n  "tmdb_id": "{{nodes.mp.output.tmdb_id}}"\n}'}
+                placeholder={'{\n  "tmdb_id": "1396"\n}'}
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1221,7 +1421,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="通知图片地址"
-                placeholder="输入 {{ 选择 poster_url"
+                placeholder="输入图片地址，或点击“插入变量”"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1233,6 +1433,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="通知标题"
+                insertMode="template"
                 placeholder="RSS 自动化命中"
                 references={fieldReferences}
               />
@@ -1244,11 +1445,12 @@ const NodeConfigModal = ({
               rules={[{ required: true }]}
               extra={
                 protocolFieldExtra(inputProtocol('message')) ||
-                '输入 {{ 唤起智能提示，可用 ↑↓ 选择并按 Enter 插入。'
+                '点击“插入变量”，选中后会放到当前光标位置。'
               }
             >
               <TemplateVariableInput
                 ariaLabel="通知内容"
+                insertMode="template"
                 multiline
                 references={fieldReferences}
               />
@@ -1293,7 +1495,7 @@ const NodeConfigModal = ({
           </Space>
         </div>
       }
-      maskClosable={false}
+      mask={{ closable: false }}
       onCancel={onClose}
       open={Boolean(node)}
       title={node ? `配置 · ${NODE_LABELS[node.type]}` : '节点配置'}
@@ -1309,7 +1511,7 @@ const NodeConfigModal = ({
           {preview && (
             <Alert
               className={styles.nodeConfigPreview}
-              message={
+              title={
                 <>
                   <Text strong>{preview.label}</Text>
                   {preview.detail && (
@@ -1331,7 +1533,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigPreview}
               description={`输入 ${nodeProtocol.inputs.length} 个 · 输出 ${nodeProtocol.outputs.length} 个；变量均声明名称、类型、说明和示例值。`}
-              message="节点变量协议已登记"
+              title="节点变量协议已登记"
               showIcon
               type="info"
             />
@@ -1358,12 +1560,16 @@ const NodeConfigModal = ({
                 >
                   <InputNumber
                     disabled={[
+                      'moviepilot_transfer',
+                      'delete_qbittorrent',
                       'organize_strm',
                       'strm_regenerate',
                       'http_request',
                     ].includes(node.type)}
                     max={
                       [
+                        'moviepilot_transfer',
+                        'delete_qbittorrent',
                         'organize_strm',
                         'strm_regenerate',
                         'http_request',
@@ -1377,10 +1583,13 @@ const NodeConfigModal = ({
                 {[
                   'qbittorrent',
                   'wait_qbittorrent',
+                  'moviepilot_transfer',
+                  'delete_qbittorrent',
                   'offline115',
                   'offline115_openapi',
                   'wait115',
                   'moviepilot_title_recognize',
+                  'filmfusion_recognize',
                   'media_exists',
                   'hdhive_query',
                   'hdhive_unlock',
@@ -1436,7 +1645,7 @@ const ActionFields = ({
     >
       <TemplateVariableInput
         ariaLabel="下载 URL"
-        placeholder="输入 {{ 选择 RSS 下载字段或上游变量"
+        placeholder="点击“插入变量”选择 RSS 下载字段或上游变量"
         references={fieldReferences}
       />
     </Form.Item>
@@ -1445,21 +1654,24 @@ const ActionFields = ({
         <Form.Item label="保存路径" name="save_path">
           <TemplateVariableInput
             ariaLabel="qBittorrent 保存路径"
-            placeholder="/downloads/{{item.category}}"
+            insertMode="template"
+            placeholder="例如 /downloads/电影，可在光标处插入变量"
             references={fieldReferences}
           />
         </Form.Item>
         <Form.Item label="分类" name="category">
           <TemplateVariableInput
             ariaLabel="qBittorrent 分类"
-            placeholder="{{item.category}}"
+            insertMode="template"
+            placeholder="例如 电影，或点击“插入变量”"
             references={fieldReferences}
           />
         </Form.Item>
         <Form.Item className={styles.nodeConfigFull} label="标签" name="tags">
           <TemplateVariableInput
             ariaLabel="qBittorrent 标签"
-            placeholder="rss,{{nodes.mp.output.media_type}}"
+            insertMode="template"
+            placeholder="例如 rss,电影，可在光标处插入变量"
             references={fieldReferences}
           />
         </Form.Item>

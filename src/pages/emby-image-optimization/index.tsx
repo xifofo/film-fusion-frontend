@@ -10,6 +10,7 @@ import {
 import { PageContainer } from '@ant-design/pro-components';
 import {
   Alert,
+  App,
   Button,
   Card,
   Col,
@@ -17,7 +18,6 @@ import {
   Form,
   Grid,
   InputNumber,
-  message,
   Row,
   Segmented,
   Select,
@@ -347,7 +347,7 @@ const RuleEditor: React.FC<{
 
   return (
     <div className={styles.ruleBody}>
-      <Space direction="vertical" size={2} style={{ marginBottom: 18 }}>
+      <Space orientation="vertical" size={2} style={{ marginBottom: 18 }}>
         <Title level={5} style={{ margin: 0 }}>
           {profile.title}
         </Title>
@@ -370,7 +370,7 @@ const RuleEditor: React.FC<{
             min={0}
             max={4096}
             precision={0}
-            addonAfter="px"
+            suffix="px"
             disabled={!enabled}
             style={{ width: '100%' }}
           />
@@ -380,7 +380,7 @@ const RuleEditor: React.FC<{
             min={0}
             max={4096}
             precision={0}
-            addonAfter="px"
+            suffix="px"
             disabled={!enabled}
             style={{ width: '100%' }}
           />
@@ -427,7 +427,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
   const { styles } = useStyles();
   const screens = Grid.useBreakpoint();
   const [form] = Form.useForm<API.EmbyImageOptimizationSettings>();
-  const [messageApi, contextHolder] = message.useMessage();
+  const { message: messageApi } = App.useApp();
   const [loading, setLoading] = useState(true);
   const [samplesLoading, setSamplesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -593,7 +593,6 @@ const EmbyImageOptimizationPage: React.FC = () => {
         </Button>,
       ]}
     >
-      {contextHolder}
       <Spin spinning={loading}>
         <Row gutter={[16, 16]} className={styles.pageGrid}>
           <Col xs={24} xl={10}>
@@ -604,7 +603,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
                 onValuesChange={invalidateTest}
               >
                 <div className={styles.globalToggle}>
-                  <Space direction="vertical" size={0}>
+                  <Space orientation="vertical" size={0}>
                     <Text strong>启用图片优化</Text>
                     <Text type="secondary">保存后由 8097 代理即时执行</Text>
                   </Space>
@@ -618,7 +617,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
                   onChange={(key) =>
                     setProfileKey(key as API.EmbyImageProfileKey)
                   }
-                  tabPosition={screens.lg ? 'left' : 'top'}
+                  tabPlacement={screens.lg ? 'start' : 'top'}
                   items={profiles.map((item) => ({
                     key: item.key,
                     label: item.shortLabel,
@@ -647,8 +646,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
                     setSampleID(value);
                     invalidateTest();
                   }}
-                  showSearch
-                  optionFilterProp="label"
+                  showSearch={{ optionFilterProp: 'label' }}
                   placeholder="选择 Emby 图片样本"
                   options={compatibleSamples.map((sample) => ({
                     value: sample.id,
@@ -738,7 +736,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
                   showIcon
                   type="info"
                   style={{ marginTop: 14 }}
-                  message={
+                  title={
                     !optimizationEnabled
                       ? '图片优化总开关未启用'
                       : !profileRuleEnabled

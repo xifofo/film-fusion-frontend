@@ -229,7 +229,7 @@ const AutomationWizard = ({
       <Steps
         className={styles.wizardSteps}
         current={step}
-        direction="horizontal"
+        orientation="horizontal"
         items={[
           { title: 'RSS', description: '解析真实内容' },
           { title: '流程', description: '边设计边预览' },
@@ -317,7 +317,7 @@ const AutomationWizard = ({
                       </Col>
                       <Col md={7} xs={12}>
                         <Form.Item label="刷新间隔" name="interval_minutes">
-                          <InputNumber addonAfter="分钟" max={1440} min={1} />
+                          <InputNumber suffix="分钟" max={1440} min={1} />
                         </Form.Item>
                       </Col>
                     </Row>
@@ -347,12 +347,11 @@ const AutomationWizard = ({
                 aria-label="选择预览样本"
                 className={styles.sampleChoiceSelect}
                 onChange={setSelectedSample}
-                optionFilterProp="label"
                 options={sample.items.map((item, index) => ({
                   label: `${index + 1}. ${String(item.fields.title || `样本 ${index + 1}`)}`,
                   value: index,
                 }))}
-                showSearch
+                showSearch={{ optionFilterProp: 'label' }}
                 value={selectedSample}
               />
               <div className={styles.sampleFieldGrid}>
@@ -366,7 +365,7 @@ const AutomationWizard = ({
                 ))}
               </div>
               <Alert
-                message="这些字段会直接出现在下一步的流程预览中"
+                title="这些字段会直接出现在下一步的流程预览中"
                 showIcon
                 type="info"
               />
@@ -405,6 +404,7 @@ const AutomationWizard = ({
             setStep(2);
           }}
           previewFeed={sample}
+          sourceMapping={source?.mapping}
           sources={[]}
           targets={targets}
           workflows={[]}
@@ -454,14 +454,14 @@ const AutomationWizard = ({
               </Form>
               <Alert
                 description="首次刷新只记录当前已有条目作为基线，不会把历史内容突然全部下载；之后出现的新条目才会进入流程。"
-                message="首次启用是安全的"
+                title="首次启用是安全的"
                 showIcon
                 type="success"
               />
               {actionCount === 0 && (
                 <Alert
                   description="如果要立即启用，请返回流程设计，添加 qBittorrent、115 离线或通知节点；也可以先关闭立即启用，将它保存成草稿。"
-                  message="当前流程还没有执行动作"
+                  title="当前流程还没有执行动作"
                   showIcon
                   style={{ marginTop: 12 }}
                   type="warning"
