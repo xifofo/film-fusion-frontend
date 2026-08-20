@@ -1,4 +1,10 @@
 import {
+  ApiOutlined,
+  BellOutlined,
+  BgColorsOutlined,
+  CloudServerOutlined,
+  DeploymentUnitOutlined,
+  FileTextOutlined,
   KeyOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
@@ -6,7 +12,6 @@ import {
   UploadOutlined,
 } from '@ant-design/icons';
 import {
-  PageContainer,
   ProForm,
   ProFormDigit,
   ProFormSelect,
@@ -18,6 +23,7 @@ import {
   App,
   Button,
   Form,
+  Grid,
   message,
   Space,
   Spin,
@@ -63,22 +69,26 @@ const notificationChannelOptions: Array<{
 const DEFAULT_RSS_AUTOMATION_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
 
+const SETTINGS_TAB_ICON_COLORS: Record<SettingsTabKey, string> = {
+  server: '#000000',
+  'rss-automation': '#000000',
+  '115': '#224888',
+  appearance: '#000000',
+  webhook: '#000000',
+  emby: '#52b54b',
+  notifications: '#000000',
+  moviepilot: '#4c1d95',
+  tmdb: '#032541',
+  hdhive: '#050505',
+  log: '#000000',
+  jwt: '#000000',
+};
+
 const useStyles = createStyles(({ css, token }) => ({
   page: css`
     --settings-panel-radius: 12px;
-  `,
-  intro: css`
-    margin-bottom: 16px;
-    border: 1px solid ${token.colorInfoBorder};
-    border-radius: var(--settings-panel-radius);
-
-    .ant-alert-message {
-      line-height: 22px;
-    }
-  `,
-  introTitle: css`
-    margin-inline-end: 16px;
-    white-space: nowrap;
+    --settings-tab-nav-width: 184px;
+    --settings-tab-gap: 24px;
   `,
   loadingArea: css`
     min-height: 420px;
@@ -86,22 +96,67 @@ const useStyles = createStyles(({ css, token }) => ({
   settingsTabs: css`
     .ant-tabs-nav {
       position: sticky;
-      top: 56px;
+      top: 72px;
       z-index: 8;
+      align-self: flex-start;
+      width: var(--settings-tab-nav-width);
+      max-height: calc(100vh - 96px);
       margin: 0;
-      padding: 0 24px;
+      padding: 12px 0;
+      border: 1px solid ${token.colorBorderSecondary};
       border-radius: var(--settings-panel-radius);
       background: color-mix(in srgb, ${token.colorBgContainer} 94%, transparent);
       backdrop-filter: blur(12px);
     }
 
-    .ant-tabs-tab {
-      padding-block: 18px 14px;
+    .ant-tabs-nav-list {
+      width: 100%;
     }
 
-    .ant-tabs-content-holder {
-      padding: 24px 0;
+    .ant-tabs-tab {
+      justify-content: flex-start;
+      width: 100%;
+      padding: 10px 18px;
+    }
+
+    .ant-tabs-tab-btn {
+      width: 100%;
+      text-align: start;
+    }
+
+    .ant-tabs-body-holder {
+      min-width: 0;
+      border-inline-start: 0;
       background: transparent;
+    }
+
+    .ant-tabs-body,
+    .ant-tabs-content {
+      min-width: 0;
+    }
+
+    @media (max-width: 991px) {
+      .ant-tabs-nav {
+        top: 56px;
+        align-self: stretch;
+        width: auto;
+        max-height: none;
+        padding: 0 24px;
+      }
+
+      .ant-tabs-nav-list {
+        width: auto;
+      }
+
+      .ant-tabs-tab {
+        width: auto;
+        padding-block: 18px 14px;
+      }
+
+      .ant-tabs-tab-btn {
+        width: auto;
+      }
+
     }
 
     @media (max-width: 767px) {
@@ -109,11 +164,28 @@ const useStyles = createStyles(({ css, token }) => ({
         top: 48px;
         padding-inline: 16px;
       }
-
-      .ant-tabs-content-holder {
-        padding: 16px 0;
-      }
     }
+  `,
+  tabIconTile: css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    border-radius: 7px;
+    background: #475569;
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    vertical-align: middle;
+  `,
+  brandTabIcon: css`
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    object-fit: contain;
   `,
   tabPanel: css`
     display: grid;
@@ -311,6 +383,9 @@ const useStyles = createStyles(({ css, token }) => ({
     justify-content: space-between;
     gap: 16px;
     max-width: 1120px;
+    margin-inline-start: calc(
+      var(--settings-tab-nav-width) + var(--settings-tab-gap)
+    );
     margin-top: 16px;
     padding: 12px 14px;
     border: 1px solid ${token.colorBorderSecondary};
@@ -318,6 +393,10 @@ const useStyles = createStyles(({ css, token }) => ({
     background: color-mix(in srgb, ${token.colorBgContainer} 94%, transparent);
     box-shadow: ${token.boxShadowSecondary};
     backdrop-filter: blur(12px);
+
+    @media (max-width: 991px) {
+      margin-inline-start: 0;
+    }
 
     @media (max-width: 600px) {
       align-items: flex-start;
@@ -373,6 +452,27 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 const SystemSettingsPage: React.FC = () => {
   const { styles } = useStyles();
   const { modal } = App.useApp();
+  const screens = Grid.useBreakpoint();
+  const useSideTabs = Boolean(screens.lg);
+  const renderTabIcon = (icon: ReactNode, backgroundColor: string) => (
+    <span
+      aria-hidden="true"
+      className={styles.tabIconTile}
+      style={{ backgroundColor }}
+    >
+      {icon}
+    </span>
+  );
+  const renderBrandTabIcon = (src: string, backgroundColor: string) =>
+    renderTabIcon(
+      <img
+        alt=""
+        className={styles.brandTabIcon}
+        draggable={false}
+        src={src}
+      />,
+      backgroundColor,
+    );
   const [form] = Form.useForm<API.AppConfig>();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<SettingsTabKey>('server');
@@ -663,30 +763,21 @@ const SystemSettingsPage: React.FC = () => {
   };
 
   return (
-    <PageContainer
-      className={styles.page}
-      header={{
-        title: '系统设置',
-        subTitle: '集中管理 FilmFusion 的服务连接、通知与安全策略',
-      }}
+    <div
+      className={`${styles.page} box-border w-full px-4 py-5 sm:px-6 sm:py-7 xl:px-8`}
     >
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="m-0 text-[11px] font-semibold tracking-[0.18em] text-neutral-400 uppercase dark:text-white/35">
+            System settings
+          </p>
+          <h1 className="mt-2 mb-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
+            系统设置
+          </h1>
+        </div>
+      </header>
+
       {contextHolder}
-      <Alert
-        className={styles.intro}
-        type="info"
-        showIcon
-        title={
-          <span>
-            <Typography.Text strong className={styles.introTitle}>
-              配置按用途持久化
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              登录页外观、115 与 RSS 自动化运行配置保存到数据库，其余配置写入
-              config.yaml；「需重启」项除外。
-            </Typography.Text>
-          </span>
-        }
-      />
       <div>
         <Spin spinning={loading} className={styles.loadingArea}>
           {config && (
@@ -722,13 +813,18 @@ const SystemSettingsPage: React.FC = () => {
             >
               <Tabs
                 className={styles.settingsTabs}
-                tabBarGutter={28}
+                tabBarGutter={useSideTabs ? 6 : 20}
+                tabPlacement={useSideTabs ? 'start' : 'top'}
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as SettingsTabKey)}
                 items={[
                   {
                     key: 'server',
                     label: '服务器',
+                    icon: renderTabIcon(
+                      <CloudServerOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.server,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -845,6 +941,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'rss-automation',
                     label: 'RSS 自动化',
+                    icon: renderTabIcon(
+                      <DeploymentUnitOutlined />,
+                      SETTINGS_TAB_ICON_COLORS['rss-automation'],
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -897,6 +997,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: '115',
                     label: '115',
+                    icon: renderBrandTabIcon(
+                      '/brands/115.png',
+                      SETTINGS_TAB_ICON_COLORS['115'],
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -987,6 +1091,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'appearance',
                     label: '外观设置',
+                    icon: renderTabIcon(
+                      <BgColorsOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.appearance,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1252,6 +1360,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'webhook',
                     label: 'Webhook',
+                    icon: renderTabIcon(
+                      <ApiOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.webhook,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1343,6 +1455,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'emby',
                     label: 'Emby',
+                    icon: renderBrandTabIcon(
+                      '/brands/emby.png',
+                      SETTINGS_TAB_ICON_COLORS.emby,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1469,12 +1585,85 @@ const SystemSettingsPage: React.FC = () => {
                             />
                           </div>
                         </SettingsSection>
+
+                        <SettingsSection
+                          title="封面生成"
+                          description="控制 Emby 媒体库封面的自动生成任务以及海报拼接规则。"
+                        >
+                          <div className={styles.toggleGrid}>
+                            <SettingsToggle
+                              name={['emby', 'cover', 'enabled']}
+                              title="自动生成媒体库封面"
+                              description="允许封面生成器按下方 cron 定时更新媒体库封面。"
+                            />
+                          </div>
+                          <div className={styles.fieldGrid}>
+                            <ProFormText
+                              width="md"
+                              name={['emby', 'cover', 'cron']}
+                              label="定时 cron"
+                              placeholder="如 0 3 * * * （留空仅手动）"
+                              tooltip="保存后自动重新调度，无需重启"
+                            />
+                            <ProFormDigit
+                              width="md"
+                              name={['emby', 'cover', 'poster_count']}
+                              label="拼接海报数量"
+                              min={1}
+                              fieldProps={{ precision: 0 }}
+                            />
+                          </div>
+                        </SettingsSection>
+
+                        <SettingsSection
+                          title="封面输出"
+                          description="设置封面尺寸、JPEG 质量与中英文字体。"
+                        >
+                          <div className={styles.fieldGrid}>
+                            <ProFormDigit
+                              width="md"
+                              name={['emby', 'cover', 'width']}
+                              label="输出宽度"
+                              min={1}
+                              fieldProps={{ precision: 0 }}
+                            />
+                            <ProFormDigit
+                              width="md"
+                              name={['emby', 'cover', 'height']}
+                              label="输出高度"
+                              min={1}
+                              fieldProps={{ precision: 0 }}
+                            />
+                            <ProFormDigit
+                              width="md"
+                              name={['emby', 'cover', 'jpeg_quality']}
+                              label="JPEG 质量 (1-100)"
+                              min={1}
+                              max={100}
+                              fieldProps={{ precision: 0 }}
+                            />
+                            <ProFormText
+                              width="lg"
+                              name={['emby', 'cover', 'font_cn']}
+                              label="中文字体路径"
+                            />
+                            <ProFormText
+                              width="lg"
+                              name={['emby', 'cover', 'font_en']}
+                              label="英文字体路径"
+                            />
+                          </div>
+                        </SettingsSection>
                       </div>
                     ),
                   },
                   {
                     key: 'notifications',
                     label: '通知',
+                    icon: renderTabIcon(
+                      <BellOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.notifications,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1715,85 +1904,12 @@ const SystemSettingsPage: React.FC = () => {
                     ),
                   },
                   {
-                    key: 'cover',
-                    label: '封面生成',
-                    forceRender: true,
-                    children: (
-                      <div className={styles.tabPanel}>
-                        <SettingsSection
-                          title="生成策略"
-                          description="控制自动生成任务以及海报拼接规则。"
-                        >
-                          <div className={styles.toggleGrid}>
-                            <SettingsToggle
-                              name={['emby', 'cover', 'enabled']}
-                              title="自动生成媒体库封面"
-                              description="允许封面生成器按下方 cron 定时更新媒体库封面。"
-                            />
-                          </div>
-                          <div className={styles.fieldGrid}>
-                            <ProFormText
-                              width="md"
-                              name={['emby', 'cover', 'cron']}
-                              label="定时 cron"
-                              placeholder="如 0 3 * * * （留空仅手动）"
-                              tooltip="保存后自动重新调度，无需重启"
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['emby', 'cover', 'poster_count']}
-                              label="拼接海报数量"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                          </div>
-                        </SettingsSection>
-
-                        <SettingsSection
-                          title="输出参数"
-                          description="设置封面尺寸、JPEG 质量与中英文字体。"
-                        >
-                          <div className={styles.fieldGrid}>
-                            <ProFormDigit
-                              width="md"
-                              name={['emby', 'cover', 'width']}
-                              label="输出宽度"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['emby', 'cover', 'height']}
-                              label="输出高度"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['emby', 'cover', 'jpeg_quality']}
-                              label="JPEG 质量 (1-100)"
-                              min={1}
-                              max={100}
-                              fieldProps={{ precision: 0 }}
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['emby', 'cover', 'font_cn']}
-                              label="中文字体路径"
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['emby', 'cover', 'font_en']}
-                              label="英文字体路径"
-                            />
-                          </div>
-                        </SettingsSection>
-                      </div>
-                    ),
-                  },
-                  {
                     key: 'moviepilot',
                     label: 'MoviePilot',
+                    icon: renderBrandTabIcon(
+                      '/brands/moviepilot.png',
+                      SETTINGS_TAB_ICON_COLORS.moviepilot,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1831,6 +1947,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'tmdb',
                     label: 'TMDB',
+                    icon: renderBrandTabIcon(
+                      '/brands/tmdb.png',
+                      SETTINGS_TAB_ICON_COLORS.tmdb,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -1899,6 +2019,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'hdhive',
                     label: 'HDHive',
+                    icon: renderBrandTabIcon(
+                      '/brands/hdhive.png',
+                      SETTINGS_TAB_ICON_COLORS.hdhive,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -2050,6 +2174,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'log',
                     label: '日志',
+                    icon: renderTabIcon(
+                      <FileTextOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.log,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -2126,6 +2254,10 @@ const SystemSettingsPage: React.FC = () => {
                   {
                     key: 'jwt',
                     label: '安全 (JWT)',
+                    icon: renderTabIcon(
+                      <SafetyCertificateOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.jwt,
+                    ),
                     forceRender: true,
                     children: (
                       <div className={styles.tabPanel}>
@@ -2157,7 +2289,7 @@ const SystemSettingsPage: React.FC = () => {
           )}
         </Spin>
       </div>
-    </PageContainer>
+    </div>
   );
 };
 

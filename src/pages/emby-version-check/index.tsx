@@ -10,7 +10,6 @@ import {
 } from '@ant-design/icons';
 import {
   ModalForm,
-  PageContainer,
   ProFormSelect,
   ProFormSwitch,
   ProFormText,
@@ -35,6 +34,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   getCloudPaths,
@@ -373,11 +373,9 @@ const EmbyVersionCheckPage: React.FC = () => {
   const items = result?.items || [];
 
   return (
-    <PageContainer
-      header={{
-        title: '本地多版本检查',
-        subTitle: '电影与剧集单集版本巡检',
-        extra: [
+    <ConsolePage
+      actions={
+        <>
           <VersionCheckScheduleForm
             key={setting?.updated_at || 'schedule'}
             setting={setting}
@@ -385,17 +383,15 @@ const EmbyVersionCheckPage: React.FC = () => {
             defaultPathIds={selectedPathIds}
             defaultMediaType={mediaType}
             onSaved={setSetting}
-          />,
+          />
           <Button
-            key="reload"
             icon={<ReloadOutlined />}
             loading={cloudPathLoading}
             onClick={refreshCloudPaths}
           >
             刷新映射
-          </Button>,
+          </Button>
           <Button
-            key="scan"
             type="primary"
             icon={<FileSearchOutlined />}
             loading={scanStarting}
@@ -403,9 +399,11 @@ const EmbyVersionCheckPage: React.FC = () => {
             onClick={handleScan}
           >
             {scanRunning ? '后台检查中' : '开始检查'}
-          </Button>,
-        ],
-      }}
+          </Button>
+        </>
+      }
+      eyebrow="Emby tools"
+      title="本地多版本检查"
     >
       {contextHolder}
 
@@ -615,7 +613,7 @@ const EmbyVersionCheckPage: React.FC = () => {
           )}
         </Card>
       </Spin>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

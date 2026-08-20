@@ -5,6 +5,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { Button, Card, Empty, Switch, Tag, Typography } from 'antd';
+import dayjs from 'dayjs';
 import type {
   RSSAutomationDashboard,
   RSSAutomationRunStatus,
@@ -36,6 +37,9 @@ const runStatus: Record<
   failed: { color: 'error', label: '失败' },
   cancelled: { color: 'default', label: '已取消' },
 };
+
+const formatRunTime = (value: string) =>
+  dayjs(value).format('YYYY-MM-DD HH:mm');
 
 const AutomationOverview = ({
   data,
@@ -110,6 +114,8 @@ const AutomationOverview = ({
             const latestStatus = latestRun
               ? runStatus[latestRun.status]
               : undefined;
+            const latestRunTime =
+              latestRun?.started_at || latestRun?.created_at;
             const sourceError =
               latestRun?.status === 'succeeded' ? '' : source?.last_error;
             return (
@@ -195,7 +201,19 @@ const AutomationOverview = ({
                   <span>
                     <Text type="secondary">最近运行</Text>
                     {latestStatus ? (
-                      <Tag color={latestStatus.color}>{latestStatus.label}</Tag>
+                      <div className={styles.automationLatestRun}>
+                        <Tag color={latestStatus.color}>
+                          {latestStatus.label}
+                        </Tag>
+                        {latestRunTime && (
+                          <Text
+                            className={styles.automationRunTime}
+                            type="secondary"
+                          >
+                            {formatRunTime(latestRunTime)}
+                          </Text>
+                        )}
+                      </div>
                     ) : (
                       <Text>暂无</Text>
                     )}

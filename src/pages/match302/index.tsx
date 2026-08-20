@@ -3,11 +3,7 @@ import type {
   ProColumns,
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import {
   Button,
   Drawer,
@@ -19,6 +15,7 @@ import {
   Typography,
 } from 'antd';
 import React, { useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import CreateForm from '@/pages/match302/components/CreateForm';
 import UpdateForm from '@/pages/match302/components/UpdateForm';
@@ -386,23 +383,7 @@ const Match302List: React.FC = () => {
   ];
 
   return (
-    <PageContainer
-      header={{
-        title: 'Match302 重定向管理',
-        breadcrumb: {
-          routes: [
-            {
-              path: '',
-              breadcrumbName: '首页',
-            },
-            {
-              path: '',
-              breadcrumbName: 'Match302 重定向管理',
-            },
-          ],
-        },
-      }}
-    >
+    <ConsolePage eyebrow="Redirect rules" title="Match302 重定向管理">
       {contextHolder}
       <ProTable<API.Match302, API.Match302QueryParams>
         headerTitle="Match302 重定向列表"
@@ -513,7 +494,7 @@ const Match302List: React.FC = () => {
           </Space>
         )}
       </Drawer>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

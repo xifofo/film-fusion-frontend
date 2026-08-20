@@ -1,4 +1,3 @@
-import { PageContainer } from '@ant-design/pro-components';
 import { Alert } from 'antd';
 import {
   Clapperboard,
@@ -13,6 +12,7 @@ import {
   Video,
 } from 'lucide-react';
 import React, { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { Button } from '@/components/ui/button';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import { embyStatsLibraryImageUrl, getEmbyStats } from '@/services/film-fusion';
@@ -255,34 +255,32 @@ const EmbyStatsPage: React.FC = () => {
     : '';
 
   return (
-    <PageContainer
-      className={styles.pageContainer}
-      header={{
-        title: 'Emby 媒体统计',
-        extra: [
-          <div className={styles.headerMeta} key="stats-actions">
-            {generatedText && (
-              <span className={styles.generatedTime} title="服务器实时统计时间">
-                <Clock3 aria-hidden="true" />
-                {generatedText}
-              </span>
-            )}
-            <Button
-              className={styles.refreshButton}
-              disabled={loading}
-              onClick={refresh}
-              type="button"
-              variant="outline"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={loading ? styles.refreshing : undefined}
-              />
-              刷新数据
-            </Button>
-          </div>,
-        ],
-      }}
+    <ConsolePage
+      actions={
+        <div className={styles.headerMeta} key="stats-actions">
+          {generatedText && (
+            <span className={styles.generatedTime} title="服务器实时统计时间">
+              <Clock3 aria-hidden="true" />
+              {generatedText}
+            </span>
+          )}
+          <Button
+            className={styles.refreshButton}
+            disabled={loading}
+            onClick={refresh}
+            type="button"
+            variant="outline"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={loading ? styles.refreshing : undefined}
+            />
+            刷新数据
+          </Button>
+        </div>
+      }
+      eyebrow="Emby analytics"
+      title="Emby 媒体统计"
     >
       <div className={styles.page}>
         {error && (
@@ -421,7 +419,7 @@ const EmbyStatsPage: React.FC = () => {
           </div>
         )}
       </div>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

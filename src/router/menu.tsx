@@ -10,6 +10,7 @@ import {
   Folder,
   GitBranch,
   Images,
+  Info,
   Link2,
   ListRestart,
   Route,
@@ -144,6 +145,11 @@ export const menuItems: AppMenuItem[] = [
         path: '/rss-automation',
       },
     ],
+  },
+  {
+    name: '系统信息',
+    icon: Info,
+    path: '/system-info',
   },
   {
     name: '系统设置',

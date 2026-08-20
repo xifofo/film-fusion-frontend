@@ -3,14 +3,11 @@ import type {
   ProColumns,
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import { Button, Drawer, message, Popconfirm, Space, Tag, Tooltip } from 'antd';
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   deleteCloudDirectory,
@@ -313,17 +310,7 @@ const DirectoryList: React.FC = () => {
   ];
 
   return (
-    <PageContainer
-      header={{
-        title: '目录配置管理',
-        breadcrumb: {
-          routes: [
-            { path: '', breadcrumbName: '首页' },
-            { path: '', breadcrumbName: '目录配置管理' },
-          ],
-        },
-      }}
-    >
+    <ConsolePage eyebrow="Media library" title="目录配置管理">
       {contextHolder}
       <ProTable<API.CloudDirectory, API.CloudDirectoryQueryParams>
         headerTitle="目录配置列表"
@@ -387,7 +374,7 @@ const DirectoryList: React.FC = () => {
           />
         )}
       </Drawer>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

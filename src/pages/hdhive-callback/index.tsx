@@ -1,7 +1,7 @@
-import { PageContainer } from '@ant-design/pro-components';
 import { Button, message, Result, Spin, Typography } from 'antd';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import ConsolePage from '@/components/ConsolePage';
 import { exchangeHDHiveToken } from '@/services/film-fusion';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
@@ -65,7 +65,7 @@ const HDHiveCallbackPage: React.FC = () => {
   }, [messageApi, params]);
 
   return (
-    <PageContainer header={{ title: 'HDHive 授权回调' }}>
+    <ConsolePage eyebrow="HDHive access" title="HDHive 授权回调">
       {contextHolder}
       {status === 'loading' ? (
         <Result
@@ -90,7 +90,7 @@ const HDHiveCallbackPage: React.FC = () => {
           ]}
         />
       )}
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

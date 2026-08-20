@@ -5,7 +5,6 @@ import {
   ThunderboltOutlined,
   UnlockOutlined,
 } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
 import {
   Alert,
   App,
@@ -24,6 +23,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import {
   clearEmbyProxy302Logs,
   getEmbyLoginSecurityStatus,
@@ -551,11 +551,7 @@ const EmbyProxyLogPage: React.FC = () => {
   ];
 
   return (
-    <PageContainer
-      header={{
-        title: 'Emby 代理运维',
-      }}
-    >
+    <ConsolePage eyebrow="Proxy operations" title="Emby 代理运维">
       <Alert
         type="info"
         showIcon
@@ -741,7 +737,7 @@ const EmbyProxyLogPage: React.FC = () => {
           scroll={{ x: 1400 }}
         />
       </Card>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

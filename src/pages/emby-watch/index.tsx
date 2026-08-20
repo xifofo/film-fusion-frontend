@@ -1,4 +1,3 @@
-import { PageContainer } from '@ant-design/pro-components';
 import { Empty, message, Select } from 'antd';
 import {
   BarChart3,
@@ -12,6 +11,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { Button } from '@/components/ui/button';
 import { getEmbyWatchUsers } from '@/services/film-fusion';
 import AnnualReportTab from './components/AnnualReportTab';
@@ -157,40 +157,38 @@ const EmbyWatchPage: React.FC = () => {
     : null;
 
   return (
-    <PageContainer
-      className={styles.pageContainer}
-      header={{
-        title: '观看记录',
-        extra: [
-          <div className={styles.headerActions} key="watch-actions">
-            <a className={styles.openCalendarLink} href="/watch">
-              <ExternalLink aria-hidden="true" />
-              独立观影日历
-            </a>
-            <Button
-              className={styles.headerButton}
-              disabled={loading}
-              onClick={() => void refreshPage()}
-              type="button"
-              variant="outline"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={loading ? styles.refreshing : undefined}
-              />
-              刷新
-            </Button>
-            <Button
-              className={styles.settingsButton}
-              onClick={() => setSettingsOpen(true)}
-              type="button"
-            >
-              <Settings2 aria-hidden="true" />
-              统计设置
-            </Button>
-          </div>,
-        ],
-      }}
+    <ConsolePage
+      actions={
+        <div className={styles.headerActions} key="watch-actions">
+          <a className={styles.openCalendarLink} href="/watch">
+            <ExternalLink aria-hidden="true" />
+            独立观影日历
+          </a>
+          <Button
+            className={styles.headerButton}
+            disabled={loading}
+            onClick={() => void refreshPage()}
+            type="button"
+            variant="outline"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={loading ? styles.refreshing : undefined}
+            />
+            刷新
+          </Button>
+          <Button
+            className={styles.settingsButton}
+            onClick={() => setSettingsOpen(true)}
+            type="button"
+          >
+            <Settings2 aria-hidden="true" />
+            统计设置
+          </Button>
+        </div>
+      }
+      eyebrow="Watch history"
+      title="观看记录"
     >
       {contextHolder}
       <div className={styles.page}>
@@ -295,7 +293,7 @@ const EmbyWatchPage: React.FC = () => {
         onClose={() => setSettingsOpen(false)}
         onChanged={() => void refreshPage()}
       />
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

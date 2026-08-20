@@ -7,7 +7,6 @@ import {
   TabletOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
 import {
   Alert,
   App,
@@ -37,6 +36,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import {
   getEmbyImageOptimizationSamples,
   getEmbyImageOptimizationSettings,
@@ -579,19 +579,19 @@ const EmbyImageOptimizationPage: React.FC = () => {
       : 0;
 
   return (
-    <PageContainer
-      header={{ title: 'Emby 图片优化' }}
-      extra={[
+    <ConsolePage
+      actions={
         <Button
-          key="save"
           type="primary"
           icon={<SaveOutlined />}
           loading={saving}
           onClick={handleSave}
         >
           保存设置
-        </Button>,
-      ]}
+        </Button>
+      }
+      eyebrow="Emby tools"
+      title="Emby 图片优化"
     >
       <Spin spinning={loading}>
         <Row gutter={[16, 16]} className={styles.pageGrid}>
@@ -800,7 +800,7 @@ const EmbyImageOptimizationPage: React.FC = () => {
           </Col>
         </Row>
       </Spin>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

@@ -56,4 +56,6 @@ export * from './scanTask';
 export * from './serverLog';
 // STRM 相关API
 export * from './strm';
+// 系统资源与 FilmFusion 进程运行信息
+export * from './systemInfo';
 export * from './user';

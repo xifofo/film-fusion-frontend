@@ -8,7 +8,6 @@ export type SettingsTabKey =
   | 'webhook'
   | 'emby'
   | 'notifications'
-  | 'cover'
   | 'moviepilot'
   | 'tmdb'
   | 'hdhive'
@@ -65,15 +64,12 @@ export const SETTINGS_TAB_SCOPES: Record<SettingsTabKey, SettingsTabScope> = {
       ['emby', 'add_current_media_info'],
       ['emby', 'add_next_media_info'],
       ['emby', 'security'],
+      ['emby', 'cover'],
     ],
   },
   notifications: {
     label: '通知',
     fields: [['notifications']],
-  },
-  cover: {
-    label: '封面生成',
-    fields: [['emby', 'cover']],
   },
   moviepilot: {
     label: 'MoviePilot',

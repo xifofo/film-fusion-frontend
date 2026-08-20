@@ -1,9 +1,9 @@
 import '@xyflow/react/dist/style.css';
 
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
 import { Button, message, Tabs } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import {
   getCloudDirectoryList,
@@ -147,20 +147,15 @@ const RSSAutomationPage = () => {
   };
 
   return (
-    <PageContainer
-      extra={
-        view !== 'overview'
-          ? [
-              <Button
-                icon={<ArrowLeftOutlined />}
-                key="return-overview"
-                onClick={returnToOverview}
-              >
-                返回自动化列表
-              </Button>,
-            ]
-          : undefined
+    <ConsolePage
+      actions={
+        view !== 'overview' ? (
+          <Button icon={<ArrowLeftOutlined />} onClick={returnToOverview}>
+            返回自动化列表
+          </Button>
+        ) : undefined
       }
+      eyebrow="Automation"
       title="RSS 自动化"
     >
       {contextHolder}
@@ -260,7 +255,7 @@ const RSSAutomationPage = () => {
         open={Boolean(manualWorkflow)}
         workflow={manualWorkflow}
       />
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

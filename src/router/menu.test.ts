@@ -42,6 +42,12 @@ describe('findMenuTrail', () => {
     ]);
   });
 
+  it('exposes system information as a direct navigation item', () => {
+    expect(findMenuTrail('/system-info').map((item) => item.name)).toEqual([
+      '系统信息',
+    ]);
+  });
+
   it('exposes FilmFusion local media recognition', () => {
     expect(
       findMenuTrail('/media-recognition').map((item) => item.name),

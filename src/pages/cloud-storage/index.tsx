@@ -3,13 +3,10 @@ import type {
   ProColumns,
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import { Drawer, message, Popconfirm, Space, Tag, Tooltip } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   deleteCloudStorage,
@@ -338,7 +335,7 @@ const CloudStorageList: React.FC = () => {
   ];
 
   return (
-    <PageContainer header={{ title: '云存储管理' }}>
+    <ConsolePage eyebrow="Cloud storage" title="云存储管理">
       {contextHolder}
       <ProTable<API.CloudStorage, API.CloudStorageQueryParams>
         actionRef={actionRef}
@@ -399,7 +396,7 @@ const CloudStorageList: React.FC = () => {
           cloudStorage={reloginRow}
         />
       )}
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

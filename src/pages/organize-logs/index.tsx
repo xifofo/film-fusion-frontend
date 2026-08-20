@@ -7,7 +7,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
-import { PageContainer, ProTable } from '@ant-design/pro-components';
+import { ProTable } from '@ant-design/pro-components';
 import {
   App,
   Button,
@@ -23,6 +23,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   clearOrganizeLogs,
@@ -271,7 +272,7 @@ const OrganizeLogList: React.FC = () => {
   ];
 
   return (
-    <PageContainer header={{ title: '整理日志' }}>
+    <ConsolePage eyebrow="Operations history" title="整理日志">
       {contextHolder}
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -431,7 +432,7 @@ const OrganizeLogList: React.FC = () => {
           </Descriptions>
         )}
       </Drawer>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

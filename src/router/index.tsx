@@ -39,6 +39,7 @@ const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
+const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
 const HDHiveCallback = lazy(() => import('@/pages/hdhive-callback'));
 const NotFound = lazy(() => import('@/pages/404'));
@@ -226,6 +227,10 @@ const routes: RouteObject[] = [
       {
         path: 'server-logs',
         element: <ServerLogs />,
+      },
+      {
+        path: 'system-info',
+        element: <SystemInfo />,
       },
       {
         path: 'system-settings',

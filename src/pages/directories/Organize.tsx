@@ -18,7 +18,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
-import { PageContainer, ProTable } from '@ant-design/pro-components';
+import { ProTable } from '@ant-design/pro-components';
 import {
   Alert,
   Badge,
@@ -55,6 +55,7 @@ import React, {
   useState,
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import ConsolePage from '@/components/ConsolePage';
 import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
@@ -2399,11 +2400,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   if (directoryError) {
     return (
-      <PageContainer
-        header={{
-          title: episodeMode ? '剧集预整理' : '整理目录',
-          onBack: () => navigate('/directories'),
-        }}
+      <ConsolePage
+        eyebrow="Media organize"
+        title={episodeMode ? '剧集预整理' : '整理目录'}
       >
         <Result
           status="error"
@@ -2422,7 +2421,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             </Button>,
           ]}
         />
-      </PageContainer>
+      </ConsolePage>
     );
   }
 
@@ -2454,25 +2453,26 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     : undefined;
 
   return (
-    <PageContainer
-      loading={directoryLoading && !directoryDetail}
-      header={{
-        title: `${episodeMode ? '剧集预整理' : '整理目录'}：${
-          directoryDetail?.directory_name || ''
-        }`,
-        onBack: () => navigate('/directories'),
-        backIcon: <ArrowLeftOutlined />,
-        extra: headerExtra,
-        breadcrumb: {
-          routes: [
-            { path: '/directories', breadcrumbName: '目录配置' },
-            { path: '', breadcrumbName: episodeMode ? '剧集预整理' : '整理' },
-          ],
-        },
-      }}
+    <ConsolePage
+      actions={
+        <>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/directories')}
+          >
+            返回目录
+          </Button>
+          {headerExtra}
+        </>
+      }
+      eyebrow="Media organize"
+      title={`${episodeMode ? '剧集预整理' : '整理目录'}：${
+        directoryDetail?.directory_name || ''
+      }`}
     >
       {contextHolder}
       {modalContextHolder}
+      <Spin fullscreen spinning={directoryLoading && !directoryDetail} />
 
       <Row gutter={16} style={{ alignItems: 'stretch' }}>
         <Col
@@ -3256,7 +3256,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           </Button>
         </div>
       </section>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

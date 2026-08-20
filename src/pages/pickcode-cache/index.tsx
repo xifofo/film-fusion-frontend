@@ -12,11 +12,7 @@ import type {
   ProColumns,
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import {
   App,
   Button,
@@ -33,6 +29,7 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import React, { useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   batchDeletePickcodeCache,
@@ -256,7 +253,7 @@ const PickcodeCacheList: React.FC = () => {
   ];
 
   return (
-    <PageContainer header={{ title: 'Pickcode 缓存管理' }}>
+    <ConsolePage eyebrow="Runtime cache" title="Pickcode 缓存管理">
       {contextHolder}
 
       {/* 统计信息卡片 */}
@@ -392,7 +389,7 @@ const PickcodeCacheList: React.FC = () => {
         }}
         values={updateRow}
       />
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

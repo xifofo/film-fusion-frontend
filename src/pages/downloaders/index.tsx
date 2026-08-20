@@ -1,7 +1,7 @@
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { PageContainer } from '@ant-design/pro-components';
 import { Button, message, Spin, Typography } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import TargetPanel, {
   type TargetPanelHandle,
 } from '@/pages/rss-automation/TargetPanel';
@@ -90,31 +90,28 @@ const DownloadersPage = () => {
   }, [load, loadStatuses]);
 
   return (
-    <PageContainer
-      header={{
-        title: '下载器设置',
-        extra: [
-          <Text key="refresh-interval" type="secondary">
-            每 10 秒更新
-          </Text>,
+    <ConsolePage
+      actions={
+        <>
+          <Text type="secondary">每 10 秒更新</Text>
           <Button
             icon={<ReloadOutlined />}
-            key="refresh"
             loading={statusLoading}
             onClick={loadStatuses}
           >
             刷新状态
-          </Button>,
+          </Button>
           <Button
             icon={<PlusOutlined />}
-            key="add"
             onClick={() => targetPanelRef.current?.openCreate()}
             type="primary"
           >
             添加 qBittorrent
-          </Button>,
-        ],
-      }}
+          </Button>
+        </>
+      }
+      eyebrow="Download clients"
+      title="下载器设置"
     >
       {contextHolder}
       <Spin spinning={loading}>
@@ -129,7 +126,7 @@ const DownloadersPage = () => {
           unframed
         />
       </Spin>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

@@ -10,7 +10,7 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
-import { PageContainer, ProTable } from '@ant-design/pro-components';
+import { ProTable } from '@ant-design/pro-components';
 import {
   Alert,
   Button,
@@ -32,6 +32,7 @@ import dayjs from 'dayjs';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
+import ConsolePage from '@/components/ConsolePage';
 import {
   clearFailedDownloadQueueTasks,
   getDownloadQueueList,
@@ -356,7 +357,7 @@ const DownloadQueuePage: React.FC = () => {
   }, []);
 
   return (
-    <PageContainer header={{ title: '下载队列' }}>
+    <ConsolePage eyebrow="Download tasks" title="下载队列">
       {contextHolder}
       <Alert
         showIcon
@@ -497,7 +498,7 @@ const DownloadQueuePage: React.FC = () => {
           ),
         }}
       />
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

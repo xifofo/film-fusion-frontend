@@ -3,11 +3,7 @@ import type {
   ProColumns,
   ProDescriptionsItemProps,
 } from '@ant-design/pro-components';
-import {
-  PageContainer,
-  ProDescriptions,
-  ProTable,
-} from '@ant-design/pro-components';
+import { ProDescriptions, ProTable } from '@ant-design/pro-components';
 import {
   Button,
   Card,
@@ -24,6 +20,7 @@ import {
   Upload,
 } from 'antd';
 import React, { useRef, useState } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   batchOperateCloudPaths,
@@ -433,7 +430,7 @@ const CloudPathList: React.FC = () => {
   ];
 
   return (
-    <PageContainer header={{ title: '云路径映射管理' }}>
+    <ConsolePage eyebrow="Cloud paths" title="云路径映射管理">
       {contextHolder}
 
       <ProTable<API.CloudPath, API.CloudPathQueryParams>
@@ -691,7 +688,7 @@ const CloudPathList: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </PageContainer>
+    </ConsolePage>
   );
 };
 

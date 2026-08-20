@@ -68,25 +68,18 @@ describe('system settings tab scopes', () => {
     expect(result.server.web_115_user_agent).toBe('new-ua');
   });
 
-  it('keeps Emby and cover saves independent despite their shared root', () => {
+  it('saves Emby connection and cover fields together', () => {
     const formValues = structuredClone(baseConfig);
     formValues.emby.url = 'http://new-emby.example';
     formValues.emby.cover.width = 2000;
 
-    const embyResult = buildScopedAppConfig(
+    const result = buildScopedAppConfig(
       baseConfig,
       'emby',
       valuesFrom(formValues),
     );
-    const coverResult = buildScopedAppConfig(
-      baseConfig,
-      'cover',
-      valuesFrom(formValues),
-    );
 
-    expect(embyResult.emby.url).toBe('http://new-emby.example');
-    expect(embyResult.emby.cover.width).toBe(1000);
-    expect(coverResult.emby.url).toBe('http://emby.example');
-    expect(coverResult.emby.cover.width).toBe(2000);
+    expect(result.emby.url).toBe('http://new-emby.example');
+    expect(result.emby.cover.width).toBe(2000);
   });
 });

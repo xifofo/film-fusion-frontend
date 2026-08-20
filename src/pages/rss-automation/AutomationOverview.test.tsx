@@ -161,6 +161,7 @@ describe('AutomationOverview', () => {
               definition_json: '{}',
               context_json: '{}',
               status: 'succeeded',
+              started_at: '2026-08-18T09:12:34',
               created_at: '2026-08-18T00:00:00Z',
               updated_at: '2026-08-18T00:01:00Z',
             },
@@ -176,6 +177,7 @@ describe('AutomationOverview', () => {
     );
 
     expect(screen.getByText('成功')).toBeTruthy();
+    expect(screen.getByText('2026-08-18 09:12')).toBeTruthy();
     expect(
       screen.queryByText('解析 RSS XML 失败: XML syntax error'),
     ).toBeNull();

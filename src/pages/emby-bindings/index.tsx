@@ -2,14 +2,14 @@ import { PlusOutlined } from '@ant-design/icons';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import {
   ModalForm,
-  PageContainer,
   ProFormSelect,
   ProFormSwitch,
   ProFormTextArea,
   ProTable,
 } from '@ant-design/pro-components';
-import { Alert, Button, message, Popconfirm, Tag } from 'antd';
+import { Button, message, Popconfirm, Tag } from 'antd';
 import React, { useRef } from 'react';
+import ConsolePage from '@/components/ConsolePage';
 import {
   createEmbyBinding,
   deleteEmbyBinding,
@@ -243,18 +243,8 @@ const EmbyBindingsPage: React.FC = () => {
   ];
 
   return (
-    <PageContainer
-      header={{
-        title: 'Emby 账号绑定',
-      }}
-    >
+    <ConsolePage eyebrow="Emby tools" title="Emby 账号绑定">
       {contextHolder}
-      <Alert
-        style={{ marginBottom: 16 }}
-        type="info"
-        showIcon
-        title="为某个 Emby 账号指定固定的 115 存储(cookie)。该账号播放命中 Match302 规则时会强制走指定存储（等价于直接指定负载均衡账号，后续走相同的秒传 + 播放流程），不依赖该规则是否开启负载均衡；指定账号不可用 / 并发已满 / 秒传未就绪时自动回退到正常流程。"
-      />
       <ProTable<API.EmbyAccountBinding>
         headerTitle="Emby 账号 → 115 存储 绑定"
         actionRef={actionRef}
@@ -283,7 +273,7 @@ const EmbyBindingsPage: React.FC = () => {
         }}
         columns={columns}
       />
-    </PageContainer>
+    </ConsolePage>
   );
 };
 
