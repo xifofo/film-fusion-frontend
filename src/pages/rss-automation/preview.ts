@@ -58,6 +58,106 @@ const resolveConfiguredString = (
   return expression;
 };
 
+const escapeRegularExpression = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const compilePreviewRegularExpression = (raw: unknown, global = false) => {
+  let source = String(raw ?? '');
+  const flags = new Set(global ? ['g'] : []);
+  const inlineFlags = source.match(/^\(\?([ims]+)\)/);
+  if (inlineFlags) {
+    for (const flag of inlineFlags[1]) flags.add(flag);
+    source = source.slice(inlineFlags[0].length);
+  }
+  source = source.replace(/\(\?P<([A-Za-z_][A-Za-z0-9_]*)>/g, '(?<$1>');
+  return new RegExp(source, [...flags].join(''));
+};
+
+const regularExpressionReplacementNameCharacter = /[\p{L}\p{N}_]/u;
+
+const expandGoRegularExpressionReplacement = (
+  replacement: string,
+  match: RegExpExecArray,
+) => {
+  let result = '';
+  let index = 0;
+  while (index < replacement.length) {
+    if (replacement[index] !== '$') {
+      result += replacement[index];
+      index += 1;
+      continue;
+    }
+    if (replacement[index + 1] === '$') {
+      result += '$';
+      index += 2;
+      continue;
+    }
+
+    let name = '';
+    let nextIndex = index + 1;
+    if (replacement[nextIndex] === '{') {
+      const closingBrace = replacement.indexOf('}', nextIndex + 1);
+      if (closingBrace < 0) {
+        result += '$';
+        index += 1;
+        continue;
+      }
+      name = replacement.slice(nextIndex + 1, closingBrace);
+      nextIndex = closingBrace + 1;
+    } else {
+      const start = nextIndex;
+      while (
+        regularExpressionReplacementNameCharacter.test(
+          replacement[nextIndex] || '',
+        )
+      ) {
+        nextIndex += 1;
+      }
+      name = replacement.slice(start, nextIndex);
+    }
+    if (!name) {
+      result += '$';
+      index += 1;
+      continue;
+    }
+    const captured = /^\d+$/.test(name)
+      ? match[Number(name)]
+      : match.groups?.[name];
+    result += captured ?? '';
+    index = nextIndex;
+  }
+  return result;
+};
+
+const replaceWithGoRegularExpression = (
+  input: string,
+  pattern: unknown,
+  replacement: unknown,
+) => {
+  const expression = compilePreviewRegularExpression(pattern, true);
+  const template = String(replacement ?? '');
+  let result = '';
+  let cursor = 0;
+  let replacementCount = 0;
+  let match = expression.exec(input);
+  while (match) {
+    result += input.slice(cursor, match.index);
+    result += expandGoRegularExpressionReplacement(template, match);
+    cursor = match.index + match[0].length;
+    replacementCount += 1;
+    if (match[0] === '') {
+      if (expression.lastIndex >= input.length) break;
+      expression.lastIndex +=
+        (input.codePointAt(expression.lastIndex) || 0) > 0xffff ? 2 : 1;
+    }
+    match = expression.exec(input);
+  }
+  return {
+    result: result + input.slice(cursor),
+    replacementCount,
+  };
+};
+
 const convertValue = (value: unknown, valueType: unknown) => {
   const raw = String(value ?? '').trim();
   switch (String(valueType || 'string')) {
@@ -237,7 +337,7 @@ const previewNode = (
         };
       case 'regex': {
         const input = resolveConfiguredString(context, config.input);
-        const expression = new RegExp(String(config.pattern || ''));
+        const expression = compilePreviewRegularExpression(config.pattern);
         const match = expression.exec(input);
         if (!match) {
           return {
@@ -307,6 +407,81 @@ const previewNode = (
           detail: `输入：${input || '空'}`,
           selectedPorts: [matched ? 'matched' : 'unmatched'],
           output: { matched, matchedKeywords },
+        };
+      }
+      case 'keyword_replace': {
+        const input = resolveConfiguredString(context, config.input);
+        const rules = Array.isArray(config.replacements)
+          ? config.replacements
+              .map((value) =>
+                value && typeof value === 'object'
+                  ? (value as Record<string, unknown>)
+                  : {},
+              )
+              .map((rule) => ({
+                keyword: String(rule.keyword ?? '').trim(),
+                replacement: String(rule.replacement ?? ''),
+              }))
+              .filter((rule) => rule.keyword)
+          : [];
+        if (rules.length === 0) {
+          throw new Error('请至少添加一条关键词替换规则');
+        }
+        const caseSensitive = Boolean(config.case_sensitive);
+        let result = input;
+        let replacementCount = 0;
+        for (const rule of rules) {
+          if (caseSensitive) {
+            replacementCount += result.split(rule.keyword).length - 1;
+            result = result.split(rule.keyword).join(rule.replacement);
+            continue;
+          }
+          const expression = new RegExp(
+            escapeRegularExpression(rule.keyword),
+            'giu',
+          );
+          result = result.replace(expression, () => {
+            replacementCount += 1;
+            return rule.replacement;
+          });
+        }
+        const variable = String(config.variable || 'result');
+        (context.vars as Record<string, unknown>)[variable] = result;
+        const output = {
+          result,
+          replacement_count: replacementCount,
+          variables: { [variable]: result },
+        };
+        return {
+          active: true,
+          tone: 'success',
+          label: `${variable} = ${result || '空文本'}`,
+          detail: `按顺序替换 ${replacementCount} 处 · 原文：${input || '空'}`,
+          selectedPorts: ['success'],
+          output,
+        };
+      }
+      case 'regex_replace': {
+        const input = resolveConfiguredString(context, config.input);
+        const { result, replacementCount } = replaceWithGoRegularExpression(
+          input,
+          config.pattern,
+          config.replacement,
+        );
+        const variable = String(config.variable || 'result');
+        (context.vars as Record<string, unknown>)[variable] = result;
+        const output = {
+          result,
+          replacement_count: replacementCount,
+          variables: { [variable]: result },
+        };
+        return {
+          active: true,
+          tone: 'success',
+          label: `${variable} = ${result || '空文本'}`,
+          detail: `正则替换 ${replacementCount} 处 · 原文：${input || '空'}`,
+          selectedPorts: ['success'],
+          output,
         };
       }
       case 'convert': {
@@ -390,6 +565,41 @@ const previewNode = (
             file_name: '运行时返回',
           },
         };
+      case 'rename115_openapi': {
+        const fileID = resolveConfiguredString(context, config.file_id);
+        const newName = resolveConfiguredString(context, config.new_name);
+        if (!fileID) throw new Error('文件或文件夹 ID 尚未解析');
+        if (!newName) throw new Error('115 新名称尚未解析');
+        if (
+          newName === '.' ||
+          newName === '..' ||
+          /[\\/]/.test(newName) ||
+          Array.from(newName).some((character) => {
+            const codePoint = character.codePointAt(0) || 0;
+            return codePoint < 32 || codePoint === 127;
+          })
+        ) {
+          throw new Error('115 新名称包含无效字符');
+        }
+        if (new TextEncoder().encode(newName).length > 255) {
+          throw new Error('115 新名称不能超过 255 字节');
+        }
+        const output = {
+          renamed: true,
+          file_id: fileID,
+          file_name: newName,
+          new_name: newName,
+          access_method: 'openapi',
+        };
+        return {
+          active: true,
+          tone: 'success',
+          label: `将重命名为 ${newName}`,
+          detail: `115 ID：${fileID} · 样本预览不会调用真实接口`,
+          selectedPorts: ['success'],
+          output,
+        };
+      }
       case 'wait_qbittorrent':
         return {
           active: true,

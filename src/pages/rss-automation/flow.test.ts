@@ -48,6 +48,32 @@ describe('RSS automation flow conversion', () => {
     expect(node.name).toBe('关键词匹配');
   });
 
+  it('creates keyword and regex replacement nodes with safe text outputs', () => {
+    const keyword = createNodeDefinition('keyword_replace', { x: 120, y: 220 });
+    const regex = createNodeDefinition('regex_replace', { x: 320, y: 220 });
+
+    expect(keyword).toMatchObject({
+      name: '关键词替换',
+      max_attempts: 1,
+      config: {
+        input: '$item.title',
+        replacements: [{ keyword: '', replacement: '' }],
+        case_sensitive: false,
+        variable: 'normalized_title',
+      },
+    });
+    expect(regex).toMatchObject({
+      name: '正则替换',
+      max_attempts: 1,
+      config: {
+        input: '$item.title',
+        pattern: '[._-]+',
+        replacement: ' ',
+        variable: 'normalized_title',
+      },
+    });
+  });
+
   it('normalizes visible parallel handles from node configuration', () => {
     const node = createNodeDefinition('parallel', { x: 0, y: 0 });
     expect(nodeBranches(node)).toEqual(['branch-1', 'branch-2']);
@@ -78,6 +104,22 @@ describe('RSS automation flow conversion', () => {
     expect(wait.max_attempts).toBe(3);
     expect(recognize.name).toBe('MP 媒体识别');
     expect(recognize.config).toEqual({ tmdb_id: '' });
+  });
+
+  it('creates a retryable 115 OpenAPI rename node', () => {
+    const rename = createNodeDefinition('rename115_openapi', {
+      x: 500,
+      y: 100,
+    });
+
+    expect(rename).toMatchObject({
+      name: '115 API 重命名',
+      max_attempts: 3,
+      config: {
+        file_id: '',
+        new_name: '{{item.title}}',
+      },
+    });
   });
 
   it('creates a pre-download MoviePilot title recognition node', () => {

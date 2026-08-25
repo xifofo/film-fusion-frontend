@@ -34,11 +34,14 @@ import {
   testMediaRecognition,
   validateMediaRecognitionCategoryConfig,
 } from '@/services/film-fusion';
+import RenameConfigSection from './RenameConfigSection';
 import {
   inspectRecognitionWords,
   splitRecognitionWords,
   tmdbImageURL,
 } from './rules';
+import YamlEditor from './YamlEditor';
+import { getYAMLDiagnostics } from './yamlDiagnostics';
 
 const FILE_EXAMPLE =
   '/downloads/百花杀 (2026)/百花杀.S01E03.2160p.WEB-DL.H265.10bit.DDP5.1.mkv';
@@ -179,6 +182,16 @@ const MediaRecognitionPage = () => {
   const rules = useMemo(() => inspectRecognitionWords(wordsText), [wordsText]);
   const dirty = wordsText !== savedWordsText;
   const categoryDirty = categoryYAML !== savedCategoryYAML;
+  const categorySyntaxDiagnostics = useMemo(
+    () => getYAMLDiagnostics(categoryYAML),
+    [categoryYAML],
+  );
+  const categorySyntaxErrors = categorySyntaxDiagnostics.filter(
+    (diagnostic) => diagnostic.severity === 'error',
+  );
+  const categorySyntaxWarnings = categorySyntaxDiagnostics.filter(
+    (diagnostic) => diagnostic.severity === 'warning',
+  );
 
   const saveWords = async () => {
     setSaving(true);
@@ -203,6 +216,10 @@ const MediaRecognitionPage = () => {
   };
 
   const validateCategory = async () => {
+    if (categorySyntaxErrors.length > 0) {
+      void message.warning('请先修正媒体分类配置中的 YAML 语法错误');
+      return;
+    }
     setCategoryValidating(true);
     try {
       const response =
@@ -229,6 +246,10 @@ const MediaRecognitionPage = () => {
   };
 
   const saveCategory = async () => {
+    if (categorySyntaxErrors.length > 0) {
+      void message.warning('请先修正媒体分类配置中的 YAML 语法错误');
+      return;
+    }
     setCategorySaving(true);
     try {
       const response = await saveMediaRecognitionCategoryConfig(categoryYAML);
@@ -252,6 +273,10 @@ const MediaRecognitionPage = () => {
   const runTest = async () => {
     if (!input.trim()) {
       void message.warning('请输入媒体标题或文件路径');
+      return;
+    }
+    if (categorySyntaxErrors.length > 0) {
+      void message.warning('请先修正媒体分类配置中的 YAML 语法错误');
       return;
     }
     setTesting(true);
@@ -437,6 +462,8 @@ const MediaRecognitionPage = () => {
           )}
         </section>
 
+        <RenameConfigSection />
+
         <section className="overflow-hidden rounded-2xl bg-white/82 shadow-[0_18px_55px_rgba(0,0,0,0.045)] backdrop-blur-xl dark:bg-white/[0.055]">
           <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -570,6 +597,7 @@ const MediaRecognitionPage = () => {
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-4 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
+                disabled={categorySyntaxErrors.length > 0}
                 icon={<CheckCircle2 aria-hidden="true" className="size-4" />}
                 loading={categoryValidating}
                 onClick={() => void validateCategory()}
@@ -588,7 +616,9 @@ const MediaRecognitionPage = () => {
               </Button>
               <Button
                 className="!h-9 !rounded-xl !border-0 !px-4 !shadow-none"
-                disabled={categorySaving || loading}
+                disabled={
+                  categorySaving || loading || categorySyntaxErrors.length > 0
+                }
                 icon={<Save aria-hidden="true" className="size-4" />}
                 loading={categorySaving}
                 onClick={() => void saveCategory()}
@@ -627,25 +657,49 @@ const MediaRecognitionPage = () => {
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
               <div className="min-w-0">
-                <label
-                  className="sr-only"
-                  htmlFor="media-recognition-category-yaml"
-                >
-                  媒体分类 YAML 编辑器
-                </label>
                 <div className="rounded-2xl bg-neutral-950 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-shadow focus-within:ring-3 focus-within:ring-black/[0.08] dark:bg-black/35 dark:focus-within:ring-white/8">
-                  <Input.TextArea
-                    className="!min-h-[540px] !resize-y !bg-transparent !px-3 !py-2.5 !font-mono !text-[13px] !leading-6 !text-neutral-100 placeholder:!text-white/25"
+                  <YamlEditor
+                    describedBy="media-recognition-category-yaml-status"
                     id="media-recognition-category-yaml"
-                    onChange={(event) => setCategoryYAML(event.target.value)}
+                    onChange={setCategoryYAML}
                     placeholder={
                       "movie:\n  动画电影:\n    genre_ids: '16'\n  其它电影:\n\ntv:\n  电视剧:"
                     }
-                    rows={24}
-                    spellCheck={false}
                     value={categoryYAML}
-                    variant="borderless"
                   />
+                </div>
+                <div
+                  aria-live="polite"
+                  className={cn(
+                    'mt-2 flex min-h-5 items-start gap-1.5 px-1 text-[11px] leading-5',
+                    categorySyntaxErrors.length > 0
+                      ? 'text-red-600 dark:text-red-300'
+                      : categorySyntaxWarnings.length > 0
+                        ? 'text-amber-700 dark:text-amber-300'
+                        : 'text-emerald-700 dark:text-emerald-300',
+                  )}
+                  id="media-recognition-category-yaml-status"
+                >
+                  {categorySyntaxErrors.length > 0 ? (
+                    <TriangleAlert
+                      aria-hidden="true"
+                      className="mt-0.5 size-3.5 shrink-0"
+                    />
+                  ) : (
+                    <Check
+                      aria-hidden="true"
+                      className="mt-0.5 size-3.5 shrink-0"
+                    />
+                  )}
+                  <span>
+                    {!categoryYAML.trim()
+                      ? '等待输入 YAML；保存时还会校验分类结构。'
+                      : categorySyntaxErrors.length > 0
+                        ? `发现 ${categorySyntaxErrors.length} 处语法错误：${categorySyntaxErrors[0]?.message}`
+                        : categorySyntaxWarnings.length > 0
+                          ? `YAML 可解析，但有 ${categorySyntaxWarnings.length} 条语法提醒：${categorySyntaxWarnings[0]?.message}`
+                          : 'YAML 语法正确；保存时还会校验分类结构与匹配顺序。'}
+                  </span>
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-import { DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Alert,
   Button,
@@ -90,6 +90,20 @@ const normalizeKeywords = (raw: unknown) => {
     .map((value) => String(value).trim())
     .filter(Boolean)
     .filter((value, index, keywords) => keywords.indexOf(value) === index);
+};
+
+const normalizeReplacementRules = (raw: unknown) => {
+  const values = Array.isArray(raw) ? raw : [];
+  return values.map((value) => {
+    const rule =
+      value && typeof value === 'object'
+        ? (value as Record<string, unknown>)
+        : {};
+    return {
+      keyword: String(rule.keyword ?? '').trim(),
+      replacement: String(rule.replacement ?? ''),
+    };
+  });
 };
 
 const normalizeBranches = (raw: unknown) => {
@@ -242,6 +256,8 @@ const NodeConfigModal = ({
       'variable',
       'value_type',
       'keywords',
+      'replacements',
+      'replacement',
       'match_mode',
       'case_sensitive',
       'policy',
@@ -290,6 +306,9 @@ const NodeConfigModal = ({
     }
     if (node.type === 'keyword') {
       config.keywords = normalizeKeywords(values.keywords);
+    }
+    if (node.type === 'keyword_replace') {
+      config.replacements = normalizeReplacementRules(values.replacements);
     }
     if (node.type === 'if') {
       config.condition = {
@@ -435,6 +454,140 @@ const NodeConfigModal = ({
               valuePropName="checked"
             >
               <Switch checkedChildren="区分" unCheckedChildren="忽略" />
+            </Form.Item>
+          </>
+        );
+      case 'keyword_replace':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              按列表顺序执行字面量全局替换，并将最终文本保存到 $vars.变量名。
+            </Text>
+            <TemplateConfigField
+              field="input"
+              label="输入字段"
+              protocol={inputProtocol('input')}
+              references={fieldReferences}
+              required
+            />
+            <Form.List
+              name="replacements"
+              rules={[
+                {
+                  validator: (_, rules) => {
+                    if (!Array.isArray(rules) || rules.length === 0) {
+                      return Promise.reject(
+                        new Error('请至少添加一条关键词替换规则'),
+                      );
+                    }
+                    if (rules.length > 100) {
+                      return Promise.reject(
+                        new Error('关键词替换规则不能超过 100 条'),
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <div
+                  className={`${styles.nodeConfigFull} ${styles.replacementRuleList}`}
+                >
+                  {fields.map((field, index) => (
+                    <div className={styles.replacementRuleRow} key={field.key}>
+                      <Form.Item
+                        label={`关键词 ${index + 1}`}
+                        name={[field.name, 'keyword']}
+                        rules={[
+                          {
+                            required: true,
+                            whitespace: true,
+                            message: '请输入要替换的关键词',
+                          },
+                        ]}
+                      >
+                        <Input maxLength={200} placeholder="例如：WEB-DL" />
+                      </Form.Item>
+                      <Form.Item
+                        extra="留空表示删除关键词"
+                        label="替换为"
+                        name={[field.name, 'replacement']}
+                      >
+                        <Input maxLength={2000} placeholder="例如：WEB" />
+                      </Form.Item>
+                      <Button
+                        aria-label={`删除关键词替换规则 ${index + 1}`}
+                        className={styles.replacementRuleDelete}
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                        type="text"
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    block
+                    icon={<PlusOutlined />}
+                    onClick={() => add({ keyword: '', replacement: '' })}
+                    type="dashed"
+                  >
+                    添加替换规则
+                  </Button>
+                  <Form.ErrorList errors={errors} />
+                </div>
+              )}
+            </Form.List>
+            <Form.Item
+              label="区分大小写"
+              name="case_sensitive"
+              valuePropName="checked"
+            >
+              <Switch checkedChildren="区分" unCheckedChildren="忽略" />
+            </Form.Item>
+            <Form.Item
+              label="保存变量名"
+              name="variable"
+              rules={[{ required: true }]}
+            >
+              <Input placeholder="normalized_title" />
+            </Form.Item>
+          </>
+        );
+      case 'regex_replace':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              使用 Go/RE2 正则全局替换所有命中内容，并将结果保存到
+              $vars.变量名。
+            </Text>
+            <TemplateConfigField
+              field="input"
+              label="输入字段"
+              protocol={inputProtocol('input')}
+              references={fieldReferences}
+              required
+            />
+            <Form.Item
+              label="正则表达式"
+              name="pattern"
+              rules={[{ required: true }]}
+            >
+              <Input placeholder="[._-]+" />
+            </Form.Item>
+            <Form.Item
+              extra="支持 ${1} 或 ${name} 捕获组；捕获组后紧接文字时必须使用花括号。留空表示删除命中内容。"
+              label="替换内容"
+              name="replacement"
+            >
+              <Input placeholder="例如：${name} 第${2}集" />
+            </Form.Item>
+            <Form.Item
+              label="保存变量名"
+              name="variable"
+              rules={[{ required: true }]}
+            >
+              <Input placeholder="normalized_title" />
             </Form.Item>
           </>
         );
@@ -793,6 +946,70 @@ const NodeConfigModal = ({
               extra="默认 10080 分钟，即 7 天；超时后走失败出口。"
             >
               <InputNumber max={43200} min={1} style={{ width: '100%' }} />
+            </Form.Item>
+          </>
+        );
+      case 'rename115_openapi':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="通常连接在“等待 115 下载完成”的成功出口，并把该节点的 file_id 插入下方。样本预览只展示将要使用的 ID 和名称，不会调用真实 115 接口。"
+              title="通过 115 OpenAPI 重命名文件或文件夹"
+              showIcon
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="115 OpenAPI 账号"
+              name="cloud_storage_id"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={cloudStorages
+                  .filter(
+                    (storage) =>
+                      storage.storage_type === '115open' &&
+                      storage.status === 'active',
+                  )
+                  .map((storage) => ({
+                    label: storage.storage_name,
+                    value: storage.id,
+                  }))}
+                placeholder="选择执行重命名的 115 OpenAPI 账号"
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('file_id')) ||
+                '推荐插入“等待 115 下载完成 · 首个完成文件 ID”。'
+              }
+              label="文件或文件夹 ID"
+              name="file_id"
+              rules={[{ required: true }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="115 重命名对象 ID"
+                placeholder="点击“插入变量”选择等待节点的 file_id"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra={
+                protocolFieldExtra(inputProtocol('new_name')) ||
+                '最大 255 字节；重命名文件时请在模板中保留 .mkv 等扩展名。'
+              }
+              label="新名称"
+              name="new_name"
+              rules={[{ required: true }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="115 重命名新名称"
+                placeholder="例如：{{item.title}}.mkv"
+                references={fieldReferences}
+              />
             </Form.Item>
           </>
         );
@@ -1588,6 +1805,7 @@ const NodeConfigModal = ({
                   'offline115',
                   'offline115_openapi',
                   'wait115',
+                  'rename115_openapi',
                   'moviepilot_title_recognize',
                   'filmfusion_recognize',
                   'media_exists',

@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import AutomationOverview from './AutomationOverview';
@@ -52,6 +58,7 @@ describe('AutomationOverview', () => {
         data={dashboard}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={vi.fn()}
         onManualRun={vi.fn()}
         onToggle={onToggle}
@@ -85,6 +92,7 @@ describe('AutomationOverview', () => {
         }}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={vi.fn()}
         onManualRun={vi.fn()}
         onToggle={vi.fn()}
@@ -102,6 +110,7 @@ describe('AutomationOverview', () => {
         data={dashboard}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={onEdit}
         onManualRun={vi.fn()}
         onToggle={vi.fn()}
@@ -124,6 +133,7 @@ describe('AutomationOverview', () => {
         data={dashboard}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={vi.fn()}
         onManualRun={onManualRun}
         onToggle={vi.fn()}
@@ -140,6 +150,33 @@ describe('AutomationOverview', () => {
 
     expect(onManualRun).toHaveBeenCalledWith(11);
     expect(onViewLogs).toHaveBeenCalledWith(11);
+  });
+
+  it('places deletion under more actions and confirms before deleting', async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AutomationOverview
+        data={dashboard}
+        loading={false}
+        onCreate={vi.fn()}
+        onDelete={onDelete}
+        onEdit={vi.fn()}
+        onManualRun={vi.fn()}
+        onToggle={vi.fn()}
+        onViewLogs={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '更多操作 下载新番' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: /删除自动化/ }),
+    );
+
+    expect(screen.getByText('删除这个 RSS 自动化？')).toBeTruthy();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(7));
   });
 
   it('hides an earlier source error when the latest run succeeded', () => {
@@ -169,6 +206,7 @@ describe('AutomationOverview', () => {
         }}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={vi.fn()}
         onManualRun={vi.fn()}
         onToggle={vi.fn()}
@@ -209,6 +247,7 @@ describe('AutomationOverview', () => {
         }}
         loading={false}
         onCreate={vi.fn()}
+        onDelete={vi.fn()}
         onEdit={vi.fn()}
         onManualRun={vi.fn()}
         onToggle={vi.fn()}

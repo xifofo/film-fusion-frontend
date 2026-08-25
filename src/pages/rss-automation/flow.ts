@@ -20,6 +20,8 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   trigger: 'RSS 触发器',
   regex: '正则提取',
   keyword: '关键词匹配',
+  keyword_replace: '关键词替换',
+  regex_replace: '正则替换',
   convert: '类型转换',
   if: 'IF 条件',
   parallel: '并行分支',
@@ -31,6 +33,7 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   offline115: '115 Cookie 离线',
   offline115_openapi: '115 OpenAPI 离线',
   wait115: '等待 115 下载完成',
+  rename115_openapi: '115 API 重命名',
   moviepilot_title_recognize: 'MP 标题识别',
   filmfusion_recognize: 'FilmFusion 本地识别',
   media_exists: '本地 / Emby 查重',
@@ -54,6 +57,7 @@ export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'offline115',
   'offline115_openapi',
   'wait115',
+  'rename115_openapi',
   'moviepilot_title_recognize',
   'filmfusion_recognize',
   'media_exists',
@@ -203,6 +207,22 @@ export const createNodeDefinition = (
       case_sensitive: false,
     });
   }
+  if (type === 'keyword_replace') {
+    Object.assign(config, {
+      input: '$item.title',
+      replacements: [{ keyword: '', replacement: '' }],
+      case_sensitive: false,
+      variable: 'normalized_title',
+    });
+  }
+  if (type === 'regex_replace') {
+    Object.assign(config, {
+      input: '$item.title',
+      pattern: '[._-]+',
+      replacement: ' ',
+      variable: 'normalized_title',
+    });
+  }
   if (type === 'convert') {
     Object.assign(config, {
       input: '$item.size_bytes',
@@ -223,6 +243,12 @@ export const createNodeDefinition = (
     Object.assign(config, {
       poll_interval_seconds: 30,
       max_wait_minutes: 10080,
+    });
+  }
+  if (type === 'rename115_openapi') {
+    Object.assign(config, {
+      file_id: '',
+      new_name: '{{item.title}}',
     });
   }
   if (type === 'wait_qbittorrent') {
@@ -333,6 +359,7 @@ export const createNodeDefinition = (
       type === 'offline115_openapi' ||
       type === 'wait_qbittorrent' ||
       type === 'wait115' ||
+      type === 'rename115_openapi' ||
       type === 'moviepilot_title_recognize' ||
       type === 'filmfusion_recognize' ||
       type === 'media_exists' ||

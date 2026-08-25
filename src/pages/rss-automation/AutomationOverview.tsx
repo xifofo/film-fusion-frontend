@@ -1,11 +1,23 @@
 import {
+  DeleteOutlined,
   EditOutlined,
   FileTextOutlined,
+  MoreOutlined,
   PlayCircleOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
-import { Button, Card, Empty, Switch, Tag, Typography } from 'antd';
+import {
+  Button,
+  Card,
+  Dropdown,
+  Empty,
+  Modal,
+  Switch,
+  Tag,
+  Typography,
+} from 'antd';
 import dayjs from 'dayjs';
+import { useState } from 'react';
 import type {
   RSSAutomationDashboard,
   RSSAutomationRunStatus,
@@ -19,6 +31,7 @@ type AutomationOverviewProps = {
   data: RSSAutomationDashboard;
   loading: boolean;
   onCreate: () => void;
+  onDelete: (sourceId: number) => Promise<void> | void;
   onEdit: (workflowId: number) => void;
   onManualRun: (workflowId: number) => void;
   onToggle: (sourceId: number, enabled: boolean) => Promise<void> | void;
@@ -45,12 +58,19 @@ const AutomationOverview = ({
   data,
   loading,
   onCreate,
+  onDelete,
   onEdit,
   onManualRun,
   onToggle,
   onViewLogs,
   togglingSourceId,
 }: AutomationOverviewProps) => {
+  const [deleteTarget, setDeleteTarget] = useState<{
+    sourceId: number;
+    sourceName: string;
+    workflowName: string;
+  }>();
+  const [deleting, setDeleting] = useState(false);
   const sourceByID = new Map(data.sources.map((source) => [source.id, source]));
   const latestRunByWorkflow = new Map<
     number,
@@ -61,6 +81,19 @@ const AutomationOverview = ({
       latestRunByWorkflow.set(run.workflow_id, run);
     }
   }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await onDelete(deleteTarget.sourceId);
+      setDeleteTarget(undefined);
+    } catch {
+      // The page-level handler reports the API error; keep the dialog open.
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className={styles.overviewShell}>
@@ -156,6 +189,41 @@ const AutomationOverview = ({
                   >
                     编辑
                   </Button>,
+                  <Dropdown
+                    key="more"
+                    menu={{
+                      items: [
+                        {
+                          danger: true,
+                          icon: <DeleteOutlined />,
+                          key: 'delete',
+                          label: '删除自动化',
+                        },
+                      ],
+                      onClick: ({ key }) => {
+                        if (key === 'delete' && source) {
+                          setDeleteTarget({
+                            sourceId: source.id,
+                            sourceName: source.name,
+                            workflowName: workflow.name,
+                          });
+                        }
+                      },
+                    }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                  >
+                    <Button
+                      aria-label={`更多操作 ${workflow.name}`}
+                      className={styles.automationCardAction}
+                      disabled={!source}
+                      icon={<MoreOutlined />}
+                      size="small"
+                      type="text"
+                    >
+                      更多
+                    </Button>
+                  </Dropdown>,
                 ]}
                 className={styles.automationCard}
                 key={workflow.id}
@@ -236,6 +304,28 @@ const AutomationOverview = ({
           })}
         </div>
       )}
+      <Modal
+        cancelButtonProps={{ disabled: deleting }}
+        cancelText="取消"
+        closable={!deleting}
+        confirmLoading={deleting}
+        destroyOnHidden
+        mask={{ closable: !deleting }}
+        okButtonProps={{ danger: true }}
+        okText="确认删除"
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(undefined);
+        }}
+        onOk={() => void confirmDelete()}
+        open={Boolean(deleteTarget)}
+        title="删除这个 RSS 自动化？"
+      >
+        <Paragraph>
+          {deleteTarget
+            ? `将删除 RSS 源“${deleteTarget.sourceName}”和自动化流程“${deleteTarget.workflowName}”。历史运行记录仍会保留。`
+            : ''}
+        </Paragraph>
+      </Modal>
     </div>
   );
 };

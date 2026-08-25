@@ -5,7 +5,6 @@ import {
   CloseCircleOutlined,
   DeleteOutlined,
   ExportOutlined,
-  EyeInvisibleOutlined,
   EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
@@ -22,9 +21,7 @@ import { ProTable } from '@ant-design/pro-components';
 import {
   Alert,
   Badge,
-  Breadcrumb,
   Button,
-  Card,
   Checkbox,
   Col,
   Dropdown,
@@ -47,6 +44,7 @@ import {
   Typography,
 } from 'antd';
 import type { DataNode } from 'antd/es/tree';
+import { createStyles } from 'antd-style';
 import React, {
   useCallback,
   useEffect,
@@ -78,10 +76,6 @@ const PAGE_LIMIT = 1150;
 const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
 const EPISODE_FILENAME_REGEX_STORAGE_KEY =
   'film-fusion.episodeOrganize.filenameRegex';
-const DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
-  'film-fusion.organize.directoryPanelVisible';
-const EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
-  'film-fusion.episodeOrganize.directoryPanelVisible';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
@@ -164,28 +158,6 @@ function saveFilenameRegexConfig(
   }
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(config));
-  } catch {
-    return;
-  }
-}
-
-function loadDirectoryPanelVisible(storageKey: string): boolean {
-  if (typeof window === 'undefined') {
-    return true;
-  }
-  try {
-    return window.localStorage.getItem(storageKey) !== 'false';
-  } catch {
-    return true;
-  }
-}
-
-function saveDirectoryPanelVisible(storageKey: string, visible: boolean) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  try {
-    window.localStorage.setItem(storageKey, String(visible));
   } catch {
     return;
   }
@@ -507,20 +479,370 @@ const formatDateTime = (value?: string) => {
   return date.toLocaleString();
 };
 
+const useStyles = createStyles(({ css, token }) => ({
+  page: css`
+    max-width: 1920px;
+    margin-inline: auto;
+  `,
+  workspace: css`
+    display: grid;
+    grid-template-columns: minmax(280px, 336px) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+
+    @media (max-width: 991px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  `,
+  directoryColumn: css`
+    position: sticky;
+    top: 24px;
+    min-width: 0;
+
+    @media (max-width: 991px) {
+      position: static;
+    }
+  `,
+  directoryPanelHeader: css`
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+  `,
+  directoryPanelTitle: css`
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    color: ${token.colorTextHeading};
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+  `,
+  directoryPanelIcon: css`
+    color: ${token.colorTextSecondary};
+    font-size: 15px;
+  `,
+  mainColumn: css`
+    display: grid;
+    min-width: 0;
+    gap: 16px;
+  `,
+  section: css`
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 12px;
+    background: ${token.colorBgContainer};
+  `,
+  sectionHeader: css`
+    box-sizing: border-box;
+    display: flex;
+    min-height: 48px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 10px 12px;
+    border-bottom: 1px solid ${token.colorBorderSecondary};
+  `,
+  sectionTitle: css`
+    min-width: 0;
+    flex: 0 1 auto;
+    margin: 0;
+    color: ${token.colorTextHeading};
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+  `,
+  sectionExtra: css`
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  `,
+  sectionBody: css`
+    padding: 16px 20px 20px;
+
+    @media (max-width: 600px) {
+      padding: 16px;
+    }
+  `,
+  directoryBody: css`
+    padding: 12px;
+  `,
+  directorySearch: css`
+    margin-bottom: 12px;
+  `,
+  directoryTree: css`
+    max-height: calc(100vh - 380px);
+    overflow: auto;
+    padding: 2px;
+
+    .ant-tree-treenode {
+      min-height: 28px;
+      padding-block: 0;
+    }
+
+    .ant-tree-node-content-wrapper {
+      min-width: 0;
+      min-height: 28px;
+      line-height: 28px;
+    }
+
+    @media (max-width: 991px) {
+      max-height: 360px;
+    }
+  `,
+  rulesBody: css`
+    padding: 12px;
+  `,
+  rulesToolbar: css`
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 24px;
+  `,
+  compactRule: css`
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  `,
+  filenameRule: css`
+    flex: 1 1 640px;
+
+    @media (max-width: 767px) {
+      flex-basis: 100%;
+    }
+  `,
+  compactRuleLabel: css`
+    flex: 0 0 auto;
+    color: ${token.colorTextHeading};
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 20px;
+  `,
+  regexPatternInput: css`
+    width: min(100%, 260px);
+  `,
+  regexReplacementInput: css`
+    width: min(100%, 160px);
+  `,
+  selectedSourceStrip: css`
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid ${token.colorBorderSecondary};
+  `,
+  selectedSourceLabel: css`
+    flex: 0 0 auto;
+    color: ${token.colorTextHeading};
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 22px;
+  `,
+  selectionTags: css`
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    .ant-tag {
+      max-width: 100%;
+      margin-inline-end: 0;
+    }
+  `,
+  queueHeaderTitle: css`
+    display: inline-flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+
+    .ant-typography {
+      font-size: 12px;
+      font-weight: 400;
+    }
+  `,
+  queueSectionBody: css`
+    padding: 12px;
+  `,
+  tableSurface: css`
+    .ant-pro-card {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .ant-pro-card-body {
+      padding: 0;
+    }
+
+    .ant-pro-table-list-toolbar-container {
+      padding-block: 0 12px;
+    }
+
+    .ant-table-container {
+      overflow: hidden;
+      border: 1px solid ${token.colorBorderSecondary};
+      border-radius: 8px;
+    }
+  `,
+  resultTabs: css`
+    .ant-tabs-nav {
+      margin-bottom: 16px;
+    }
+  `,
+  resultEmpty: css`
+    display: grid;
+    min-height: 220px;
+    place-items: center;
+  `,
+  rawResponse: css`
+    max-height: 480px;
+    margin: 0;
+    overflow: auto;
+    padding: 16px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 8px;
+    background: ${token.colorFillQuaternary};
+    color: ${token.colorText};
+    font-family: ${token.fontFamilyCode};
+    font-size: 12px;
+    line-height: 20px;
+    white-space: pre-wrap;
+  `,
+  actionDockSpacer: css`
+    height: 96px;
+
+    @media (max-width: 639px) {
+      height: 148px;
+    }
+  `,
+  actionDock: css`
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    z-index: 99;
+    display: flex;
+    box-sizing: border-box;
+    width: auto;
+    max-width: max-content;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: 12px;
+    background: color-mix(in srgb, ${token.colorBgElevated} 92%, transparent);
+    box-shadow: ${token.boxShadowSecondary};
+    backdrop-filter: blur(20px);
+
+    @media (min-width: 640px) {
+      left: auto;
+    }
+
+    @media (min-width: 1024px) {
+      right: 24px;
+      bottom: 20px;
+      max-width: calc(100vw - var(--app-sidebar-offset) - 48px);
+    }
+
+    @media (min-width: 1280px) {
+      flex-direction: row;
+      align-items: center;
+    }
+  `,
+  actionDockMeta: css`
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    padding-inline: 2px;
+  `,
+  actionDockDivider: css`
+    width: 100%;
+    height: 1px;
+    flex: 0 0 auto;
+    background: ${token.colorBorderSecondary};
+
+    @media (min-width: 1280px) {
+      width: 1px;
+      height: 24px;
+    }
+  `,
+  actionDockControls: css`
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+
+    @media (max-width: 479px) {
+      .ant-btn {
+        flex: 1 1 auto;
+      }
+    }
+  `,
+}));
+
+type WorkspaceSectionProps = {
+  bodyClassName?: string;
+  children: React.ReactNode;
+  extra?: React.ReactNode;
+  title: React.ReactNode;
+};
+
+const WorkspaceSection: React.FC<WorkspaceSectionProps> = ({
+  bodyClassName,
+  children,
+  extra,
+  title,
+}) => {
+  const { styles } = useStyles();
+
+  return (
+    <section className={styles.section}>
+      <header className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        {extra ? <div className={styles.sectionExtra}>{extra}</div> : null}
+      </header>
+      <div
+        className={`${styles.sectionBody}${bodyClassName ? ` ${bodyClassName}` : ''}`}
+      >
+        {children}
+      </div>
+    </section>
+  );
+};
+
 type OrganizePageProps = {
   episodeMode?: boolean;
 };
 
 const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
+  const { styles } = useStyles();
   const navigate = useNavigate();
   const params = useParams<{ id: string }>();
   const directoryId = Number(params.id);
   const filenameRegexStorageKey = episodeMode
     ? EPISODE_FILENAME_REGEX_STORAGE_KEY
     : FILENAME_REGEX_STORAGE_KEY;
-  const directoryPanelVisibleStorageKey = episodeMode
-    ? EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY
-    : DIRECTORY_PANEL_VISIBLE_STORAGE_KEY;
   const defaultRegexConfig = episodeMode
     ? defaultEpisodeFilenameRegexConfig
     : defaultFilenameRegexConfig;
@@ -537,9 +859,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [selectedKey, setSelectedKey] = useState<string>();
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
-  const [directoryPanelVisible, setDirectoryPanelVisible] = useState(() =>
-    loadDirectoryPanelVisible(directoryPanelVisibleStorageKey),
-  );
   const [filenameRegexConfig, setFilenameRegexConfig] =
     useState<FilenameRegexConfig>(() =>
       loadFilenameRegexConfig(filenameRegexStorageKey, defaultRegexConfig),
@@ -607,13 +926,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       setBestVersionEnabled(true);
     }
   }, [episodeMode]);
-
-  useEffect(() => {
-    saveDirectoryPanelVisible(
-      directoryPanelVisibleStorageKey,
-      directoryPanelVisible,
-    );
-  }, [directoryPanelVisible, directoryPanelVisibleStorageKey]);
 
   const previewCategoryOptions = useMemo(() => {
     const names =
@@ -966,11 +1278,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         };
       }),
     [activePreviewTask, buildPathByKey],
-  );
-
-  const selectedPath = useMemo(
-    () => (selectedKey ? buildPathByKey(selectedKey) : []),
-    [selectedKey, buildPathByKey],
   );
 
   const checkedFolders = useMemo(
@@ -2454,137 +2761,91 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   return (
     <ConsolePage
-      actions={
-        <>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/directories')}
-          >
-            返回目录
-          </Button>
-          {headerExtra}
-        </>
-      }
+      actions={headerExtra}
+      className={styles.page}
       eyebrow="Media organize"
       title={`${episodeMode ? '剧集预整理' : '整理目录'}：${
         directoryDetail?.directory_name || ''
       }`}
+      titlePrefix={
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/directories')}
+        >
+          返回目录
+        </Button>
+      }
     >
       {contextHolder}
       {modalContextHolder}
       <Spin fullscreen spinning={directoryLoading && !directoryDetail} />
 
-      <Row gutter={16} style={{ alignItems: 'stretch' }}>
-        <Col
-          xs={24}
-          md={9}
-          lg={8}
-          xl={7}
-          style={{ display: directoryPanelVisible ? undefined : 'none' }}
-        >
-          <Card
-            title={
-              <Space>
-                <FolderOpenOutlined />
+      <div className={styles.workspace}>
+        <aside className={styles.directoryColumn}>
+          <section className={styles.section}>
+            <header className={styles.directoryPanelHeader}>
+              <div className={styles.directoryPanelTitle}>
+                <FolderOpenOutlined
+                  aria-hidden="true"
+                  className={styles.directoryPanelIcon}
+                />
                 <span>115 目录</span>
-              </Space>
-            }
-            size="small"
-            styles={{ body: { padding: 12 } }}
-          >
-            <Input.Search
-              allowClear
-              placeholder="搜索已加载目录"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              style={{ marginBottom: 12 }}
-            />
-            <Spin spinning={rootLoading}>
-              {filteredTreeData.length === 0 && !rootLoading ? (
-                <Empty
-                  description="暂无目录"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              ) : (
-                <Tree
-                  showIcon
-                  blockNode
-                  checkable
-                  checkStrictly
-                  treeData={filteredTreeData}
-                  loadData={onLoadData}
-                  expandedKeys={expandedKeys}
-                  onExpand={(keys) => setExpandedKeys(keys)}
-                  selectedKeys={selectedKey ? [selectedKey] : []}
-                  onSelect={(keys) => {
-                    const key = keys[0];
-                    setSelectedKey(key ? String(key) : undefined);
-                  }}
-                  checkedKeys={{ checked: checkedKeys, halfChecked: [] }}
-                  onCheck={(checked) => {
-                    const next = Array.isArray(checked)
-                      ? checked
-                      : checked.checked;
-                    setCheckedKeys(next.map((k) => String(k)));
-                  }}
-                  style={{ maxHeight: 'calc(100vh - 360px)', overflow: 'auto' }}
-                />
-              )}
-            </Spin>
-          </Card>
-        </Col>
-
-        <Col
-          xs={24}
-          md={directoryPanelVisible ? 15 : 24}
-          lg={directoryPanelVisible ? 16 : 24}
-          xl={directoryPanelVisible ? 17 : 24}
-        >
-          <Card
-            size="small"
-            extra={
-              <Button
-                aria-label={
-                  directoryPanelVisible ? '隐藏 115 目录栏' : '显示 115 目录栏'
-                }
-                icon={
-                  directoryPanelVisible ? (
-                    <EyeInvisibleOutlined />
-                  ) : (
-                    <EyeOutlined />
-                  )
-                }
-                onClick={() => setDirectoryPanelVisible((visible) => !visible)}
+              </div>
+              <Tag color={checkedKeys.length > 0 ? 'blue' : 'default'}>
+                已选 {checkedKeys.length}
+              </Tag>
+            </header>
+            <div className={`${styles.sectionBody} ${styles.directoryBody}`}>
+              <Input.Search
+                allowClear
+                className={styles.directorySearch}
+                placeholder="搜索目录"
                 size="small"
-                type="text"
-              >
-                {directoryPanelVisible ? '隐藏目录栏' : '显示目录栏'}
-              </Button>
-            }
-            title={
-              <Space size={8} wrap>
-                <span style={{ color: 'rgba(0,0,0,0.45)' }}>当前查看：</span>
-                {selectedPath.length > 0 ? (
-                  <Breadcrumb
-                    items={selectedPath.map((item) => ({ title: item.name }))}
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
+              <Spin spinning={rootLoading}>
+                {filteredTreeData.length === 0 && !rootLoading ? (
+                  <Empty
+                    description="暂无目录"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 ) : (
-                  <Typography.Text type="secondary">
-                    {directoryPanelVisible
-                      ? '点击左侧目录预览路径，勾选 ☑ 多选目录后点击整理'
-                      : '目录栏已隐藏，显示目录栏后可继续选择目录'}
-                  </Typography.Text>
+                  <Tree
+                    showIcon
+                    blockNode
+                    checkable
+                    className={styles.directoryTree}
+                    checkStrictly
+                    treeData={filteredTreeData}
+                    loadData={onLoadData}
+                    expandedKeys={expandedKeys}
+                    onExpand={(keys) => setExpandedKeys(keys)}
+                    selectedKeys={selectedKey ? [selectedKey] : []}
+                    onSelect={(keys) => {
+                      const key = keys[0];
+                      setSelectedKey(key ? String(key) : undefined);
+                    }}
+                    checkedKeys={{ checked: checkedKeys, halfChecked: [] }}
+                    onCheck={(checked) => {
+                      const next = Array.isArray(checked)
+                        ? checked
+                        : checked.checked;
+                      setCheckedKeys(next.map((k) => String(k)));
+                    }}
+                  />
                 )}
-              </Space>
-            }
-          >
-            <Alert
-              type={filenameRegexConfig.enabled ? 'warning' : 'info'}
-              showIcon={false}
-              style={{ marginBottom: 12 }}
-              title={
-                <Space size={[8, 8]} wrap>
-                  <Typography.Text strong>识别方式：</Typography.Text>
+              </Spin>
+            </div>
+          </section>
+        </aside>
+
+        <div className={styles.mainColumn}>
+          <section className={styles.section}>
+            <div className={styles.rulesBody}>
+              <div className={styles.rulesToolbar}>
+                <div className={styles.compactRule}>
+                  <span className={styles.compactRuleLabel}>识别方式</span>
                   <Segmented<RecognitionSource>
                     name="organize-recognition-source"
                     size="small"
@@ -2593,11 +2854,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     disabled={organizeLoading || createPreviewLoading}
                     onChange={(value) => setOrganizeRecognitionSource(value)}
                   />
-                  <Typography.Text type="secondary">
-                    {organizeRecognitionSource === 'moviepilot'
-                      ? '仅使用 MoviePilot 识别与转名。'
-                      : '使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
-                  </Typography.Text>
+                </div>
+
+                <div className={`${styles.compactRule} ${styles.filenameRule}`}>
+                  <span className={styles.compactRuleLabel}>文件名处理</span>
                   <Button
                     size="small"
                     type={filenameRegexConfig.enabled ? 'primary' : 'default'}
@@ -2607,19 +2867,19 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                       })
                     }
                   >
-                    文件名处理：
                     {filenameRegexConfig.enabled ? '已开启' : '未开启'}
                   </Button>
                   <Input
+                    className={styles.regexPatternInput}
                     size="small"
                     prefix="正则"
                     value={filenameRegexConfig.pattern}
                     onChange={(e) =>
                       updateFilenameRegexConfig({ pattern: e.target.value })
                     }
-                    style={{ width: 320 }}
                   />
                   <Input
+                    className={styles.regexReplacementInput}
                     size="small"
                     prefix="替换为"
                     value={filenameRegexConfig.replacement}
@@ -2628,7 +2888,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         replacement: e.target.value,
                       })
                     }
-                    style={{ width: 200 }}
                   />
                   <Button
                     size="small"
@@ -2642,26 +2901,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   >
                     恢复默认
                   </Button>
-                  <Typography.Text type="secondary">
-                    开启后用替换结果调用当前识别方式。
-                  </Typography.Text>
-                </Space>
-              }
-            />
+                </div>
+              </div>
 
-            {checkedFolders.length > 0 ? (
-              <Alert
-                type="info"
-                showIcon={false}
-                style={{ marginBottom: 12 }}
-                title={
-                  <Space size={[4, 4]} wrap>
-                    <Typography.Text
-                      type="secondary"
-                      style={{ marginRight: 4 }}
-                    >
-                      已勾选 {checkedFolders.length} 个目录：
-                    </Typography.Text>
+              {checkedFolders.length > 0 ? (
+                <div className={styles.selectedSourceStrip}>
+                  <span className={styles.selectedSourceLabel}>
+                    来源 · {checkedFolders.length}
+                  </span>
+                  <div className={styles.selectionTags}>
                     {checkedFolders.map((f) => (
                       <Tag
                         key={f.key}
@@ -2679,67 +2927,28 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         </Tooltip>
                       </Tag>
                     ))}
-                    <Button
-                      size="small"
-                      type="link"
-                      onClick={() => setCheckedKeys([])}
-                    >
-                      清空
-                    </Button>
-                  </Space>
-                }
-              />
-            ) : null}
+                  </div>
+                  <Button
+                    size="small"
+                    type="link"
+                    onClick={() => setCheckedKeys([])}
+                  >
+                    清空
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </section>
 
-            <ProTable<API.OrganizePreviewTask>
-              rowKey="id"
-              headerTitle={
-                <Space size={[10, 4]} wrap>
-                  <Typography.Text strong>后台预整理队列</Typography.Text>
-                  <Badge
-                    status={previewRealtimeMeta[previewRealtimeStatus].status}
-                    text={previewRealtimeMeta[previewRealtimeStatus].text}
-                  />
-                  {processingPreviewTask ? (
-                    <Typography.Text
-                      type="secondary"
-                      ellipsis={{
-                        tooltip:
-                          processingPreviewTask.folder_path ||
-                          processingPreviewTask.folder_name ||
-                          processingPreviewTask.folder_id,
-                      }}
-                      style={{ maxWidth: 460 }}
-                    >
-                      正在处理：
-                      {processingPreviewTask.folder_name ||
-                        processingPreviewTask.folder_id}
-                      {' · '}
-                      已用时 {formatElapsedSeconds(processingElapsedSeconds)}
-                    </Typography.Text>
-                  ) : queuedPreviewTaskCount > 0 ? (
-                    <Typography.Text type="secondary">
-                      等待处理 {queuedPreviewTaskCount} 项
-                    </Typography.Text>
-                  ) : null}
-                </Space>
-              }
-              size="small"
-              search={false}
-              options={false}
-              loading={previewTasksInitialLoading}
-              dataSource={previewTasks}
-              columns={previewTaskColumns}
-              pagination={{ defaultPageSize: 5, showSizeChanger: true }}
-              scroll={{ x: 'max-content' }}
-              style={{ marginBottom: 12 }}
-              locale={{
-                emptyText:
-                  '还没有预整理任务。勾选左侧目录后点“加入预整理”，后台会先展开子目录，再按间隔逐个生成预览结果。',
-              }}
-              toolBarRender={() => [
+          <WorkspaceSection
+            bodyClassName={styles.queueSectionBody}
+            extra={
+              <>
+                <Badge
+                  status={previewRealtimeMeta[previewRealtimeStatus].status}
+                  text={previewRealtimeMeta[previewRealtimeStatus].text}
+                />
                 <Button
-                  key="clearPending"
                   size="small"
                   danger
                   icon={<DeleteOutlined />}
@@ -2748,9 +2957,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   onClick={() => confirmClearPreviewTasks('pending')}
                 >
                   移除排队中 ({pendingPreviewTaskCount})
-                </Button>,
+                </Button>
                 <Button
-                  key="clearFailed"
                   size="small"
                   danger
                   icon={<DeleteOutlined />}
@@ -2759,9 +2967,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   onClick={() => confirmClearPreviewTasks('failed')}
                 >
                   清理失败 ({failedPreviewTaskCount})
-                </Button>,
+                </Button>
                 <Button
-                  key="clearAll"
                   size="small"
                   danger
                   icon={<DeleteOutlined />}
@@ -2770,20 +2977,86 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   onClick={() => confirmClearPreviewTasks()}
                 >
                   清理全部 ({clearablePreviewTaskCount})
-                </Button>,
+                </Button>
                 <Button
-                  key="refresh"
                   size="small"
                   icon={<ReloadOutlined />}
                   loading={previewTasksManualRefreshing}
                   onClick={handleRefreshPreviewTasks}
                 >
                   刷新
-                </Button>,
-              ]}
+                </Button>
+              </>
+            }
+            title={
+              <span className={styles.queueHeaderTitle}>
+                <span>后台预整理队列</span>
+                {processingPreviewTask ? (
+                  <Typography.Text
+                    type="secondary"
+                    ellipsis={{
+                      tooltip:
+                        processingPreviewTask.folder_path ||
+                        processingPreviewTask.folder_name ||
+                        processingPreviewTask.folder_id,
+                    }}
+                    style={{ maxWidth: 460 }}
+                  >
+                    正在处理：
+                    {processingPreviewTask.folder_name ||
+                      processingPreviewTask.folder_id}
+                    {' · '}
+                    已用时 {formatElapsedSeconds(processingElapsedSeconds)}
+                  </Typography.Text>
+                ) : queuedPreviewTaskCount > 0 ? (
+                  <Typography.Text type="secondary">
+                    等待处理 {queuedPreviewTaskCount} 项
+                  </Typography.Text>
+                ) : null}
+              </span>
+            }
+          >
+            <ProTable<API.OrganizePreviewTask>
+              className={styles.tableSurface}
+              rowKey="id"
+              size="small"
+              search={false}
+              options={false}
+              loading={previewTasksInitialLoading}
+              dataSource={previewTasks}
+              columns={previewTaskColumns}
+              pagination={{ defaultPageSize: 5, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+              locale={{
+                emptyText:
+                  '还没有预整理任务。勾选左侧目录后点“加入预整理”，后台会先展开子目录，再按间隔逐个生成预览结果。',
+              }}
+              toolBarRender={false}
             />
+          </WorkspaceSection>
 
-            <div ref={previewResultRef}>
+          <div ref={previewResultRef}>
+            <WorkspaceSection
+              extra={
+                resultData ? (
+                  <>
+                    <Tag color="blue">明细 {visibleItemsForTable.length}</Tag>
+                    <Tag
+                      color={
+                        selectedItemRowsForApply.length > 0
+                          ? 'success'
+                          : 'default'
+                      }
+                    >
+                      已选 {selectedItemRowsForApply.length}
+                    </Tag>
+                  </>
+                ) : (
+                  <Tag>尚无预览</Tag>
+                )
+              }
+              title="核对整理结果"
+            >
               {resultData ? (
                 <>
                   {(() => {
@@ -2828,6 +3101,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   })()}
 
                   <Tabs
+                    className={styles.resultTabs}
                     items={[
                       {
                         key: 'items',
@@ -2893,6 +3167,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               </div>
                             ) : null}
                             <ProTable<OrganizeItemRow>
+                              className={styles.tableSurface}
                               key={activeVersionKey}
                               rowKey={getOrganizeItemRowKey}
                               rowSelection={{
@@ -2933,6 +3208,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         label: `目录调试 (${flatDirDebugForTable.length})`,
                         children: (
                           <ProTable<OrganizeDirDebugRow>
+                            className={styles.tableSurface}
                             rowKey={(row) =>
                               `${row.__folder_id || ''}::${row.target_dir}`
                             }
@@ -2966,32 +3242,39 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         key: 'raw',
                         label: '原始响应',
                         children: (
-                          <Typography.Paragraph style={{ margin: 0 }}>
-                            <pre
-                              style={{
-                                margin: 0,
-                                whiteSpace: 'pre-wrap',
-                                maxHeight: 480,
-                                overflow: 'auto',
-                              }}
-                            >
-                              {JSON.stringify(
-                                rawResponse ?? resultData ?? {},
-                                null,
-                                2,
-                              )}
-                            </pre>
-                          </Typography.Paragraph>
+                          <pre className={styles.rawResponse}>
+                            {JSON.stringify(
+                              rawResponse ?? resultData ?? {},
+                              null,
+                              2,
+                            )}
+                          </pre>
                         ),
                       },
                     ]}
                   />
                 </>
-              ) : null}
-            </div>
-          </Card>
-        </Col>
-      </Row>
+              ) : (
+                <div className={styles.resultEmpty}>
+                  <Empty
+                    description="先选择目录并生成整理预览，再在这里核对文件、版本与目标路径"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  >
+                    <Button
+                      disabled={checkedKeys.length === 0}
+                      icon={<PlayCircleOutlined />}
+                      loading={organizeLoading && organizeRequestMode === 'dry'}
+                      onClick={() => triggerOrganize('dry')}
+                    >
+                      生成整理预览
+                    </Button>
+                  </Empty>
+                </div>
+              )}
+            </WorkspaceSection>
+          </div>
+        </div>
+      </div>
 
       <Modal
         title="指定 TMDB ID"
@@ -3189,12 +3472,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         </Space>
       </Modal>
 
-      <div aria-hidden="true" className="h-32 sm:h-24 xl:h-20" />
-      <section
-        aria-label="整理操作"
-        className="fixed right-3 bottom-3 left-3 z-[99] box-border flex w-auto max-w-max flex-col gap-2 rounded-2xl border border-black/[0.08] bg-white/90 px-3 py-2.5 shadow-[0_14px_42px_rgba(0,0,0,0.16)] backdrop-blur-2xl sm:right-4 sm:bottom-4 sm:left-auto lg:right-6 lg:bottom-5 lg:max-w-[calc(100vw-var(--app-sidebar-offset)-3rem)] xl:flex-row xl:items-center dark:border-white/10 dark:bg-neutral-950/88 dark:shadow-[0_14px_42px_rgba(0,0,0,0.5)]"
-      >
-        <div className="flex min-w-0 items-center gap-2 px-0.5">
+      <div aria-hidden="true" className={styles.actionDockSpacer} />
+      <section aria-label="整理操作" className={styles.actionDock}>
+        <div className={styles.actionDockMeta}>
           <Tag
             color={checkedKeys.length > 0 ? 'blue' : 'default'}
             style={{ marginInlineEnd: 0 }}
@@ -3213,12 +3493,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           ) : null}
         </div>
 
-        <div
-          aria-hidden="true"
-          className="h-px w-full shrink-0 bg-black/[0.08] xl:h-6 xl:w-px dark:bg-white/10"
-        />
+        <div aria-hidden="true" className={styles.actionDockDivider} />
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className={styles.actionDockControls}>
           <div className="flex items-center gap-1">
             <Typography.Text type="secondary">演练模式</Typography.Text>
             <Switch

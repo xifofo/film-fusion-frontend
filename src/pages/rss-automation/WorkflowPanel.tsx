@@ -52,6 +52,7 @@ import {
 } from 'react';
 import type {
   RSSAutomationDefinition,
+  RSSAutomationEntryHistoryItem,
   RSSAutomationMapping,
   RSSAutomationNodeDefinition,
   RSSAutomationNodeProtocol,
@@ -67,6 +68,7 @@ import {
   updateRSSAutomationWorkflow,
   validateRSSAutomationWorkflow,
 } from '@/services/film-fusion';
+import EntryHistoryPanel from './EntryHistoryPanel';
 import FlowNode from './FlowNode';
 import {
   createNodeDefinition,
@@ -105,6 +107,38 @@ const referencePreview = (value: unknown) => {
   const text =
     typeof value === 'object' ? JSON.stringify(value) : String(value).trim();
   return text.length > 42 ? `${text.slice(0, 42)}…` : text;
+};
+
+const previewFeedFromEntry = (
+  item: RSSAutomationEntryHistoryItem,
+): RSSAutomationParsedFeed => {
+  let fields: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(item.entry.fields_json) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      fields = { ...(parsed as Record<string, unknown>) };
+    }
+  } catch {
+    // Keep the canonical entry fields below so older malformed records remain previewable.
+  }
+
+  const canonicalFields: Record<string, unknown> = {
+    title: item.entry.title,
+    detail_url: item.entry.detail_url,
+    download_url: item.entry.download_url,
+    guid: item.entry.guid,
+    published_at: item.entry.published_at,
+  };
+  for (const [name, value] of Object.entries(canonicalFields)) {
+    if (fields[name] == null && value != null && value !== '') {
+      fields[name] = value;
+    }
+  }
+
+  return {
+    title: item.source_name || 'RSS 条目记录',
+    items: [{ fields }],
+  };
 };
 
 type WorkflowPanelProps = {
@@ -160,7 +194,10 @@ const palette: Array<{
   title: string;
   types: RSSAutomationNodeType[];
 }> = [
-  { title: '数据处理', types: ['keyword', 'regex', 'convert'] },
+  {
+    title: '数据处理',
+    types: ['keyword', 'keyword_replace', 'regex', 'regex_replace', 'convert'],
+  },
   { title: '流程控制', types: ['if', 'parallel', 'join', 'end'] },
   {
     title: '执行动作',
@@ -172,6 +209,7 @@ const palette: Array<{
       'offline115_openapi',
       'offline115',
       'wait115',
+      'rename115_openapi',
       'moviepilot_title_recognize',
       'filmfusion_recognize',
       'media_exists',
@@ -371,6 +409,9 @@ const WorkflowPanelInner = ({
   const [layingOut, setLayingOut] = useState(false);
   const [previewItemIndex, setPreviewItemIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [entryPickerOpen, setEntryPickerOpen] = useState(false);
+  const [selectedPreviewFeed, setSelectedPreviewFeed] =
+    useState<RSSAutomationParsedFeed>();
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<PendingWorkflowImport>();
   const [viewport, setViewportState] = useState<Viewport>({
@@ -389,6 +430,8 @@ const WorkflowPanelInner = ({
     () => new Map(sources.map((source) => [source.id, source])),
     [sources],
   );
+  const effectivePreviewFeed =
+    mode === 'manage' ? selectedPreviewFeed : previewFeed;
 
   const loadDefinition = useCallback(
     (definition: RSSAutomationDefinition) => {
@@ -422,6 +465,10 @@ const WorkflowPanelInner = ({
         enabled: workflow.enabled,
         version: workflow.version,
       });
+      setSelectedPreviewFeed(undefined);
+      setPreviewItemIndex(0);
+      setPreviewOpen(false);
+      setEntryPickerOpen(false);
       loadDefinition(definition);
     },
     [loadDefinition, messageApi],
@@ -449,8 +496,8 @@ const WorkflowPanelInner = ({
   }, [loading, meta.id, mode, selectWorkflow, setEdges, setNodes, workflows]);
 
   useEffect(() => {
-    if (!previewFeed?.items[previewItemIndex]) setPreviewItemIndex(0);
-  }, [previewFeed, previewItemIndex]);
+    if (!effectivePreviewFeed?.items[previewItemIndex]) setPreviewItemIndex(0);
+  }, [effectivePreviewFeed, previewItemIndex]);
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId)?.data.definition,
@@ -462,9 +509,15 @@ const WorkflowPanelInner = ({
     [edges, nodes, viewport],
   );
   const simulation = useMemo(() => {
-    const item = previewFeed?.items[previewItemIndex]?.fields;
+    const item = effectivePreviewFeed?.items[previewItemIndex]?.fields;
     return item ? simulateRSSAutomation(previewDefinition, item) : undefined;
-  }, [previewDefinition, previewFeed, previewItemIndex]);
+  }, [effectivePreviewFeed, previewDefinition, previewItemIndex]);
+  const previewEntry = useCallback((item: RSSAutomationEntryHistoryItem) => {
+    setSelectedPreviewFeed(previewFeedFromEntry(item));
+    setPreviewItemIndex(0);
+    setEntryPickerOpen(false);
+    setPreviewOpen(true);
+  }, []);
   const fieldReferences = useMemo(() => {
     const references: NodeFieldReference[] = [];
     const seen = new Set<string>();
@@ -475,7 +528,7 @@ const WorkflowPanelInner = ({
     };
 
     const sampleFields =
-      previewFeed?.items[previewItemIndex]?.fields ||
+      effectivePreviewFeed?.items[previewItemIndex]?.fields ||
       ({} as Record<string, unknown>);
     const mapping =
       sourceMapping ||
@@ -501,7 +554,11 @@ const WorkflowPanelInner = ({
     for (const flowNode of nodes) {
       if (!ancestorIDs.has(flowNode.id)) continue;
       const definition = flowNode.data.definition;
-      if (['regex', 'convert'].includes(definition.type)) {
+      if (
+        ['regex', 'keyword_replace', 'regex_replace', 'convert'].includes(
+          definition.type,
+        )
+      ) {
         const name = String(definition.config?.variable || '').trim();
         if (name) {
           addReference({
@@ -536,7 +593,15 @@ const WorkflowPanelInner = ({
 
     const configuredReference = (() => {
       if (!selectedNode) return '';
-      if (['keyword', 'regex', 'convert'].includes(selectedNode.type)) {
+      if (
+        [
+          'keyword',
+          'keyword_replace',
+          'regex',
+          'regex_replace',
+          'convert',
+        ].includes(selectedNode.type)
+      ) {
         return String(selectedNode.config?.input || '').trim();
       }
       if (selectedNode.type === 'if') {
@@ -556,6 +621,9 @@ const WorkflowPanelInner = ({
       }
       if (selectedNode.type === 'moviepilot_title_recognize') {
         return String(selectedNode.config?.input || '').trim();
+      }
+      if (selectedNode.type === 'rename115_openapi') {
+        return String(selectedNode.config?.file_id || '').trim();
       }
       if (selectedNode.type === 'filmfusion_recognize') {
         return String(
@@ -596,7 +664,7 @@ const WorkflowPanelInner = ({
   }, [
     edges,
     nodes,
-    previewFeed,
+    effectivePreviewFeed,
     previewItemIndex,
     sourceByID,
     sourceMapping,
@@ -1255,14 +1323,35 @@ const WorkflowPanelInner = ({
                         导入 / 导出
                       </Button>
                     </Dropdown>
-                    {mode === 'wizard' && previewFeed && simulation && (
-                      <Tooltip title="用真实 RSS 样本查看当前流程结果">
+                    {((mode === 'wizard' &&
+                      effectivePreviewFeed &&
+                      simulation) ||
+                      (mode === 'manage' && meta.sourceId > 0)) && (
+                      <Tooltip
+                        title={
+                          mode === 'manage'
+                            ? selectedPreviewFeed
+                              ? '重新选择一个已有 RSS 条目并预览当前流程'
+                              : '选择一个已有 RSS 条目并预览当前流程'
+                            : '用真实 RSS 条目模拟当前流程，不会执行任何动作'
+                        }
+                      >
                         <Button
-                          aria-label="样本预览"
+                          aria-label="RSS 条目预览"
                           icon={<EyeOutlined />}
-                          onClick={() => setPreviewOpen(true)}
+                          onClick={() => {
+                            if (mode === 'manage') {
+                              setEntryPickerOpen(true);
+                              return;
+                            }
+                            setPreviewOpen(true);
+                          }}
                         >
-                          样本预览
+                          {mode === 'manage'
+                            ? selectedPreviewFeed
+                              ? '重新选择 RSS 条目'
+                              : '选择 RSS 条目'
+                            : `RSS 条目预览 (${effectivePreviewFeed?.items.length || 0})`}
                         </Button>
                       </Tooltip>
                     )}
@@ -1390,6 +1479,24 @@ const WorkflowPanelInner = ({
 
       <Modal
         centered
+        destroyOnHidden
+        footer={null}
+        onCancel={() => setEntryPickerOpen(false)}
+        open={entryPickerOpen}
+        title="选择 RSS 条目"
+        width="min(1180px, 96vw)"
+      >
+        {meta.sourceId > 0 && (
+          <EntryHistoryPanel
+            fixedSourceId={meta.sourceId}
+            onPreviewEntry={previewEntry}
+            sources={sources}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        centered
         className={styles.samplePreviewModal}
         footer={null}
         onCancel={() => setPreviewOpen(false)}
@@ -1397,7 +1504,7 @@ const WorkflowPanelInner = ({
         title={
           <Space>
             <EyeOutlined />
-            <span>样本预览</span>
+            <span>RSS 条目预览</span>
             <Tooltip title="不会触发下载或其他执行动作">
               <Tag className={styles.previewModeTag} color="blue">
                 仅预览
@@ -1407,10 +1514,10 @@ const WorkflowPanelInner = ({
         }
         width={720}
       >
-        {previewFeed && simulation && (
+        {effectivePreviewFeed && simulation && (
           <SamplePreviewPanel
             definition={previewDefinition}
-            feed={previewFeed}
+            feed={effectivePreviewFeed}
             itemIndex={previewItemIndex}
             onItemChange={setPreviewItemIndex}
             preview={simulation}

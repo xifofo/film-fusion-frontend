@@ -13,6 +13,8 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'trigger',
   'regex',
   'keyword',
+  'keyword_replace',
+  'regex_replace',
   'convert',
   'if',
   'parallel',
@@ -24,6 +26,7 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'offline115',
   'offline115_openapi',
   'wait115',
+  'rename115_openapi',
   'moviepilot_title_recognize',
   'filmfusion_recognize',
   'media_exists',
@@ -209,15 +212,24 @@ const makePortable = (definition: RSSAutomationDefinition) => {
       removed.qbittorrent_targets += 1;
       delete config.target_id;
     }
-    if (node.type === 'offline115' || node.type === 'offline115_openapi') {
+    if (
+      node.type === 'offline115' ||
+      node.type === 'offline115_openapi' ||
+      node.type === 'rename115_openapi'
+    ) {
       if ('cloud_storage_id' in config) {
-        if (node.type === 'offline115_openapi') {
+        if (
+          node.type === 'offline115_openapi' ||
+          node.type === 'rename115_openapi'
+        ) {
           removed.offline115_openapi_accounts += 1;
         } else {
           removed.offline115_accounts += 1;
         }
         delete config.cloud_storage_id;
       }
+    }
+    if (node.type === 'offline115' || node.type === 'offline115_openapi') {
       if ('directory_id' in config) {
         removed.offline115_directories += 1;
         delete config.directory_id;
@@ -255,7 +267,8 @@ export const getWorkflowImportRequirements = (
     (node) => node.type === 'offline115',
   ).length,
   offline115OpenAPIAccounts: definition.nodes.filter(
-    (node) => node.type === 'offline115_openapi',
+    (node) =>
+      node.type === 'offline115_openapi' || node.type === 'rename115_openapi',
   ).length,
   directorySelections: definition.nodes.filter(
     (node) =>

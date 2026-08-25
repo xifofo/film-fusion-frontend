@@ -1,4 +1,4 @@
-import { ReloadOutlined } from '@ant-design/icons';
+import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   Button,
   Card,
@@ -88,17 +88,24 @@ const notificationTag = (item: RSSAutomationEntryHistoryItem) => {
 
 type EntryHistoryPanelProps = {
   sources: RSSAutomationSource[];
+  fixedSourceId?: number;
+  onPreviewEntry?: (item: RSSAutomationEntryHistoryItem) => void;
 };
 
-const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
+const EntryHistoryPanel = ({
+  sources,
+  fixedSourceId,
+  onPreviewEntry,
+}: EntryHistoryPanelProps) => {
   const [items, setItems] = useState<RSSAutomationEntryHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'matched'>('all');
-  const [sourceId, setSourceId] = useState<number>();
+  const [selectedSourceId, setSelectedSourceId] = useState<number>();
   const [loading, setLoading] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const pageSize = 30;
+  const sourceId = fixedSourceId ?? selectedSourceId;
 
   const load = useCallback(
     async (silent = false) => {
@@ -134,8 +141,8 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const columns = useMemo<ColumnsType<RSSAutomationEntryHistoryItem>>(
-    () => [
+  const columns = useMemo<ColumnsType<RSSAutomationEntryHistoryItem>>(() => {
+    const result: ColumnsType<RSSAutomationEntryHistoryItem> = [
       {
         title: 'RSS 条目',
         render: (_, item) => {
@@ -236,9 +243,26 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
         width: 172,
         render: formatTime,
       },
-    ],
-    [],
-  );
+    ];
+    if (onPreviewEntry) {
+      result.push({
+        title: '操作',
+        fixed: 'right',
+        width: 132,
+        render: (_, item) => (
+          <Button
+            aria-label={`选择并预览 ${item.entry.title || `条目 ${item.entry.id}`}`}
+            icon={<EyeOutlined />}
+            onClick={() => onPreviewEntry(item)}
+            type="primary"
+          >
+            选择并预览
+          </Button>
+        ),
+      });
+    }
+    return result;
+  }, [onPreviewEntry]);
 
   return (
     <>
@@ -258,27 +282,38 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
               ]}
               value={filter}
             />
-            <Select
-              allowClear
-              aria-label="RSS 来源"
-              onChange={(value) => {
-                setPage(1);
-                setSourceId(value);
-              }}
-              options={sources.map((source) => ({
-                label: source.name,
-                value: source.id,
-              }))}
-              placeholder="全部 RSS 源"
-              style={{ minWidth: 180 }}
-              value={sourceId}
-            />
+            {fixedSourceId === undefined && (
+              <Select
+                allowClear
+                aria-label="RSS 来源"
+                onChange={(value) => {
+                  setPage(1);
+                  setSelectedSourceId(value);
+                }}
+                options={sources.map((source) => ({
+                  label: source.name,
+                  value: source.id,
+                }))}
+                placeholder="全部 RSS 源"
+                style={{ minWidth: 180 }}
+                value={selectedSourceId}
+              />
+            )}
             <Button icon={<ReloadOutlined />} onClick={() => void load()}>
               刷新
             </Button>
           </Space>
         }
-        title="RSS 条目记录"
+        title={
+          onPreviewEntry
+            ? '选择 RSS 条目进行流程预览'
+            : fixedSourceId === undefined
+              ? 'RSS 条目记录'
+              : `${
+                  sources.find((source) => source.id === fixedSourceId)?.name ||
+                  '当前自动化'
+                } · RSS 条目记录`
+        }
       >
         <Table
           columns={columns}
@@ -295,7 +330,7 @@ const EntryHistoryPanel = ({ sources }: EntryHistoryPanelProps) => {
             total,
           }}
           rowKey={(item) => item.entry.id}
-          scroll={{ x: 1050 }}
+          scroll={{ x: onPreviewEntry ? 1180 : 1050 }}
         />
       </Card>
     </>

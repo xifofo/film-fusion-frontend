@@ -548,6 +548,32 @@
   line-height: 1.6;
 }
 
+.replacementRuleList {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.replacementRuleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 10px 0;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  background: #f8fafc;
+
+  :global(.ant-form-item) {
+    min-width: 0;
+    margin-bottom: 10px;
+  }
+}
+
+.replacementRuleDelete {
+  margin-top: 29px;
+}
+
 .nodeConfigRetryFields {
   margin-bottom: 18px;
 }
@@ -950,6 +976,8 @@
 }
 .node_regex,
 .node_keyword,
+.node_keyword_replace,
+.node_regex_replace,
 .node_convert {
   border-left-color: #7c3aed;
 }
@@ -965,6 +993,7 @@
 .node_offline115,
 .node_offline115_openapi,
 .node_wait115,
+.node_rename115_openapi,
 .node_moviepilot_title_recognize,
 .node_filmfusion_recognize,
 .node_media_exists,
@@ -1358,6 +1387,19 @@
 
   .nodeConfigForm {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .replacementRuleRow {
+    grid-template-columns: minmax(0, 1fr) 32px;
+
+    > :global(.ant-form-item):nth-child(2) {
+      grid-column: 1;
+    }
+
+    .replacementRuleDelete {
+      grid-row: 1;
+      grid-column: 2;
+    }
   }
 
   .nodeConfigModal {

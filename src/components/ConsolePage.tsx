@@ -7,6 +7,7 @@ export type ConsolePageProps = {
   className?: string;
   eyebrow: ReactNode;
   title: ReactNode;
+  titlePrefix?: ReactNode;
 };
 
 const ConsolePage = ({
@@ -15,6 +16,7 @@ const ConsolePage = ({
   className,
   eyebrow,
   title,
+  titlePrefix,
 }: ConsolePageProps) => (
   <div
     className={cn(
@@ -27,9 +29,18 @@ const ConsolePage = ({
         <p className="m-0 text-[11px] font-semibold tracking-[0.18em] text-neutral-400 uppercase dark:text-white/35">
           {eyebrow}
         </p>
-        <h1 className="mt-2 mb-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
-          {title}
-        </h1>
+        {titlePrefix ? (
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-3">
+            <div className="shrink-0">{titlePrefix}</div>
+            <h1 className="m-0 min-w-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
+              {title}
+            </h1>
+          </div>
+        ) : (
+          <h1 className="mt-2 mb-0 text-2xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-[30px] dark:text-white">
+            {title}
+          </h1>
+        )}
       </div>
 
       {actions ? (

@@ -130,6 +130,41 @@ export type MediaRecognitionTestResult = {
   raw: Record<string, unknown>;
 };
 
+export type MediaRecognitionRenameType = 'movie' | 'tv';
+
+export type MediaRecognitionRenameVariable = {
+  name: string;
+  label: string;
+  description: string;
+  example: unknown;
+};
+
+export type MediaRecognitionRenameConfigResult = {
+  configured: boolean;
+  active: boolean;
+  movie_format: string;
+  tv_format: string;
+  default_movie_format: string;
+  default_tv_format: string;
+  common_variables: MediaRecognitionRenameVariable[];
+  tv_variables: MediaRecognitionRenameVariable[];
+  load_errors: string[];
+};
+
+export type MediaRecognitionRenameValidationResult = {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  variables: string[];
+};
+
+export type MediaRecognitionRenamePreviewResult = {
+  path: string;
+  template: string;
+  variables: Record<string, unknown>;
+  warnings: string[];
+};
+
 /** 获取 FilmFusion 本地识别词。 */
 export async function getMediaRecognitionWords() {
   return apiClient.get<API.Response<MediaRecognitionWordsResult>>(
@@ -179,5 +214,50 @@ export async function testMediaRecognition(data: {
   return apiClient.post<API.Response<MediaRecognitionTestResult>>(
     '/api/media-recognition/test',
     data,
+  );
+}
+
+/** 获取全局电影、电视剧重命名模板及可用变量。 */
+export async function getMediaRecognitionRenameConfig() {
+  return apiClient.get<API.Response<MediaRecognitionRenameConfigResult>>(
+    '/api/media-recognition/rename-config',
+    { skipErrorHandler: true },
+  );
+}
+
+/** 覆盖保存两套重命名模板，保存后立即接管整理命名。 */
+export async function saveMediaRecognitionRenameConfig(data: {
+  movie_format: string;
+  tv_format: string;
+}) {
+  return apiClient.put<API.Response<MediaRecognitionRenameConfigResult>>(
+    '/api/media-recognition/rename-config',
+    data,
+    { skipErrorHandler: true },
+  );
+}
+
+/** 校验当前草稿模板，不保存。 */
+export async function validateMediaRecognitionRenameTemplate(data: {
+  media_type: MediaRecognitionRenameType;
+  template: string;
+}) {
+  return apiClient.post<API.Response<MediaRecognitionRenameValidationResult>>(
+    '/api/media-recognition/rename-config/validate',
+    data,
+    { skipErrorHandler: true },
+  );
+}
+
+/** 使用当前草稿模板和可选示例变量生成相对路径，不保存。 */
+export async function previewMediaRecognitionRenameTemplate(data: {
+  media_type: MediaRecognitionRenameType;
+  template: string;
+  sample?: Record<string, unknown>;
+}) {
+  return apiClient.post<API.Response<MediaRecognitionRenamePreviewResult>>(
+    '/api/media-recognition/rename-config/preview',
+    data,
+    { skipErrorHandler: true },
   );
 }

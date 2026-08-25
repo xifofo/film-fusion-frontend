@@ -154,6 +154,111 @@ describe('RSS automation sample preview', () => {
     expect(forbidden.nodes.end.active).toBe(true);
   });
 
+  it('previews ordered keyword replacement and Go-style regex capture replacement', () => {
+    const replacementDefinition: RSSAutomationDefinition = {
+      schema_version: 1,
+      nodes: [
+        { id: 'trigger', type: 'trigger', position: { x: 0, y: 0 } },
+        {
+          id: 'keyword_replace',
+          type: 'keyword_replace',
+          position: { x: 200, y: 0 },
+          config: {
+            input: '$item.title',
+            replacements: [
+              { keyword: '[字幕组]', replacement: '' },
+              { keyword: 'web-dl', replacement: 'WEB' },
+            ],
+            case_sensitive: false,
+            variable: 'keyword_title',
+          },
+        },
+        {
+          id: 'regex_replace',
+          type: 'regex_replace',
+          position: { x: 400, y: 0 },
+          config: {
+            input: '$vars.keyword_title',
+            pattern: 'S(?P<season>\\d{2})E(\\d{2})',
+            replacement: `\${season} 第\${2}集`,
+            variable: 'clean_title',
+          },
+        },
+        { id: 'end', type: 'end', position: { x: 600, y: 0 } },
+      ],
+      edges: [
+        {
+          id: 'r1',
+          source: 'trigger',
+          source_port: 'next',
+          target: 'keyword_replace',
+        },
+        {
+          id: 'r2',
+          source: 'keyword_replace',
+          source_port: 'success',
+          target: 'regex_replace',
+        },
+        {
+          id: 'r3',
+          source: 'regex_replace',
+          source_port: 'success',
+          target: 'end',
+        },
+      ],
+    };
+
+    const preview = simulateRSSAutomation(replacementDefinition, {
+      title: '[字幕组] Show S01E02 web-dl WEB-DL',
+    });
+
+    expect(preview.variables.keyword_title).toBe(' Show S01E02 WEB WEB');
+    expect(preview.variables.clean_title).toBe(' Show 01 第02集 WEB WEB');
+    expect(preview.nodes.keyword_replace.detail).toContain('替换 3 处');
+    expect(preview.nodes.regex_replace.detail).toContain('替换 1 处');
+    expect(preview.nodes.regex_replace.output).toMatchObject({
+      result: ' Show 01 第02集 WEB WEB',
+      replacement_count: 1,
+    });
+    expect(preview.activeEdgeIds).toEqual(['r1', 'r2', 'r3']);
+    expect(preview.nodes.end.active).toBe(true);
+  });
+
+  it('keeps regex replacement on the success path when nothing matches', () => {
+    const noMatchDefinition: RSSAutomationDefinition = {
+      schema_version: 1,
+      nodes: [
+        { id: 'trigger', type: 'trigger', position: { x: 0, y: 0 } },
+        {
+          id: 'replace',
+          type: 'regex_replace',
+          position: { x: 200, y: 0 },
+          config: {
+            input: '$item.title',
+            pattern: '\\[[^]]+\\]',
+            replacement: '',
+            variable: 'clean_title',
+          },
+        },
+        { id: 'end', type: 'end', position: { x: 400, y: 0 } },
+      ],
+      edges: [
+        { id: 'n1', source: 'trigger', source_port: 'next', target: 'replace' },
+        { id: 'n2', source: 'replace', source_port: 'success', target: 'end' },
+      ],
+    };
+
+    const preview = simulateRSSAutomation(noMatchDefinition, {
+      title: 'Show S01E01',
+    });
+
+    expect(preview.variables.clean_title).toBe('Show S01E01');
+    expect(preview.nodes.replace.output).toMatchObject({
+      replacement_count: 0,
+    });
+    expect(preview.nodes.end.active).toBe(true);
+  });
+
   it('previews the 115 completion and MP recognition chain with node outputs', () => {
     const mediaDefinition: RSSAutomationDefinition = {
       schema_version: 1,
@@ -218,6 +323,56 @@ describe('RSS automation sample preview', () => {
     expect(preview.nodes.mp.label).toContain('TMDB 12345');
     expect(preview.nodes.organize.label).toContain('目录配置 #9');
     expect(preview.nodes.notify.detail).toBe('识别结果 12345，STRM 1');
+    expect(preview.nodes.end.active).toBe(true);
+  });
+
+  it('previews a 115 OpenAPI rename without calling the real API', () => {
+    const renameDefinition: RSSAutomationDefinition = {
+      schema_version: 1,
+      nodes: [
+        { id: 'trigger', type: 'trigger', position: { x: 0, y: 0 } },
+        {
+          id: 'wait',
+          type: 'wait115',
+          position: { x: 200, y: 0 },
+          config: { poll_interval_seconds: 30, max_wait_minutes: 10080 },
+        },
+        {
+          id: 'rename',
+          type: 'rename115_openapi',
+          position: { x: 400, y: 0 },
+          config: {
+            cloud_storage_id: 1,
+            file_id: '$nodes.wait.output.file_id',
+            new_name: '{{item.title}}.mkv',
+          },
+        },
+        { id: 'end', type: 'end', position: { x: 600, y: 0 } },
+      ],
+      edges: [
+        { id: 'r1', source: 'trigger', source_port: 'next', target: 'wait' },
+        { id: 'r2', source: 'wait', source_port: 'success', target: 'rename' },
+        { id: 'r3', source: 'rename', source_port: 'success', target: 'end' },
+      ],
+    };
+
+    const preview = simulateRSSAutomation(renameDefinition, {
+      title: '示例剧.S01E04',
+    });
+
+    expect(preview.nodes.rename).toMatchObject({
+      active: true,
+      tone: 'success',
+      selectedPorts: ['success'],
+      output: {
+        renamed: true,
+        file_id: '运行时返回',
+        file_name: '示例剧.S01E04.mkv',
+        access_method: 'openapi',
+      },
+    });
+    expect(preview.nodes.rename.detail).toContain('不会调用真实接口');
+    expect(preview.activeEdgeIds).toEqual(['r1', 'r2', 'r3']);
     expect(preview.nodes.end.active).toBe(true);
   });
 

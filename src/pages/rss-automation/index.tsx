@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import ConsolePage from '@/components/ConsolePage';
 import type { RSSAutomationDashboard } from '@/services/film-fusion';
 import {
+  deleteRSSAutomation,
   getCloudDirectoryList,
   getCloudStorageList,
   getRSSAutomationDashboard,
@@ -110,6 +111,25 @@ const RSSAutomationPage = () => {
     [load, messageApi],
   );
 
+  const removeAutomation = useCallback(
+    async (sourceId: number) => {
+      try {
+        const response = await deleteRSSAutomation(sourceId);
+        if (response.code !== 0) {
+          throw new Error(response.message || '删除 RSS 自动化失败');
+        }
+        messageApi.success('RSS 自动化已删除');
+        await load(true);
+      } catch (error: any) {
+        messageApi.error(
+          error?.data || error?.message || '删除 RSS 自动化失败',
+        );
+        throw error;
+      }
+    },
+    [load, messageApi],
+  );
+
   useEffect(() => {
     load();
     const timer = window.setInterval(() => load(true), 15_000);
@@ -171,6 +191,7 @@ const RSSAutomationPage = () => {
                   data={data}
                   loading={loading}
                   onCreate={() => setView('wizard')}
+                  onDelete={removeAutomation}
                   onEdit={(workflowId) => {
                     setEditingWorkflowId(workflowId);
                     setView('editor');
@@ -238,6 +259,26 @@ const RSSAutomationPage = () => {
                   loading={loading}
                   onChanged={() => load(true)}
                   sources={[editingSource]}
+                />
+              ),
+            },
+            {
+              key: 'entries',
+              label: 'RSS 条目',
+              children: (
+                <EntryHistoryPanel
+                  fixedSourceId={editingSource.id}
+                  sources={[editingSource]}
+                />
+              ),
+            },
+            {
+              key: 'runs',
+              label: '运行情况',
+              children: (
+                <RunPanel
+                  workflowId={editingWorkflow.id}
+                  workflowName={editingWorkflow.name}
                 />
               ),
             },

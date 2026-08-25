@@ -119,6 +119,38 @@ describe('RSS workflow transfer', () => {
     });
   });
 
+  it('keeps 115 rename templates portable while removing the local account binding', () => {
+    const withRename = structuredClone(definition);
+    withRename.nodes.push({
+      id: 'rename-openapi',
+      type: 'rename115_openapi',
+      position: { x: 520, y: 320 },
+      config: {
+        cloud_storage_id: 21,
+        file_id: '$nodes.wait.output.file_id',
+        new_name: '{{item.title}}.mkv',
+      },
+    });
+
+    const exported = createWorkflowTransferPackage(
+      withRename,
+      '115 重命名流程',
+    );
+    const rename = exported.definition.nodes.find(
+      (node) => node.id === 'rename-openapi',
+    );
+
+    expect(rename?.config).toEqual({
+      file_id: '$nodes.wait.output.file_id',
+      new_name: '{{item.title}}.mkv',
+    });
+    expect(exported.removed_bindings.offline115_openapi_accounts).toBe(1);
+    expect(
+      parseWorkflowTransferText(JSON.stringify(exported)).requirements
+        .offline115OpenAPIAccounts,
+    ).toBe(1);
+  });
+
   it('accepts a bare definition and rejects unsafe graph references', () => {
     expect(parseWorkflowTransferText(JSON.stringify(definition)).source).toBe(
       'bare-definition',
