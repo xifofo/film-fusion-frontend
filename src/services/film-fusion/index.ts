@@ -4,14 +4,14 @@
 export * from './appConfig';
 // 115网盘授权相关API
 export * from './auth115';
-
+// 115 目录增量监控与自动化流程
+export * from './automation';
 // 云盘路径相关API
 export * from './cloudPath';
 // 云存储相关API
 export * from './cloudStorage';
 // 115 Cookie 目录相关API
 export * from './cookie115';
-
 // 目录配置相关API
 export * from './directory';
 // 115Open 下载队列
@@ -48,8 +48,6 @@ export * from './organize';
 export * from './organizeLog';
 // Pickcode 缓存相关API
 export * from './pickcodeCache';
-// 独立 RSS 自动化流程
-export * from './rssAutomation';
 // 扫描任务相关API
 export * from './scanTask';
 // 运行日志（server 进程日志文件查看）

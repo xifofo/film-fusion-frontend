@@ -1,0 +1,66 @@
+.triggerRadioGroup {
+  width: 100%;
+}
+
+.triggerCard,
+.triggerCardSelected {
+  height: 100%;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.triggerCardSelected {
+  border-color: var(--ant-color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ant-color-primary) 16%, transparent);
+}
+
+.triggerIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--ant-color-primary);
+  font-size: 20px;
+  background: var(--ant-color-primary-bg);
+  border-radius: 10px;
+}
+
+.triggerChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.triggerContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.triggerHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.triggerTitle {
+  margin: 0 !important;
+}
+
+.triggerDescription {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.triggerDetail {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.rssEditor {
+  width: 100%;
+}

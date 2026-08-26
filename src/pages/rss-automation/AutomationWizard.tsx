@@ -231,9 +231,9 @@ const AutomationWizard = ({
         current={step}
         orientation="horizontal"
         items={[
-          { title: 'RSS', description: '解析真实内容' },
-          { title: '流程', description: '边设计边预览' },
-          { title: '启用', description: '保存自动化' },
+          { title: 'RSS', content: '解析真实内容' },
+          { title: '流程', content: '边设计边预览' },
+          { title: '启用', content: '保存自动化' },
         ]}
         responsive={false}
       />

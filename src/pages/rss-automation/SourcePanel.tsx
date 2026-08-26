@@ -68,6 +68,7 @@ const sourceInput = (
   source: RSSAutomationSource,
 ): RSSAutomationSourceInput => ({
   name: source.name,
+  description: source.description,
   enabled: source.enabled,
   feed_url: source.feed_url,
   interval_minutes: source.interval_minutes,

@@ -29,10 +29,9 @@ describe('findMenuTrail', () => {
     ).toEqual(['目录配置']);
   });
 
-  it('exposes the independent RSS automation module', () => {
-    expect(findMenuTrail('/rss-automation').map((item) => item.name)).toEqual([
-      'RSS',
-      'RSS 自动化',
+  it('exposes the 115 directory automation center', () => {
+    expect(findMenuTrail('/automations').map((item) => item.name)).toEqual([
+      '自动化中心',
     ]);
   });
 

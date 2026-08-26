@@ -5,6 +5,7 @@ import {
   CloseCircleOutlined,
   DeleteOutlined,
   ExportOutlined,
+  EyeInvisibleOutlined,
   EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
@@ -18,6 +19,7 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
+import type { TableColumnsType } from 'antd';
 import {
   Alert,
   Badge,
@@ -37,6 +39,7 @@ import {
   Space,
   Spin,
   Switch,
+  Table,
   Tabs,
   Tag,
   Tooltip,
@@ -62,6 +65,7 @@ import {
   createOrganizePreviewTasks,
   deleteOrganizePreviewTask,
   get115CookieDirs,
+  getAppConfig,
   getCloudDirectoryDetail,
   getOrganizeCategoryConfig,
   getOrganizePreviewTask,
@@ -76,13 +80,17 @@ const PAGE_LIMIT = 1150;
 const FILENAME_REGEX_STORAGE_KEY = 'film-fusion.organize.filenameRegex';
 const EPISODE_FILENAME_REGEX_STORAGE_KEY =
   'film-fusion.episodeOrganize.filenameRegex';
+const DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
+  'film-fusion.organize.directoryPanelVisible';
+const EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
+  'film-fusion.episodeOrganize.directoryPanelVisible';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
 const DEFAULT_PREVIEW_TASK_LIMIT = 100;
 const MAX_PREVIEW_TASK_LIMIT = 1000;
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
-type RecognitionSource = 'moviepilot' | 'local';
+type RecognitionSource = 'moviepilot' | 'local' | 'shadow';
 type PreviewQueueOptions = {
   mediaType: OrganizeMediaType;
   recognitionSource: RecognitionSource;
@@ -97,13 +105,35 @@ const mediaTypeOptions: Array<{ label: string; value: OrganizeMediaType }> = [
   { label: '电影', value: 'movie' },
   { label: '剧集', value: 'tv' },
 ];
+const organizeMediaTypeText = (value?: string): string => {
+  switch ((value || '').trim().toLowerCase()) {
+    case 'movie':
+    case '电影':
+      return '电影';
+    case 'tv':
+    case '电视剧':
+    case '剧集':
+      return '电视剧';
+    default:
+      return (value || '').trim();
+  }
+};
 const recognitionSourceOptions: Array<{
   label: string;
   value: RecognitionSource;
 }> = [
-  { label: 'MoviePilot 识别', value: 'moviepilot' },
-  { label: 'FilmFusion 识别', value: 'local' },
+  { label: '仅 MP2', value: 'moviepilot' },
+  { label: '仅 FilmFusion', value: 'local' },
+  { label: '影子模式', value: 'shadow' },
 ];
+const recognitionSourcePresentation: Record<
+  RecognitionSource,
+  { label: string; color: string }
+> = {
+  moviepilot: { label: '仅 MP2', color: 'blue' },
+  local: { label: '仅 FilmFusion', color: 'geekblue' },
+  shadow: { label: '影子模式', color: 'purple' },
+};
 type FilenameRegexConfig = {
   enabled: boolean;
   pattern: string;
@@ -163,6 +193,28 @@ function saveFilenameRegexConfig(
   }
 }
 
+function loadDirectoryPanelVisible(storageKey: string): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  try {
+    return window.localStorage.getItem(storageKey) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function saveDirectoryPanelVisible(storageKey: string, visible: boolean) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(storageKey, String(visible));
+  } catch {
+    return;
+  }
+}
+
 type TreeItemMeta = {
   name: string;
   parentKey: string;
@@ -175,11 +227,246 @@ type OrganizeDirDebug = NonNullable<
 
 type OrganizeItemRow = OrganizeItem & { __folder_id?: string };
 type OrganizeDirDebugRow = OrganizeDirDebug & { __folder_id?: string };
+type OrganizeShadowFieldRow = {
+  key: string;
+  stage: string;
+  label: string;
+  moviepilot: string;
+  local: string;
+  status: 'matched' | 'different' | 'unavailable';
+};
 type OrganizeVersionGroup = NonNullable<
   API.Organize115CookieResult['version_groups']
 >[number];
 
 const ALL_VERSION_KEY = '__all_versions__';
+
+const organizeRecognitionShadowFields: Array<{
+  key: keyof API.OrganizeRecognitionShadowSnapshot;
+  label: string;
+}> = [
+  { key: 'media_type', label: '媒体类型' },
+  { key: 'title', label: '标题' },
+  { key: 'original_title', label: '原始标题' },
+  { key: 'year', label: '年份' },
+  { key: 'title_year', label: '标题年份' },
+  { key: 'tmdb_id', label: 'TMDB ID' },
+  { key: 'category', label: '媒体分类' },
+  { key: 'season_episode', label: '季集' },
+  { key: 'resource_type', label: '资源类型' },
+  { key: 'resource_pix', label: '分辨率' },
+  { key: 'video_encode', label: '视频编码' },
+  { key: 'begin_season', label: '起始季' },
+];
+
+function organizeShadowValue(value: unknown): string {
+  if (value === undefined || value === null || value === '') {
+    return '-';
+  }
+  return String(value);
+}
+
+export function buildOrganizeShadowFieldRows(
+  comparison?: API.Organize115ShadowComparison,
+): OrganizeShadowFieldRow[] {
+  if (!comparison) return [];
+  const differenceKeys = new Set(
+    (comparison.differences || []).map(
+      (difference) => `${difference.stage}:${difference.field}`,
+    ),
+  );
+  const rows: OrganizeShadowFieldRow[] = [];
+  const moviePilotRecognition = comparison.recognition?.moviepilot;
+  const localRecognition = comparison.recognition?.local;
+  if (comparison.recognition) {
+    for (const field of organizeRecognitionShadowFields) {
+      const moviePilot = organizeShadowValue(
+        moviePilotRecognition?.[field.key],
+      );
+      const local = organizeShadowValue(localRecognition?.[field.key]);
+      if (moviePilot === '-' && local === '-') continue;
+      rows.push({
+        key: `recognition:${field.key}`,
+        stage: '识别',
+        label: field.label,
+        moviepilot: moviePilot,
+        local,
+        status:
+          !moviePilotRecognition || !localRecognition
+            ? 'unavailable'
+            : differenceKeys.has(`recognition:${field.key}`)
+              ? 'different'
+              : 'matched',
+      });
+    }
+  }
+  if (comparison.transfer) {
+    rows.push({
+      key: 'transfer:transfer_name',
+      stage: '命名',
+      label: '重命名',
+      moviepilot: organizeShadowValue(comparison.transfer.moviepilot),
+      local: organizeShadowValue(comparison.transfer.local),
+      status:
+        comparison.transfer.moviepilot_error || comparison.transfer.local_error
+          ? 'unavailable'
+          : differenceKeys.has('transfer:transfer_name')
+            ? 'different'
+            : 'matched',
+    });
+  }
+  if (
+    comparison.moviepilot_target_path ||
+    comparison.local_target_path ||
+    comparison.local_target_error
+  ) {
+    rows.push({
+      key: 'target:target_path',
+      stage: '路径',
+      label: '目标路径',
+      moviepilot: organizeShadowValue(comparison.moviepilot_target_path),
+      local: organizeShadowValue(
+        comparison.local_target_error || comparison.local_target_path,
+      ),
+      status: comparison.local_target_error
+        ? 'unavailable'
+        : differenceKeys.has('target:target_path')
+          ? 'different'
+          : 'matched',
+    });
+  }
+  return rows;
+}
+
+function renderOrganizeShadowStatus(
+  comparison?: API.Organize115ShadowComparison,
+) {
+  if (!comparison) {
+    return <span style={{ color: 'rgba(0,0,0,0.25)' }}>-</span>;
+  }
+  if (comparison.status === 'matched') {
+    return (
+      <Tag color="success" icon={<CheckCircleOutlined />}>
+        影子一致
+      </Tag>
+    );
+  }
+  if (comparison.status === 'different') {
+    return (
+      <Tag color="warning" icon={<WarningOutlined />}>
+        差异 {comparison.differences?.length || 0}
+      </Tag>
+    );
+  }
+  const label =
+    comparison.status === 'moviepilot_error'
+      ? 'MP2 失败'
+      : comparison.status === 'local_unavailable'
+        ? '本地不可用'
+        : '本地失败';
+  return (
+    <Tag color="error" icon={<CloseCircleOutlined />}>
+      {label}
+    </Tag>
+  );
+}
+
+const organizeShadowFieldColumns: TableColumnsType<OrganizeShadowFieldRow> = [
+  { title: '阶段', dataIndex: 'stage', key: 'stage', width: 80 },
+  { title: '字段', dataIndex: 'label', key: 'label', width: 110 },
+  {
+    title: 'MP2（主结果）',
+    dataIndex: 'moviepilot',
+    key: 'moviepilot',
+    width: 320,
+    render: (value: string) => (
+      <Typography.Text
+        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+      >
+        {value}
+      </Typography.Text>
+    ),
+  },
+  {
+    title: 'FilmFusion（影子）',
+    dataIndex: 'local',
+    key: 'local',
+    width: 320,
+    render: (value: string) => (
+      <Typography.Text
+        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+      >
+        {value}
+      </Typography.Text>
+    ),
+  },
+  {
+    title: '结果',
+    dataIndex: 'status',
+    key: 'status',
+    width: 100,
+    render: (status: OrganizeShadowFieldRow['status']) => {
+      if (status === 'matched') return <Tag color="success">一致</Tag>;
+      if (status === 'different') return <Tag color="warning">有差异</Tag>;
+      return <Tag color="error">未完成</Tag>;
+    },
+  },
+];
+
+function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
+  const comparison = row.shadow_comparison;
+  if (!comparison) {
+    return (
+      <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+        {JSON.stringify(row, null, 2)}
+      </pre>
+    );
+  }
+  const errors = [
+    comparison.recognition?.moviepilot_error,
+    comparison.recognition?.local_error,
+    comparison.transfer?.moviepilot_error,
+    comparison.transfer?.local_error,
+    comparison.local_target_error,
+  ].filter((value): value is string => !!value);
+  return (
+    <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+      <Alert
+        showIcon
+        type={
+          comparison.matched ? 'success' : errors.length ? 'error' : 'warning'
+        }
+        title={
+          comparison.matched
+            ? 'MP2 与 FilmFusion 的整理结果一致'
+            : errors.length
+              ? '影子对比未完整完成'
+              : `发现 ${comparison.differences?.length || 0} 项差异`
+        }
+        description={
+          errors.length
+            ? errors.join('；')
+            : 'MP2 始终作为主结果，FilmFusion 仅跟跑并记录差异。'
+        }
+      />
+      <Table<OrganizeShadowFieldRow>
+        bordered
+        size="small"
+        rowKey="key"
+        pagination={false}
+        scroll={{ x: 910 }}
+        columns={organizeShadowFieldColumns}
+        dataSource={buildOrganizeShadowFieldRows(comparison)}
+      />
+      <details>
+        <summary style={{ cursor: 'pointer' }}>查看当前条目原始数据</summary>
+        <pre style={{ margin: '12px 0 0', whiteSpace: 'pre-wrap' }}>
+          {JSON.stringify(row, null, 2)}
+        </pre>
+      </details>
+    </Space>
+  );
+}
 
 function getOrganizeItemRowKey(row: OrganizeItemRow): string {
   return `${row.__folder_id || ''}::${row.file_id}`;
@@ -494,10 +781,17 @@ const useStyles = createStyles(({ css, token }) => ({
       grid-template-columns: minmax(0, 1fr);
     }
   `,
+  workspaceWithoutDirectory: css`
+    grid-template-columns: minmax(0, 1fr);
+  `,
   directoryColumn: css`
     position: sticky;
     top: 24px;
     min-width: 0;
+
+    &[hidden] {
+      display: none;
+    }
 
     @media (max-width: 991px) {
       position: static;
@@ -530,6 +824,9 @@ const useStyles = createStyles(({ css, token }) => ({
     display: grid;
     min-width: 0;
     gap: 16px;
+  `,
+  resultSection: css`
+    min-width: 0;
   `,
   section: css`
     min-width: 0;
@@ -843,6 +1140,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const filenameRegexStorageKey = episodeMode
     ? EPISODE_FILENAME_REGEX_STORAGE_KEY
     : FILENAME_REGEX_STORAGE_KEY;
+  const directoryPanelVisibleStorageKey = episodeMode
+    ? EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY
+    : DIRECTORY_PANEL_VISIBLE_STORAGE_KEY;
   const defaultRegexConfig = episodeMode
     ? defaultEpisodeFilenameRegexConfig
     : defaultFilenameRegexConfig;
@@ -859,6 +1159,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [selectedKey, setSelectedKey] = useState<string>();
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [directoryPanelVisible, setDirectoryPanelVisible] = useState(() =>
+    loadDirectoryPanelVisible(directoryPanelVisibleStorageKey),
+  );
   const [filenameRegexConfig, setFilenameRegexConfig] =
     useState<FilenameRegexConfig>(() =>
       loadFilenameRegexConfig(filenameRegexStorageKey, defaultRegexConfig),
@@ -867,14 +1170,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     episodeMode ? 'tv' : 'auto',
   );
   const [organizeRecognitionSource, setOrganizeRecognitionSource] =
-    useState<RecognitionSource>('moviepilot');
+    useState<RecognitionSource>('shadow');
   const [organizeCategory, setOrganizeCategory] = useState<string>();
   const [bestVersionEnabled, setBestVersionEnabled] = useState(episodeMode);
   const [previewOptionsOpen, setPreviewOptionsOpen] = useState(false);
   const [previewMediaTypeDraft, setPreviewMediaTypeDraft] =
     useState<OrganizeMediaType>(episodeMode ? 'tv' : 'auto');
   const [previewRecognitionSourceDraft, setPreviewRecognitionSourceDraft] =
-    useState<RecognitionSource>('moviepilot');
+    useState<RecognitionSource>('shadow');
+  const recognitionSourceOverriddenRef = useRef(false);
   const [previewCategoryDraft, setPreviewCategoryDraft] = useState<string>();
   const [previewBestVersionDraft, setPreviewBestVersionDraft] =
     useState(episodeMode);
@@ -921,11 +1225,39 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     : organizeMediaType;
 
   useEffect(() => {
+    let cancelled = false;
+    void getAppConfig()
+      .then((response) => {
+        const source = response.data?.config?.media_recognition?.source;
+        if (
+          cancelled ||
+          recognitionSourceOverriddenRef.current ||
+          (source !== 'moviepilot' && source !== 'local' && source !== 'shadow')
+        ) {
+          return;
+        }
+        setOrganizeRecognitionSource(source);
+        setPreviewRecognitionSourceDraft(source);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (episodeMode) {
       setOrganizeMediaType('tv');
       setBestVersionEnabled(true);
     }
   }, [episodeMode]);
+
+  useEffect(() => {
+    saveDirectoryPanelVisible(
+      directoryPanelVisibleStorageKey,
+      directoryPanelVisible,
+    );
+  }, [directoryPanelVisible, directoryPanelVisibleStorageKey]);
 
   const previewCategoryOptions = useMemo(() => {
     const names =
@@ -1483,8 +1815,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         if (!episodeMode) {
           setOrganizeMediaType(payload.task?.media_type || 'auto');
         }
+        recognitionSourceOverriddenRef.current = true;
         setOrganizeRecognitionSource(
-          payload.task?.recognition_source || 'moviepilot',
+          payload.task?.recognition_source || 'shadow',
         );
         setOrganizeCategory(payload.task?.category || undefined);
         setBestVersionEnabled(!!payload.task?.best_version_enabled);
@@ -2104,7 +2437,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         width: 180,
         ellipsis: true,
         render: (_, row) =>
-          [row.media_type, row.category]
+          [organizeMediaTypeText(row.media_type), row.category]
             .map((value) => value?.trim())
             .filter(Boolean)
             .join(' / ') || '-',
@@ -2128,6 +2461,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             </Tooltip>
           );
         },
+      },
+      {
+        title: '影子对比',
+        dataIndex: 'shadow_comparison',
+        width: 140,
+        hideInTable: resultData?.recognition_source !== 'shadow',
+        render: (_, row) => renderOrganizeShadowStatus(row.shadow_comparison),
       },
       {
         title: '重命名为',
@@ -2304,7 +2644,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         render: (_, row) => renderVersionTag(row),
       },
     ],
-    [buildPathByKey, episodeMode],
+    [buildPathByKey, episodeMode, resultData?.recognition_source],
   );
 
   const dirDebugColumns = useMemo<ProColumns<OrganizeDirDebugRow>[]>(
@@ -2455,16 +2795,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         title: '识别方式',
         dataIndex: 'recognition_source',
         width: 130,
-        render: (_, row) =>
-          row.recognition_source === 'local' ? (
-            <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>
-              FilmFusion
+        render: (_, row) => {
+          const mode = recognitionSourcePresentation[row.recognition_source];
+          return (
+            <Tag color={mode.color} style={{ marginInlineEnd: 0 }}>
+              {mode.label}
             </Tag>
-          ) : (
-            <Tag color="blue" style={{ marginInlineEnd: 0 }}>
-              MoviePilot
-            </Tag>
-          ),
+          );
+        },
       },
       {
         title: 'TMDB',
@@ -2780,8 +3118,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       {modalContextHolder}
       <Spin fullscreen spinning={directoryLoading && !directoryDetail} />
 
-      <div className={styles.workspace}>
-        <aside className={styles.directoryColumn}>
+      <div
+        className={`${styles.workspace}${
+          directoryPanelVisible ? '' : ` ${styles.workspaceWithoutDirectory}`
+        }`}
+      >
+        <aside
+          className={styles.directoryColumn}
+          hidden={!directoryPanelVisible}
+        >
           <section className={styles.section}>
             <header className={styles.directoryPanelHeader}>
               <div className={styles.directoryPanelTitle}>
@@ -2791,9 +3136,23 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 />
                 <span>115 目录</span>
               </div>
-              <Tag color={checkedKeys.length > 0 ? 'blue' : 'default'}>
-                已选 {checkedKeys.length}
-              </Tag>
+              <Space size={4}>
+                <Tag
+                  color={checkedKeys.length > 0 ? 'blue' : 'default'}
+                  style={{ marginInlineEnd: 0 }}
+                >
+                  已选 {checkedKeys.length}
+                </Tag>
+                <Button
+                  aria-label="隐藏 115 目录栏"
+                  icon={<EyeInvisibleOutlined />}
+                  onClick={() => setDirectoryPanelVisible(false)}
+                  size="small"
+                  type="text"
+                >
+                  隐藏
+                </Button>
+              </Space>
             </header>
             <div className={`${styles.sectionBody} ${styles.directoryBody}`}>
               <Input.Search
@@ -2844,6 +3203,17 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           <section className={styles.section}>
             <div className={styles.rulesBody}>
               <div className={styles.rulesToolbar}>
+                {!directoryPanelVisible ? (
+                  <Button
+                    aria-label="显示 115 目录栏"
+                    icon={<EyeOutlined />}
+                    onClick={() => setDirectoryPanelVisible(true)}
+                    size="small"
+                    type="text"
+                  >
+                    显示 115 目录
+                  </Button>
+                ) : null}
                 <div className={styles.compactRule}>
                   <span className={styles.compactRuleLabel}>识别方式</span>
                   <Segmented<RecognitionSource>
@@ -2852,7 +3222,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     value={organizeRecognitionSource}
                     options={recognitionSourceOptions}
                     disabled={organizeLoading || createPreviewLoading}
-                    onChange={(value) => setOrganizeRecognitionSource(value)}
+                    onChange={(value) => {
+                      recognitionSourceOverriddenRef.current = true;
+                      setOrganizeRecognitionSource(value);
+                    }}
                   />
                 </div>
 
@@ -3035,7 +3408,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             />
           </WorkspaceSection>
 
-          <div ref={previewResultRef}>
+          <div className={styles.resultSection} ref={previewResultRef}>
             <WorkspaceSection
               extra={
                 resultData ? (
@@ -3186,18 +3559,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               dataSource={visibleItemsForTable}
                               columns={itemColumns}
                               expandable={{
-                                expandedRowRender: (row) => (
-                                  <Typography.Paragraph style={{ margin: 0 }}>
-                                    <pre
-                                      style={{
-                                        margin: 0,
-                                        whiteSpace: 'pre-wrap',
-                                      }}
-                                    >
-                                      {JSON.stringify(row, null, 2)}
-                                    </pre>
-                                  </Typography.Paragraph>
-                                ),
+                                columnTitle:
+                                  resultData.recognition_source === 'shadow'
+                                    ? '影子详情'
+                                    : undefined,
+                                expandedRowRender:
+                                  renderOrganizeItemExpandedRow,
                               }}
                             />
                           </>
@@ -3346,16 +3713,21 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               name="preview-recognition-source"
               value={previewRecognitionSourceDraft}
               options={recognitionSourceOptions}
-              onChange={(value) => setPreviewRecognitionSourceDraft(value)}
+              onChange={(value) => {
+                recognitionSourceOverriddenRef.current = true;
+                setPreviewRecognitionSourceDraft(value);
+              }}
               style={{ marginTop: 6 }}
             />
             <Typography.Text
               type="secondary"
               style={{ display: 'block', marginTop: 6, fontSize: 12 }}
             >
-              {previewRecognitionSourceDraft === 'moviepilot'
-                ? '队列任务只调用 MoviePilot 识别与转名。'
-                : '队列任务使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
+              {previewRecognitionSourceDraft === 'shadow'
+                ? '先运行 MP2 主识别，再用相同输入运行 FilmFusion 本地影子；本地结果只参与差异记录。'
+                : previewRecognitionSourceDraft === 'moviepilot'
+                  ? '只运行 MP2 识别与 MoviePilot 转名，不执行 FilmFusion 本地识别。'
+                  : '只使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
             </Typography.Text>
           </div>
           <Row gutter={12}>

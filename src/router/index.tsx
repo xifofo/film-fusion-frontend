@@ -37,7 +37,7 @@ const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
 const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
-const RSSAutomation = lazy(() => import('@/pages/rss-automation'));
+const Automation = lazy(() => import('@/pages/automations'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
@@ -221,8 +221,8 @@ const routes: RouteObject[] = [
         element: <OrganizeLogs />,
       },
       {
-        path: 'rss-automation',
-        element: <RSSAutomation />,
+        path: 'automations',
+        element: <Automation />,
       },
       {
         path: 'server-logs',

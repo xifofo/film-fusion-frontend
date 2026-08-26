@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import ConsolePage from '@/components/ConsolePage';
 import TargetPanel, {
   type TargetPanelHandle,
-} from '@/pages/rss-automation/TargetPanel';
+} from '@/pages/automations/TargetPanel';
 import type {
-  RSSAutomationTarget,
-  RSSAutomationTargetStatus,
+  AutomationTarget,
+  AutomationTargetStatus,
 } from '@/services/film-fusion';
 import { getDownloaderStatuses, getDownloaders } from '@/services/film-fusion';
 
@@ -15,8 +15,8 @@ const STATUS_REFRESH_INTERVAL = 10_000;
 const { Text } = Typography;
 
 const DownloadersPage = () => {
-  const [downloaders, setDownloaders] = useState<RSSAutomationTarget[]>([]);
-  const [statuses, setStatuses] = useState<RSSAutomationTargetStatus[]>([]);
+  const [downloaders, setDownloaders] = useState<AutomationTarget[]>([]);
+  const [statuses, setStatuses] = useState<AutomationTargetStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState('');

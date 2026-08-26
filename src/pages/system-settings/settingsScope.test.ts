@@ -16,6 +16,9 @@ const baseConfig = {
     process_new_media: true,
     security: { enabled: true },
   },
+  media_recognition: {
+    source: 'shadow',
+  },
   emby: {
     enabled: true,
     url: 'http://emby.example',
@@ -81,5 +84,20 @@ describe('system settings tab scopes', () => {
 
     expect(result.emby.url).toBe('http://new-emby.example');
     expect(result.emby.cover.width).toBe(2000);
+  });
+
+  it('saves media recognition mode without carrying another tab change', () => {
+    const formValues = structuredClone(baseConfig);
+    formValues.media_recognition.source = 'local';
+    formValues.server.port = '9999';
+
+    const result = buildScopedAppConfig(
+      baseConfig,
+      'mediaRecognition',
+      valuesFrom(formValues),
+    );
+
+    expect(result.media_recognition.source).toBe('local');
+    expect(result.server.port).toBe('9000');
   });
 });

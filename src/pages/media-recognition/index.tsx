@@ -6,6 +6,7 @@ import {
   Clipboard,
   FileCode2,
   FlaskConical,
+  GitCompareArrows,
   RefreshCw,
   RotateCcw,
   Save,
@@ -21,6 +22,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import {
+  compareMediaRecognition,
   getMediaRecognitionCategoryConfig,
   getMediaRecognitionWords,
   type MediaRecognitionCandidate,
@@ -28,10 +30,11 @@ import {
   type MediaRecognitionCategoryRule,
   type MediaRecognitionRule,
   type MediaRecognitionRuleType,
+  type MediaRecognitionShadowSnapshot,
+  type MediaRecognitionShadowTestResult,
   type MediaRecognitionTestResult,
   saveMediaRecognitionCategoryConfig,
   saveMediaRecognitionWords,
-  testMediaRecognition,
   validateMediaRecognitionCategoryConfig,
 } from '@/services/film-fusion';
 import RenameConfigSection from './RenameConfigSection';
@@ -94,6 +97,32 @@ const tmdbStatuses: Record<string, { label: string; className: string }> = {
   },
 };
 
+const shadowStatuses: Record<string, { label: string; className: string }> = {
+  matched: {
+    label: '关键字段一致',
+    className:
+      'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200',
+  },
+  different: {
+    label: '发现识别差异',
+    className:
+      'bg-amber-50 text-amber-700 dark:bg-amber-400/12 dark:text-amber-200',
+  },
+  moviepilot_error: {
+    label: 'MP2 识别失败',
+    className: 'bg-red-50 text-red-700 dark:bg-red-400/12 dark:text-red-200',
+  },
+  local_error: {
+    label: '本地影子失败',
+    className: 'bg-red-50 text-red-700 dark:bg-red-400/12 dark:text-red-200',
+  },
+  local_unavailable: {
+    label: '本地影子未启用',
+    className:
+      'bg-neutral-100 text-neutral-600 dark:bg-white/8 dark:text-white/65',
+  },
+};
+
 type RequestError = {
   message?: string;
   response?: {
@@ -139,7 +168,7 @@ const MediaRecognitionPage = () => {
   const [mode, setMode] = useState<'file' | 'title'>('file');
   const [lookupTMDB, setLookupTMDB] = useState(true);
   const [input, setInput] = useState(FILE_EXAMPLE);
-  const [result, setResult] = useState<MediaRecognitionTestResult>();
+  const [result, setResult] = useState<MediaRecognitionShadowTestResult>();
   const [testPanelOpen, setTestPanelOpen] = useState(false);
 
   const loadConfig = useCallback(
@@ -281,7 +310,7 @@ const MediaRecognitionPage = () => {
     }
     setTesting(true);
     try {
-      const response = await testMediaRecognition({
+      const response = await compareMediaRecognition({
         input: input.trim(),
         mode,
         words: splitRecognitionWords(wordsText),
@@ -289,10 +318,18 @@ const MediaRecognitionPage = () => {
         lookup_tmdb: lookupTMDB,
       });
       if (response.code !== 0 || !response.data) {
-        throw new Error(response.message || '本地识别失败');
+        throw new Error(response.message || '影子对比失败');
       }
       setResult(response.data);
-      void message.success('FilmFusion 本地识别完成');
+      if (response.data.comparison.status === 'matched') {
+        void message.success('影子对比完成：关键字段一致');
+      } else if (response.data.comparison.status === 'different') {
+        void message.warning(
+          `影子对比完成：发现 ${response.data.comparison.differences.length} 项差异`,
+        );
+      } else {
+        void message.warning('影子对比完成，但有一侧识别失败');
+      }
     } catch (error) {
       void message.error(errorText(error));
     } finally {
@@ -328,7 +365,7 @@ const MediaRecognitionPage = () => {
           <Button
             aria-controls="media-recognition-test-panel"
             aria-expanded={testPanelOpen}
-            aria-label={testPanelOpen ? '收起本地识别测试' : '展开本地识别测试'}
+            aria-label={testPanelOpen ? '收起影子对比测试' : '展开影子对比测试'}
             block
             className="!flex !h-auto !items-center !justify-between !gap-3 !rounded-none !border-0 !px-5 !py-4 !text-left !shadow-none hover:!bg-black/[0.025] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-inset focus-visible:!ring-black/10 dark:hover:!bg-white/[0.035] dark:focus-visible:!ring-white/20"
             htmlType="button"
@@ -341,10 +378,10 @@ const MediaRecognitionPage = () => {
               </span>
               <div>
                 <h2 className="m-0 text-sm font-semibold text-neutral-900 dark:text-white">
-                  本地识别测试
+                  MP2 / FilmFusion 影子对比
                 </h2>
                 <p className="mt-0.5 mb-0 text-xs text-neutral-400 dark:text-white/35">
-                  识别词 → 发布信息 → 可选 TMDB 匹配
+                  MP2 主结果 → FilmFusion 本地影子 → 字段差异
                 </p>
               </div>
             </div>
@@ -385,12 +422,12 @@ const MediaRecognitionPage = () => {
 
                   <div className="flex items-center gap-2 text-xs font-medium text-neutral-600 dark:text-white/60">
                     <Switch
-                      aria-label="查询 TMDB"
+                      aria-label="本地影子查询 TMDB"
                       checked={lookupTMDB}
                       onChange={setLookupTMDB}
                       size="small"
                     />
-                    查询 TMDB
+                    本地查询 TMDB
                   </div>
                   <Tag
                     variant="filled"
@@ -436,7 +473,7 @@ const MediaRecognitionPage = () => {
                     onClick={() => void runTest()}
                     type="primary"
                   >
-                    开始本地识别
+                    开始影子对比
                   </Button>
                   <Button
                     className="!h-9 !rounded-xl !border-0 !bg-black/[0.035] !px-4 hover:!bg-black/[0.065] dark:!bg-white/8 dark:!text-white/65 dark:hover:!bg-white/12"
@@ -448,14 +485,14 @@ const MediaRecognitionPage = () => {
                     填入示例
                   </Button>
                   <span className="text-xs text-neutral-400 dark:text-white/35">
-                    测试会使用页面里尚未保存的识别词与分类配置
+                    两边使用同一份页面草稿；结果始终以 MP2 为基准
                   </span>
                 </div>
               </div>
 
               {result && (
                 <div className="mt-6 pt-2">
-                  <RecognitionResult result={result} />
+                  <ShadowComparisonResult result={result} />
                 </div>
               )}
             </div>
@@ -651,8 +688,8 @@ const MediaRecognitionPage = () => {
               ))}
             </div>
             <p className="mt-0 mb-4 text-xs leading-5 text-neutral-400 dark:text-white/35">
-              movie、tv
-              为固定一级键；由上到下匹配。逗号表示任一值，!值表示排除，空规则是兜底并应放在最后。
+              电影、电视剧为 MP2 一级键；旧版 movie、tv
+              会自动兼容。由上到下匹配，逗号表示任一值，!值表示排除，空规则是兜底并应放在最后。
             </p>
 
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
@@ -815,6 +852,214 @@ const CategoryRulePreview = ({
   </div>
 );
 
+const shadowSnapshotFields: Array<{
+  key: keyof MediaRecognitionShadowSnapshot;
+  label: string;
+}> = [
+  { key: 'title', label: '媒体标题' },
+  { key: 'original_title', label: '原始标题' },
+  { key: 'year', label: '年份' },
+  { key: 'media_type', label: '媒体类型' },
+  { key: 'category', label: '媒体分类' },
+  { key: 'tmdb_id', label: 'TMDB ID' },
+  { key: 'season_episode', label: '季集' },
+  { key: 'resource_type', label: '资源类型' },
+  { key: 'resource_pix', label: '分辨率' },
+  { key: 'video_encode', label: '视频编码' },
+];
+
+const ShadowEngineCard = ({
+  title,
+  subtitle,
+  snapshot,
+  error,
+  primary = false,
+}: {
+  title: string;
+  subtitle: string;
+  snapshot?: MediaRecognitionShadowSnapshot;
+  error?: string;
+  primary?: boolean;
+}) => (
+  <section
+    className={cn(
+      'rounded-2xl p-4',
+      primary
+        ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950'
+        : 'bg-neutral-100/80 text-neutral-900 dark:bg-white/[0.055] dark:text-white',
+    )}
+  >
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <h3 className="m-0 text-sm font-semibold">{title}</h3>
+        <p
+          className={cn(
+            'mt-1 mb-0 text-[11px]',
+            primary
+              ? 'text-white/50 dark:text-neutral-500'
+              : 'text-neutral-400 dark:text-white/35',
+          )}
+        >
+          {subtitle}
+        </p>
+      </div>
+      <span
+        className={cn(
+          'inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-[11px] font-medium',
+          primary
+            ? 'bg-white/12 text-white dark:bg-neutral-950/8 dark:text-neutral-700'
+            : 'bg-violet-50 text-violet-700 dark:bg-violet-400/12 dark:text-violet-200',
+        )}
+      >
+        {primary ? '主结果' : '影子结果'}
+      </span>
+    </div>
+
+    {snapshot ? (
+      <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
+        {shadowSnapshotFields.map((field) => (
+          <div key={field.key}>
+            <dt
+              className={cn(
+                'text-[10px] font-semibold tracking-[0.08em] uppercase',
+                primary
+                  ? 'text-white/40 dark:text-neutral-400'
+                  : 'text-neutral-400 dark:text-white/35',
+              )}
+            >
+              {field.label}
+            </dt>
+            <dd className="mt-1 mb-0 break-words text-xs font-medium">
+              {field.key === 'media_type'
+                ? mediaTypeText(String(snapshot[field.key] || ''))
+                : optionalText(snapshot[field.key] as string | number)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    ) : (
+      <p
+        className={cn(
+          'm-0 rounded-xl px-3.5 py-3 text-xs leading-5',
+          primary
+            ? 'bg-white/8 text-red-200 dark:bg-red-500/10 dark:text-red-700'
+            : 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-200',
+        )}
+      >
+        {error || '没有可比较的识别结果'}
+      </p>
+    )}
+  </section>
+);
+
+const ShadowComparisonResult = ({
+  result,
+}: {
+  result: MediaRecognitionShadowTestResult;
+}) => {
+  const comparison = result.comparison;
+  const status =
+    shadowStatuses[comparison.status] || shadowStatuses.local_error;
+
+  return (
+    <div>
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 text-xs font-medium text-white dark:bg-white dark:text-neutral-950">
+          <GitCompareArrows aria-hidden="true" className="size-3.5" />
+          MP2 优先影子对比
+        </span>
+        <span className={cn(pillClass, status.className)}>{status.label}</span>
+        {comparison.status === 'different' && (
+          <span className={cn(pillClass, ruleStyles.block)}>
+            {comparison.differences.length} 项差异
+          </span>
+        )}
+      </div>
+
+      <p className="mt-0 mb-5 text-xs leading-5 text-neutral-500 dark:text-white/45">
+        MP2 先执行并作为对照基准；FilmFusion
+        随后使用相同输入与页面草稿运行，影子结果不会替换 MP2。
+      </p>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ShadowEngineCard
+          error={comparison.moviepilot_error}
+          primary
+          snapshot={comparison.moviepilot}
+          subtitle="MoviePilot / MP2 · 权威基准"
+          title="MP2 识别"
+        />
+        <ShadowEngineCard
+          error={comparison.local_error}
+          snapshot={comparison.local}
+          subtitle="FilmFusion · 不影响主结果"
+          title="本地识别"
+        />
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-xl bg-black/[0.015] dark:bg-white/[0.025]">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h3 className="m-0 text-xs font-semibold text-neutral-800 dark:text-white/75">
+            字段差异
+          </h3>
+          <span className="text-[11px] text-neutral-400 dark:text-white/35">
+            {comparison.differences.length} 项
+          </span>
+        </div>
+        {comparison.differences.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[660px] border-collapse text-left text-xs">
+              <thead>
+                <tr className="text-neutral-400 dark:text-white/35">
+                  <th className="w-36 px-4 py-2.5 font-medium">字段</th>
+                  <th className="px-4 py-2.5 font-medium">MP2</th>
+                  <th className="px-4 py-2.5 font-medium">FilmFusion 本地</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparison.differences.map((difference) => (
+                  <tr key={difference.field}>
+                    <td className="px-4 py-3 font-medium text-neutral-700 dark:text-white/65">
+                      {difference.label}
+                    </td>
+                    <td className="px-4 py-3 break-all text-neutral-600 dark:text-white/55">
+                      {optionalText(difference.moviepilot)}
+                    </td>
+                    <td className="px-4 py-3 break-all text-neutral-600 dark:text-white/55">
+                      {optionalText(difference.local)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="m-0 px-4 pb-4 text-xs text-emerald-700 dark:text-emerald-300">
+            {comparison.matched
+              ? '已比较的关键字段全部一致。'
+              : '当前没有可计算的字段差异，请查看两侧错误信息。'}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {result.local && (
+          <ResultDisclosure title="FilmFusion 本地识别执行详情">
+            <RecognitionResult result={result.local} />
+          </ResultDisclosure>
+        )}
+        {result.moviepilot_raw && (
+          <ResultDisclosure title="MP2 原始识别结果">
+            <pre className="m-0 max-h-[420px] overflow-auto rounded-lg bg-neutral-950 p-4 text-xs leading-5 whitespace-pre-wrap text-neutral-200 dark:bg-black/35">
+              {JSON.stringify(result.moviepilot_raw, null, 2)}
+            </pre>
+          </ResultDisclosure>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const RecognitionResult = ({
   result,
 }: {
@@ -896,7 +1141,7 @@ const RecognitionResult = ({
               {optionalText(media.year || meta.year)}
             </ResultField>
             <ResultField label="媒体分类">
-              {optionalText(media.category)}
+              {optionalText(media.category_path || media.category)}
             </ResultField>
             <ResultField label="季集">
               {optionalText(meta.season_episode)}

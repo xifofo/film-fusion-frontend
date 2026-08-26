@@ -615,7 +615,7 @@ declare namespace API {
     }>;
     dry_run?: boolean;
     media_type?: 'movie' | 'tv';
-    recognition_source?: 'moviepilot' | 'local';
+    recognition_source?: 'moviepilot' | 'local' | 'shadow';
     category?: string;
     best_version_enabled?: boolean;
     delete_source_folder?: boolean;
@@ -640,6 +640,63 @@ declare namespace API {
     lookups?: Array<{
       path: string;
       id: string;
+    }>;
+  };
+
+  type OrganizeRecognitionShadowSnapshot = {
+    engine: 'moviepilot' | 'local';
+    media_type?: string;
+    title?: string;
+    original_title?: string;
+    year?: string;
+    title_year?: string;
+    tmdb_id?: string;
+    category?: string;
+    season_episode?: string;
+    resource_type?: string;
+    resource_pix?: string;
+    video_encode?: string;
+    begin_season?: number;
+  };
+
+  type OrganizeRecognitionShadowComparison = {
+    status: string;
+    matched: boolean;
+    moviepilot?: OrganizeRecognitionShadowSnapshot;
+    local?: OrganizeRecognitionShadowSnapshot;
+    differences: Array<{
+      field: string;
+      label: string;
+      moviepilot: string;
+      local: string;
+    }>;
+    moviepilot_error?: string;
+    local_error?: string;
+  };
+
+  type OrganizeTransferShadowComparison = {
+    status: string;
+    matched: boolean;
+    moviepilot?: string;
+    local?: string;
+    moviepilot_error?: string;
+    local_error?: string;
+  };
+
+  type Organize115ShadowComparison = {
+    status: string;
+    matched: boolean;
+    recognition?: OrganizeRecognitionShadowComparison;
+    transfer?: OrganizeTransferShadowComparison;
+    moviepilot_target_path?: string;
+    local_target_path?: string;
+    local_target_error?: string;
+    differences: Array<{
+      stage: 'recognition' | 'transfer' | 'target';
+      field: string;
+      label: string;
+      moviepilot: string;
+      local: string;
     }>;
   };
 
@@ -683,6 +740,7 @@ declare namespace API {
     target_season?: number;
     target_episode?: number;
     episode_matched?: boolean;
+    shadow_comparison?: Organize115ShadowComparison;
     error?: string;
   };
 
@@ -700,7 +758,7 @@ declare namespace API {
     folder_id: string;
     folder_ids?: string[];
     media_type?: 'movie' | 'tv';
-    recognition_source: 'moviepilot' | 'local';
+    recognition_source: 'moviepilot' | 'local' | 'shadow';
     category?: string;
     best_version_enabled?: boolean;
     dry_run: boolean;
@@ -755,7 +813,7 @@ declare namespace API {
     depth: number;
     max_depth: number;
     media_type?: 'movie' | 'tv';
-    recognition_source: 'moviepilot' | 'local';
+    recognition_source: 'moviepilot' | 'local' | 'shadow';
     category?: string;
     tmdb_refs?: OrganizePreviewTmdbRef[];
     multi_episode_count?: number;
@@ -790,7 +848,7 @@ declare namespace API {
     recursive_depth?: number;
     task_limit?: number;
     media_type?: 'movie' | 'tv';
-    recognition_source?: 'moviepilot' | 'local';
+    recognition_source?: 'moviepilot' | 'local' | 'shadow';
     category?: string;
     best_version_enabled?: boolean;
     filename_regex_enabled?: boolean;
@@ -1574,8 +1632,8 @@ declare namespace API {
         trusted_proxy_cidrs: string[];
       };
     };
-    rss_automation: {
-      user_agent: string;
+    media_recognition: {
+      source: 'moviepilot' | 'local' | 'shadow';
     };
     site: {
       login_title: string;
@@ -1615,7 +1673,7 @@ declare namespace API {
       routes: {
         emby_brute_force: NotificationChannelID[];
         system_brute_force: NotificationChannelID[];
-        rss_matched: NotificationChannelID[];
+        automation_triggered: NotificationChannelID[];
         web_115_cookie_invalid: NotificationChannelID[];
       };
       telegram: {

@@ -7,8 +7,8 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
-  RSSAutomationTarget,
-  RSSAutomationTargetStatus,
+  AutomationTarget,
+  AutomationTargetStatus,
 } from '@/services/film-fusion';
 import TargetPanel from './TargetPanel';
 
@@ -69,7 +69,7 @@ describe('TargetPanel', () => {
   });
 
   it('shows concise connection status and live speeds in a downloader card', () => {
-    const target: RSSAutomationTarget = {
+    const target: AutomationTarget = {
       id: 1,
       name: '新版 qB',
       type: 'qbittorrent',
@@ -83,7 +83,7 @@ describe('TargetPanel', () => {
       created_at: '2026-08-16T00:00:00Z',
       updated_at: '2026-08-16T00:00:00Z',
     };
-    const status: RSSAutomationTargetStatus = {
+    const status: AutomationTargetStatus = {
       target_id: 1,
       enabled: true,
       online: true,

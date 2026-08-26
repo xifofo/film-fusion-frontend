@@ -27,9 +27,9 @@ import {
 } from 'antd';
 import { type Ref, useImperativeHandle, useState } from 'react';
 import type {
-  RSSAutomationTarget,
-  RSSAutomationTargetInput,
-  RSSAutomationTargetStatus,
+  AutomationTarget,
+  AutomationTargetInput,
+  AutomationTargetStatus,
 } from '@/services/film-fusion';
 import {
   createDownloader,
@@ -37,7 +37,7 @@ import {
   testDownloader,
   updateDownloader,
 } from '@/services/film-fusion';
-import styles from './index.module.less';
+import styles from './TargetPanel.module.less';
 
 const { Link, Text, Title } = Typography;
 
@@ -46,8 +46,8 @@ const QB_API_KEY_PATTERN = /^qbt_[A-Za-z0-9]{28}$/;
 
 type TargetPanelProps = {
   actionRef?: Ref<TargetPanelHandle>;
-  targets: RSSAutomationTarget[];
-  statuses?: RSSAutomationTargetStatus[];
+  targets: AutomationTarget[];
+  statuses?: AutomationTargetStatus[];
   statusLoading?: boolean;
   statusError?: string;
   cloudStorages?: API.CloudStorage[];
@@ -90,8 +90,8 @@ const formatCheckedAt = (checkedAt?: string) => {
 };
 
 const targetStatusMeta = (
-  target: RSSAutomationTarget,
-  status?: RSSAutomationTargetStatus,
+  target: AutomationTarget,
+  status?: AutomationTargetStatus,
 ) => {
   if (!target.enabled) {
     return { badge: 'default' as const, label: '已停用' };
@@ -114,7 +114,7 @@ const targetStatusMeta = (
   return { badge: 'processing' as const, label: 'WebUI 在线' };
 };
 
-const parseTarget = (target: RSSAutomationTarget): RSSAutomationTargetInput => {
+const parseTarget = (target: AutomationTarget): AutomationTargetInput => {
   let config = {
     base_url: '',
     username: '',
@@ -146,14 +146,14 @@ const TargetPanel = ({
   onChanged,
   onRefreshStatuses,
 }: TargetPanelProps) => {
-  const [form] = Form.useForm<RSSAutomationTargetInput>();
-  const [editing, setEditing] = useState<RSSAutomationTarget>();
+  const [form] = Form.useForm<AutomationTargetInput>();
+  const [editing, setEditing] = useState<AutomationTarget>();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<number>();
   const [messageApi, contextHolder] = message.useMessage();
 
-  const openModal = (target?: RSSAutomationTarget) => {
+  const openModal = (target?: AutomationTarget) => {
     setEditing(target);
     setOpen(true);
     window.setTimeout(() => {
@@ -201,7 +201,7 @@ const TargetPanel = ({
     }
   };
 
-  const toggle = async (target: RSSAutomationTarget, enabled: boolean) => {
+  const toggle = async (target: AutomationTarget, enabled: boolean) => {
     try {
       const response = await updateDownloader(target.id, {
         ...parseTarget(target),
@@ -214,7 +214,7 @@ const TargetPanel = ({
     }
   };
 
-  const test = async (target: RSSAutomationTarget) => {
+  const test = async (target: AutomationTarget) => {
     setTestingId(target.id);
     try {
       const response = await testDownloader(target.id);
@@ -227,7 +227,7 @@ const TargetPanel = ({
     }
   };
 
-  const remove = async (target: RSSAutomationTarget) => {
+  const remove = async (target: AutomationTarget) => {
     try {
       const response = await deleteDownloader(target.id);
       if (response.code !== 0) throw new Error(response.message);

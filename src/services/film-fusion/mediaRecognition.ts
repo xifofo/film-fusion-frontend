@@ -90,6 +90,7 @@ export type MediaRecognitionMediaInfo = {
   title_year?: string;
   tmdb_id?: string;
   category?: string;
+  category_path?: string;
   poster_path?: string;
   backdrop_path?: string;
   rating?: number;
@@ -128,6 +129,51 @@ export type MediaRecognitionTestResult = {
     | 'error';
   warning?: string;
   raw: Record<string, unknown>;
+};
+
+export type MediaRecognitionShadowSnapshot = {
+  engine: 'moviepilot' | 'local';
+  media_type?: string;
+  title?: string;
+  original_title?: string;
+  year?: string;
+  title_year?: string;
+  tmdb_id?: string;
+  category?: string;
+  season_episode?: string;
+  resource_type?: string;
+  resource_pix?: string;
+  video_encode?: string;
+  begin_season?: number;
+};
+
+export type MediaRecognitionShadowDifference = {
+  field: string;
+  label: string;
+  moviepilot: string;
+  local: string;
+};
+
+export type MediaRecognitionShadowComparison = {
+  status:
+    | 'matched'
+    | 'different'
+    | 'moviepilot_error'
+    | 'local_error'
+    | 'local_unavailable';
+  matched: boolean;
+  moviepilot?: MediaRecognitionShadowSnapshot;
+  local?: MediaRecognitionShadowSnapshot;
+  differences: MediaRecognitionShadowDifference[];
+  moviepilot_error?: string;
+  local_error?: string;
+};
+
+export type MediaRecognitionShadowTestResult = {
+  primary_engine: 'moviepilot';
+  moviepilot_raw?: Record<string, unknown>;
+  local?: MediaRecognitionTestResult;
+  comparison: MediaRecognitionShadowComparison;
 };
 
 export type MediaRecognitionRenameType = 'movie' | 'tv';
@@ -213,6 +259,20 @@ export async function testMediaRecognition(data: {
 }) {
   return apiClient.post<API.Response<MediaRecognitionTestResult>>(
     '/api/media-recognition/test',
+    data,
+  );
+}
+
+/** MP2 先给出主结果，再用同一份草稿配置运行 FilmFusion 本地影子。 */
+export async function compareMediaRecognition(data: {
+  input: string;
+  mode: 'file' | 'title';
+  words?: string[];
+  category_yaml?: string;
+  lookup_tmdb: boolean;
+}) {
+  return apiClient.post<API.Response<MediaRecognitionShadowTestResult>>(
+    '/api/media-recognition/shadow-test',
     data,
   );
 }

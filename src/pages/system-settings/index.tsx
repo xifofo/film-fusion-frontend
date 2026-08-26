@@ -3,9 +3,9 @@ import {
   BellOutlined,
   BgColorsOutlined,
   CloudServerOutlined,
-  DeploymentUnitOutlined,
   FileTextOutlined,
   KeyOutlined,
+  PartitionOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
   SendOutlined,
@@ -66,17 +66,14 @@ const notificationChannelOptions: Array<{
   { label: 'Webhook', value: 'webhook' },
 ];
 
-const DEFAULT_RSS_AUTOMATION_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
-
 const SETTINGS_TAB_ICON_COLORS: Record<SettingsTabKey, string> = {
   server: '#000000',
-  'rss-automation': '#000000',
   '115': '#224888',
   appearance: '#000000',
   webhook: '#000000',
   emby: '#52b54b',
   notifications: '#000000',
+  mediaRecognition: '#111827',
   moviepilot: '#4c1d95',
   tmdb: '#032541',
   hdhive: '#050505',
@@ -754,14 +751,6 @@ const SystemSettingsPage: React.FC = () => {
     messageApi.success('已获取当前浏览器 UA，请保存当前 Tab 完成保存');
   };
 
-  const handleResetRSSAutomationUserAgent = () => {
-    form.setFieldValue(
-      ['rss_automation', 'user_agent'],
-      DEFAULT_RSS_AUTOMATION_USER_AGENT,
-    );
-    messageApi.success('已恢复默认 RSS 自动化 UA，请保存当前 Tab 完成保存');
-  };
-
   return (
     <div
       className={`${styles.page} box-border w-full px-4 py-5 sm:px-6 sm:py-7 xl:px-8`}
@@ -860,7 +849,7 @@ const SystemSettingsPage: React.FC = () => {
 
                         <SettingsSection
                           title="登录与访问保护"
-                          description="限制连续失败请求；可信代理配置也用于识别 RSS 局域网免 Token 请求。"
+                          description="限制连续失败请求；可信代理配置用于识别经过反向代理访问的真实客户端地址。"
                         >
                           <div className={styles.toggleGrid}>
                             <SettingsToggle
@@ -933,62 +922,6 @@ const SystemSettingsPage: React.FC = () => {
                               title="处理新增媒体事件"
                               description="收到 Webhook 新入库通知后，执行已配置的媒体处理流程。"
                             />
-                          </div>
-                        </SettingsSection>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'rss-automation',
-                    label: 'RSS 自动化',
-                    icon: renderTabIcon(
-                      <DeploymentUnitOutlined />,
-                      SETTINGS_TAB_ICON_COLORS['rss-automation'],
-                    ),
-                    forceRender: true,
-                    children: (
-                      <div className={styles.tabPanel}>
-                        <SettingsSection
-                          title="RSS 请求"
-                          description="设置 RSS 自动化在样本预览和定时抓取时发送的浏览器标识。"
-                        >
-                          <div className={styles.userAgentEditor}>
-                            <ProFormTextArea
-                              width="xl"
-                              name={['rss_automation', 'user_agent']}
-                              label="User-Agent"
-                              placeholder="例如：Mozilla/5.0 ..."
-                              extra="保存后立即用于新的 RSS 自动化请求。"
-                              fieldProps={{
-                                autoSize: { minRows: 3, maxRows: 6 },
-                                maxLength: 2048,
-                                showCount: true,
-                              }}
-                              rules={[
-                                {
-                                  required: true,
-                                  whitespace: true,
-                                  message: '请输入 RSS 自动化 User-Agent',
-                                },
-                                {
-                                  max: 2048,
-                                  message: 'User-Agent 不能超过 2048 个字符',
-                                },
-                                {
-                                  pattern: /^[^\r\n]*$/,
-                                  message: 'User-Agent 不能包含换行',
-                                },
-                              ]}
-                            />
-                          </div>
-                          <div className={styles.userAgentActions}>
-                            <Button onClick={handleResetRSSAutomationUserAgent}>
-                              恢复默认 UA
-                            </Button>
-                            <Typography.Text type="secondary">
-                              默认模拟 macOS Chrome
-                              150；自定义值只保存在数据库。
-                            </Typography.Text>
                           </div>
                         </SettingsSection>
                       </div>
@@ -1876,8 +1809,12 @@ const SystemSettingsPage: React.FC = () => {
                             />
                             <ProFormSelect
                               width="lg"
-                              name={['notifications', 'routes', 'rss_matched']}
-                              label="RSS 规则命中"
+                              name={[
+                                'notifications',
+                                'routes',
+                                'automation_triggered',
+                              ]}
+                              label="自动化事件触发"
                               options={notificationChannelOptions}
                               fieldProps={{
                                 mode: 'multiple',
@@ -1897,6 +1834,52 @@ const SystemSettingsPage: React.FC = () => {
                                 mode: 'multiple',
                                 allowClear: true,
                               }}
+                            />
+                          </div>
+                        </SettingsSection>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'mediaRecognition',
+                    label: '媒体识别',
+                    icon: renderTabIcon(
+                      <PartitionOutlined />,
+                      SETTINGS_TAB_ICON_COLORS.mediaRecognition,
+                    ),
+                    forceRender: true,
+                    children: (
+                      <div className={styles.tabPanel}>
+                        <SettingsSection
+                          title="默认识别方式"
+                          description="作为未单独指定识别方式时的系统默认值；整理页仍可按单次任务覆盖。"
+                        >
+                          <Alert
+                            className={styles.sectionAlert}
+                            type="info"
+                            showIcon
+                            title="影子模式用于对齐 FilmFusion 与 MP2"
+                            description="MP2 先执行并作为主结果，FilmFusion 随后使用相同输入运行；差异会记录到识别结果和日志，但本地影子不会替换 MP2 主结果。"
+                          />
+                          <div className={styles.fieldGrid}>
+                            <ProFormSelect
+                              width="lg"
+                              name={['media_recognition', 'source']}
+                              label="识别方式"
+                              rules={[
+                                {
+                                  required: true,
+                                  message: '请选择识别方式',
+                                },
+                              ]}
+                              options={[
+                                {
+                                  label: '影子模式（MP2 优先）',
+                                  value: 'shadow',
+                                },
+                                { label: '仅 MP2', value: 'moviepilot' },
+                                { label: '仅 FilmFusion', value: 'local' },
+                              ]}
                             />
                           </div>
                         </SettingsSection>

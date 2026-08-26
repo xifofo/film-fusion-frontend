@@ -114,7 +114,7 @@ export default function AppLayout() {
     <>
       {currentUser && (
         <div
-          className="relative isolate flex min-h-svh w-full overflow-x-clip bg-[#f2f2ef] font-sans text-neutral-950 [--ring:#171717] dark:bg-[#080808] dark:text-white dark:[--ring:#ffffff]"
+          className="relative isolate flex h-svh w-full overflow-hidden bg-[#f2f2ef] font-sans text-neutral-950 [--ring:#171717] dark:bg-[#080808] dark:text-white dark:[--ring:#ffffff]"
           style={
             {
               '--app-sidebar-offset': sidebarCollapsed ? '5.75rem' : '17.5rem',
@@ -169,7 +169,7 @@ export default function AppLayout() {
             )}
           />
 
-          <div className="relative flex min-w-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip overflow-y-auto overscroll-contain">
             <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-start gap-3 border-b border-black/[0.055] bg-[#f2f2ef]/82 px-3 backdrop-blur-2xl sm:h-14 sm:px-4 lg:hidden dark:border-white/10 dark:bg-[#080808]/82">
               <div className="flex min-w-0 items-center gap-2">
                 <Sheet

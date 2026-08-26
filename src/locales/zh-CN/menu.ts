@@ -53,7 +53,6 @@ export default {
   'menu.云存储管理': '云存储管理',
   'menu.云路径映射': '云路径映射',
   'menu.目录配置': '目录配置',
-  'menu.RSS监控': 'RSS监控',
   'menu.日志中心': '日志中心',
   'menu.Match302重定向': 'Match302重定向',
   'menu.Pickcode缓存管理': 'Pickcode缓存管理',

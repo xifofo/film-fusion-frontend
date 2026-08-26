@@ -2,12 +2,12 @@ import type { NamePath } from 'antd/es/form/interface';
 
 export type SettingsTabKey =
   | 'server'
-  | 'rss-automation'
   | '115'
   | 'appearance'
   | 'webhook'
   | 'emby'
   | 'notifications'
+  | 'mediaRecognition'
   | 'moviepilot'
   | 'tmdb'
   | 'hdhive'
@@ -31,10 +31,6 @@ export const SETTINGS_TAB_SCOPES: Record<SettingsTabKey, SettingsTabScope> = {
       ['server', 'security'],
       ['server', 'process_new_media'],
     ],
-  },
-  'rss-automation': {
-    label: 'RSS 自动化',
-    fields: [['rss_automation']],
   },
   '115': {
     label: '115',
@@ -70,6 +66,10 @@ export const SETTINGS_TAB_SCOPES: Record<SettingsTabKey, SettingsTabScope> = {
   notifications: {
     label: '通知',
     fields: [['notifications']],
+  },
+  mediaRecognition: {
+    label: '媒体识别',
+    fields: [['media_recognition']],
   },
   moviepilot: {
     label: 'MoviePilot',
