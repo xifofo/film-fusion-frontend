@@ -195,10 +195,27 @@ const palette: Array<{
   types: RSSAutomationNodeType[];
 }> = [
   {
-    title: '数据处理',
-    types: ['keyword', 'keyword_replace', 'regex', 'regex_replace', 'convert'],
+    title: '变量与数据',
+    types: [
+      'set_variable',
+      'template',
+      'json_extract',
+      'math',
+      'datetime_operation',
+      'list_operation',
+      'coalesce',
+      'convert',
+    ],
   },
-  { title: '流程控制', types: ['if', 'parallel', 'join', 'end'] },
+  {
+    title: '文本处理',
+    types: ['keyword', 'keyword_replace', 'regex', 'regex_replace'],
+  },
+  {
+    title: '流程控制',
+    types: ['delay', 'if', 'switch', 'foreach', 'parallel', 'join', 'end'],
+  },
+  { title: '流程保护', types: ['deduplicate', 'rate_limit'] },
   {
     title: '执行动作',
     types: [
@@ -554,26 +571,46 @@ const WorkflowPanelInner = ({
     for (const flowNode of nodes) {
       if (!ancestorIDs.has(flowNode.id)) continue;
       const definition = flowNode.data.definition;
-      if (
-        ['regex', 'keyword_replace', 'regex_replace', 'convert'].includes(
-          definition.type,
-        )
-      ) {
-        const name = String(definition.config?.variable || '').trim();
-        if (name) {
-          addReference({
-            kind: 'variable',
-            name,
-            value: `$vars.${name}`,
-            preview: referencePreview(simulation?.variables[name]),
-          });
-        }
-      }
       const previewOutput = simulation?.nodes[flowNode.id]?.output;
       const previewRecord =
         previewOutput && typeof previewOutput === 'object'
           ? (previewOutput as Record<string, unknown>)
           : undefined;
+      if (
+        [
+          'regex',
+          'keyword_replace',
+          'regex_replace',
+          'convert',
+          'set_variable',
+          'template',
+          'json_extract',
+          'math',
+          'datetime_operation',
+          'list_operation',
+          'coalesce',
+          'foreach',
+        ].includes(definition.type)
+      ) {
+        const name = String(definition.config?.variable || '').trim();
+        if (name) {
+          const producedVariables =
+            previewRecord?.variables &&
+            typeof previewRecord.variables === 'object' &&
+            !Array.isArray(previewRecord.variables)
+              ? (previewRecord.variables as Record<string, unknown>)
+              : undefined;
+          addReference({
+            kind: 'variable',
+            name,
+            value: `$vars.${name}`,
+            preview:
+              referencePreview(producedVariables?.[name]) ||
+              referencePreview(simulation?.variables[name]),
+            description: `由“${definition.name || NODE_LABELS[definition.type]}”写入`,
+          });
+        }
+      }
       const protocol = nodeProtocols.find(
         (candidate) => candidate.type === definition.type,
       );
@@ -600,9 +637,32 @@ const WorkflowPanelInner = ({
           'regex',
           'regex_replace',
           'convert',
+          'json_extract',
+          'datetime_operation',
+          'list_operation',
+          'switch',
+          'foreach',
         ].includes(selectedNode.type)
       ) {
         return String(selectedNode.config?.input || '').trim();
+      }
+      if (selectedNode.type === 'set_variable') {
+        return String(selectedNode.config?.value || '').trim();
+      }
+      if (selectedNode.type === 'math') {
+        return String(selectedNode.config?.left || '').trim();
+      }
+      if (selectedNode.type === 'coalesce') {
+        const candidates = selectedNode.config?.candidates;
+        return Array.isArray(candidates)
+          ? String(candidates[0] || '').trim()
+          : '';
+      }
+      if (
+        selectedNode.type === 'deduplicate' ||
+        selectedNode.type === 'rate_limit'
+      ) {
+        return String(selectedNode.config?.key || '').trim();
       }
       if (selectedNode.type === 'if') {
         const condition = selectedNode.config?.condition;
@@ -845,6 +905,39 @@ const WorkflowPanelInner = ({
       }
       if (removedEdgeIds.size > 0) {
         messageApi.info('已移除不再存在的并行分支连线');
+      }
+    }
+    if (definition.type === 'switch') {
+      const validPorts = new Set(
+        (Array.isArray(definition.config?.cases) ? definition.config.cases : [])
+          .filter(
+            (candidate): candidate is Record<string, unknown> =>
+              Boolean(candidate) &&
+              typeof candidate === 'object' &&
+              !Array.isArray(candidate),
+          )
+          .map(
+            (candidate) => `case-${String(candidate.id || '').toLowerCase()}`,
+          )
+          .concat(['default', 'failure']),
+      );
+      const removedEdgeIds = new Set(
+        edges
+          .filter(
+            (edge) =>
+              edge.source === definition.id &&
+              !validPorts.has(edge.sourceHandle || ''),
+          )
+          .map((edge) => edge.id),
+      );
+      setEdges((current) =>
+        current.filter((edge) => !removedEdgeIds.has(edge.id)),
+      );
+      if (selectedEdgeId && removedEdgeIds.has(selectedEdgeId)) {
+        setSelectedEdgeId(undefined);
+      }
+      if (removedEdgeIds.size > 0) {
+        messageApi.info('已移除不再存在的多路分支连线');
       }
     }
     if (definition.type === 'join' && !joinHasConditionalOutcome(definition)) {

@@ -3,10 +3,17 @@ import type {
   AutomationNodeDefinition,
   AutomationWorkflow,
 } from '@/services/film-fusion';
+import {
+  type AutomationDelayUnit,
+  automationDelayParts,
+  toAutomationDelaySeconds,
+} from './delay';
 
 export type RecognitionMode = 'none' | 'local' | 'moviepilot' | 'shadow';
 
 export type AutomationActionValues = {
+  delay_value: number;
+  delay_unit: AutomationDelayUnit;
   recognition: RecognitionMode;
   organize_enabled: boolean;
   cloud_directory_id?: number;
@@ -28,6 +35,8 @@ const asNumber = (value: unknown) => {
 };
 
 export const defaultAutomationActions = (): AutomationActionValues => ({
+  delay_value: 0,
+  delay_unit: 'minutes',
   recognition: 'shadow',
   organize_enabled: false,
   media_type: 'auto',
@@ -49,12 +58,27 @@ export const buildAutomationDefinition = (
     },
   ];
 
+  const delaySeconds = toAutomationDelaySeconds(
+    values.delay_value,
+    values.delay_unit,
+  );
+  if (delaySeconds > 0) {
+    nodes.push({
+      id: 'delay',
+      type: 'delay',
+      name: '触发后延迟',
+      position: { x: 40 + nodes.length * 260, y: 120 },
+      config: { delay_seconds: delaySeconds },
+      max_attempts: 1,
+    });
+  }
+
   if (values.recognition === 'local') {
     nodes.push({
       id: 'recognize',
       type: 'filmfusion_recognize',
       name: 'FilmFusion 媒体识别',
-      position: { x: 300, y: 120 },
+      position: { x: 40 + nodes.length * 260, y: 120 },
       config: { recognition_mode: 'file', lookup_tmdb: true },
       max_attempts: 3,
     });
@@ -69,7 +93,7 @@ export const buildAutomationDefinition = (
         values.recognition === 'shadow'
           ? '影子识别（MP2 优先）'
           : '仅 MP2 识别',
-      position: { x: 300, y: 120 },
+      position: { x: 40 + nodes.length * 260, y: 120 },
       config: { recognition_source: values.recognition },
       max_attempts: 3,
     });
@@ -135,6 +159,7 @@ export const readAutomationActions = (
       nodes?: Array<{ type?: string; config?: unknown }>;
     };
     if (!Array.isArray(definition.nodes)) return fallback;
+    const delayNode = definition.nodes.find((node) => node.type === 'delay');
     const local = definition.nodes.find(
       (node) => node.type === 'filmfusion_recognize',
     );
@@ -148,6 +173,8 @@ export const readAutomationActions = (
       (node) => node.type === 'notification',
     );
     const organizeConfig = asRecord(organize?.config);
+    const delayConfig = asRecord(delayNode?.config);
+    const delay = automationDelayParts(delayConfig.delay_seconds);
     const notificationConfig = asRecord(notification?.config);
     const moviePilotConfig = asRecord(moviePilot?.config);
     const moviePilotRecognition =
@@ -155,6 +182,8 @@ export const readAutomationActions = (
         ? 'shadow'
         : 'moviepilot';
     return {
+      delay_value: delay.value,
+      delay_unit: delay.unit,
       recognition: local
         ? 'local'
         : moviePilot

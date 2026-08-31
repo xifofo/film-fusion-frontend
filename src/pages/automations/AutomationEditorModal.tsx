@@ -23,6 +23,13 @@ import type {
 import { validateAutomationWorkflow } from '@/services/film-fusion';
 import DirectoryIdInput from './DirectoryIdInput';
 import {
+  AUTOMATION_DELAY_MAX_SECONDS,
+  type AutomationDelayUnit,
+  automationDelayMaxValue,
+  automationDelayUnitOptions,
+  toAutomationDelaySeconds,
+} from './delay';
+import {
   type AutomationActionValues,
   buildAutomationDefinition,
   readAutomationActions,
@@ -82,6 +89,8 @@ const AutomationEditorModal = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const cloudStorageID = Form.useWatch('cloud_storage_id', form);
   const selectedPath = Form.useWatch('directory_path', form);
+  const delayUnit = (Form.useWatch('delay_unit', form) ||
+    'minutes') as AutomationDelayUnit;
   const organizeEnabled = Form.useWatch('organize_enabled', form);
   const notificationEnabled = Form.useWatch('notification_enabled', form);
 
@@ -291,6 +300,54 @@ const AutomationEditorModal = ({
 
         <Divider />
         <Title level={5}>发现新媒体后</Title>
+        <Form.Item
+          extra="0 表示立即执行；延迟任务会持久化，服务重启后继续等待。"
+          label="触发后延迟"
+          required
+        >
+          <Space.Compact block>
+            <Form.Item
+              name="delay_value"
+              noStyle
+              rules={[
+                { required: true, message: '请输入延迟时长' },
+                {
+                  validator: (_, value) => {
+                    const numeric = Number(value);
+                    const seconds = toAutomationDelaySeconds(
+                      value,
+                      form.getFieldValue('delay_unit') || 'minutes',
+                    );
+                    if (!Number.isInteger(numeric) || numeric < 0) {
+                      return Promise.reject(
+                        new Error('延迟时长必须是大于等于 0 的整数'),
+                      );
+                    }
+                    if (seconds > AUTOMATION_DELAY_MAX_SECONDS) {
+                      return Promise.reject(
+                        new Error('延迟时长不能超过 30 天'),
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <InputNumber
+                max={automationDelayMaxValue(delayUnit)}
+                min={0}
+                precision={0}
+                style={{ width: 'calc(100% - 110px)' }}
+              />
+            </Form.Item>
+            <Form.Item name="delay_unit" noStyle>
+              <Select
+                options={automationDelayUnitOptions}
+                style={{ width: 110 }}
+              />
+            </Form.Item>
+          </Space.Compact>
+        </Form.Item>
         <Form.Item label="媒体识别" name="recognition">
           <Radio.Group
             options={[

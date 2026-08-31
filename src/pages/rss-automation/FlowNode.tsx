@@ -3,10 +3,14 @@ import {
   Bell,
   Binary,
   Braces,
+  Calculator,
+  CalendarClock,
   CircleStop,
   Clock,
   CloudDownload,
+  CopyCheck,
   Download,
+  FileJson2,
   FolderCog,
   Gauge,
   GitBranch,
@@ -14,17 +18,24 @@ import {
   HardDriveDownload,
   Library,
   Link2,
+  ListChecks,
+  ListFilter,
   PencilLine,
   RadioTower,
   RefreshCcwDot,
   RefreshCw,
+  Repeat2,
   Replace,
   ReplaceAll,
+  Route,
   ScanSearch,
   Search,
   ShieldCheck,
   Sparkles,
+  TextQuote,
+  TimerReset,
   Trash2,
+  Variable,
   Webhook,
 } from 'lucide-react';
 import type { RSSAutomationNodeType } from '@/services/film-fusion';
@@ -38,11 +49,23 @@ import styles from './index.module.less';
 
 const icons: Record<RSSAutomationNodeType, React.ReactNode> = {
   trigger: <RadioTower size={17} />,
+  delay: <Clock size={17} />,
   regex: <Braces size={17} />,
   keyword: <Search size={17} />,
   keyword_replace: <Replace size={17} />,
   regex_replace: <ReplaceAll size={17} />,
   convert: <Binary size={17} />,
+  set_variable: <Variable size={17} />,
+  template: <TextQuote size={17} />,
+  json_extract: <FileJson2 size={17} />,
+  math: <Calculator size={17} />,
+  datetime_operation: <CalendarClock size={17} />,
+  list_operation: <ListFilter size={17} />,
+  switch: <Route size={17} />,
+  coalesce: <ListChecks size={17} />,
+  deduplicate: <CopyCheck size={17} />,
+  rate_limit: <TimerReset size={17} />,
+  foreach: <Repeat2 size={17} />,
   if: <GitBranch size={17} />,
   parallel: <GitFork size={17} />,
   join: <RefreshCcwDot size={17} />,
@@ -106,6 +129,17 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
   const type = definition.type;
   const branches = nodeBranches(definition);
   const preview = data.preview;
+  const switchCases =
+    type === 'switch' && Array.isArray(definition.config?.cases)
+      ? definition.config.cases
+          .filter(
+            (candidate): candidate is Record<string, unknown> =>
+              Boolean(candidate) &&
+              typeof candidate === 'object' &&
+              !Array.isArray(candidate),
+          )
+          .filter((candidate) => String(candidate.id || '').trim())
+      : [];
 
   const handles = (() => {
     if (type === 'end') return null;
@@ -127,6 +161,61 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
           <SourceHandle id="matched" label="匹配" top="31%" />
           <SourceHandle id="unmatched" label="不匹配" top="60%" />
           <SourceHandle id="failure" label="异常" top="84%" />
+        </>
+      );
+    }
+    if (type === 'switch') {
+      const ports = [
+        ...switchCases.map((candidate) => ({
+          id: `case-${String(candidate.id).toLowerCase()}`,
+          label: String(candidate.label || candidate.id),
+        })),
+        { id: 'default', label: '默认' },
+        { id: 'failure', label: '异常' },
+      ];
+      return ports.map((port, index) => (
+        <SourceHandle
+          id={port.id}
+          key={port.id}
+          label={port.label}
+          top={`${((index + 1) / (ports.length + 1)) * 100}%`}
+        />
+      ));
+    }
+    if (type === 'list_operation') {
+      return (
+        <>
+          <SourceHandle id="success" label="成功" top="28%" />
+          <SourceHandle id="empty" label="空列表" top="55%" />
+          <SourceHandle id="failure" label="异常" top="82%" />
+        </>
+      );
+    }
+    if (type === 'deduplicate') {
+      return (
+        <>
+          <SourceHandle id="new" label="首次" top="28%" />
+          <SourceHandle id="duplicate" label="重复" top="55%" />
+          <SourceHandle id="failure" label="异常" top="82%" />
+        </>
+      );
+    }
+    if (type === 'rate_limit') {
+      return (
+        <>
+          <SourceHandle id="allowed" label="允许" top="28%" />
+          <SourceHandle id="throttled" label="受限" top="55%" />
+          <SourceHandle id="failure" label="异常" top="82%" />
+        </>
+      );
+    }
+    if (type === 'foreach') {
+      return (
+        <>
+          <SourceHandle id="success" label="成功" top="25%" />
+          <SourceHandle id="partial" label="部分" top="50%" />
+          <SourceHandle id="empty" label="空列表" top="70%" />
+          <SourceHandle id="failure" label="异常" top="88%" />
         </>
       );
     }
@@ -193,6 +282,11 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
       } ${data.status ? styles[`status_${data.status}`] : ''} ${
         preview && !preview.active ? styles.flowNodePreviewInactive : ''
       }`}
+      style={
+        type === 'switch'
+          ? { minHeight: Math.max(92, (switchCases.length + 2) * 28) }
+          : undefined
+      }
     >
       {type !== 'trigger' && (
         <Handle

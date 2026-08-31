@@ -129,6 +129,11 @@ const TemplateVariableInput = ({
           label: '上游节点输出',
           options: filteredOptions.filter((option) => option.kind === 'node'),
         },
+        {
+          kind: 'each' as const,
+          label: '当前遍历项',
+          options: filteredOptions.filter((option) => option.kind === 'each'),
+        },
       ].filter((group) => group.options.length > 0),
     [filteredOptions],
   );

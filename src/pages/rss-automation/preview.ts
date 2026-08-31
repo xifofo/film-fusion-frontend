@@ -2,6 +2,12 @@ import type {
   RSSAutomationDefinition,
   RSSAutomationNodeDefinition,
 } from '@/services/film-fusion';
+import {
+  AUTOMATION_DELAY_MAX_SECONDS,
+  formatAutomationDelay,
+} from '../automations/delay';
+import { executeAutomationAdvancedPreviewNode } from './advancedNodes';
+import { executeAutomationVariablePreviewNode } from './variableNodes';
 
 export type RSSAutomationNodePreview = {
   active: boolean;
@@ -17,6 +23,13 @@ export type RSSAutomationFlowPreview = {
   activeEdgeIds: string[];
   activeNodeIds: string[];
   variables: Record<string, unknown>;
+};
+
+const previewValueText = (value: unknown) => {
+  if (value == null) return String(value);
+  const text =
+    typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return text.length > 90 ? `${text.slice(0, 90)}…` : text;
 };
 
 const resolveReference = (
@@ -335,6 +348,28 @@ const previewNode = (
           label: '样本从这里进入',
           selectedPorts: ['next'],
         };
+      case 'delay': {
+        const delaySeconds = Number(config.delay_seconds);
+        if (
+          !Number.isInteger(delaySeconds) ||
+          delaySeconds < 1 ||
+          delaySeconds > AUTOMATION_DELAY_MAX_SECONDS
+        ) {
+          throw new Error('延迟时长必须在 1 秒到 30 天之间');
+        }
+        return {
+          active: true,
+          tone: 'success',
+          label: `将等待 ${formatAutomationDelay(delaySeconds)}后继续`,
+          detail: '样本预览不会真的等待',
+          selectedPorts: ['success'],
+          output: {
+            delay_seconds: delaySeconds,
+            scheduled_at: '运行时计算',
+            resume_at: '运行时计算',
+          },
+        };
+      }
       case 'regex': {
         const input = resolveConfiguredString(context, config.input);
         const expression = compilePreviewRegularExpression(config.pattern);
@@ -489,12 +524,70 @@ const previewNode = (
         const value = convertValue(input, config.value_type);
         const variable = String(config.variable || 'result');
         (context.vars as Record<string, unknown>)[variable] = value;
+        const output = {
+          value,
+          variables: { [variable]: value },
+        };
         return {
           active: true,
           tone: 'success',
           label: `${variable} = ${String(value)}`,
           selectedPorts: ['success'],
-          output: value,
+          output,
+        };
+      }
+      case 'set_variable':
+      case 'template':
+      case 'json_extract':
+      case 'math': {
+        const result = executeAutomationVariablePreviewNode(node, context);
+        const value = previewValueText(result.value);
+        const action = result.written
+          ? result.overwritten
+            ? '已覆盖'
+            : '已写入'
+          : '保留原值';
+        const details = [
+          `${action} $vars.${result.variable}`,
+          result.existing
+            ? `原值：${previewValueText(result.previousValue)}`
+            : '',
+          node.type === 'template' &&
+          Array.isArray(result.output.missing_references) &&
+          result.output.missing_references.length > 0
+            ? `缺失变量已替为空：${result.output.missing_references.join('、')}`
+            : '',
+          node.type === 'json_extract'
+            ? `JSON Pointer：${String(config.pointer || '(根)')}`
+            : '',
+          node.type === 'math'
+            ? `运算：${String(config.operation || 'add')}`
+            : '',
+        ].filter(Boolean);
+        return {
+          active: true,
+          tone: result.written ? 'success' : 'neutral',
+          label: `${result.variable} = ${value}`,
+          detail: details.join(' · '),
+          selectedPorts: ['success'],
+          output: result.output,
+        };
+      }
+      case 'datetime_operation':
+      case 'list_operation':
+      case 'switch':
+      case 'coalesce':
+      case 'deduplicate':
+      case 'rate_limit':
+      case 'foreach': {
+        const result = executeAutomationAdvancedPreviewNode(node, context);
+        return {
+          active: true,
+          tone: result.tone || 'success',
+          label: result.label,
+          detail: result.detail,
+          selectedPorts: result.selectedPorts,
+          output: result.output,
         };
       }
       case 'if': {
@@ -977,12 +1070,26 @@ const previewNode = (
         throw new Error('暂不支持预览');
     }
   } catch (error: any) {
+    const reason = error?.message || '当前配置无法预览';
+    const variableNode = [
+      'set_variable',
+      'template',
+      'json_extract',
+      'math',
+      'datetime_operation',
+      'list_operation',
+      'coalesce',
+      'foreach',
+    ].includes(node.type);
     return {
       active: true,
       tone: 'warning',
       label: '当前配置无法预览',
-      detail: error?.message,
+      detail: reason,
       selectedPorts: ['failure'],
+      ...(variableNode
+        ? { output: { written: false, variables: {}, reason } }
+        : {}),
     };
   }
 };
@@ -991,26 +1098,76 @@ export const simulateRSSAutomation = (
   definition: RSSAutomationDefinition,
   item: Record<string, unknown>,
 ): RSSAutomationFlowPreview => {
-  const context: Record<string, unknown> = {
-    item,
-    vars: {},
-    nodes: {},
-  };
   const previews: Record<string, RSSAutomationNodePreview> = {};
   const activeEdgeIds = new Set<string>();
   const selectedPorts = new Map<string, string[]>();
   const nodes = new Map(definition.nodes.map((node) => [node.id, node]));
+  const orderedNodeIDs = orderedNodes(definition);
+  const incomingByTarget = new Map<string, typeof definition.edges>();
+  for (const edge of definition.edges) {
+    incomingByTarget.set(edge.target, [
+      ...(incomingByTarget.get(edge.target) || []),
+      edge,
+    ]);
+  }
+  const ancestorCache = new Map<string, Set<string>>();
+  const ancestorIDs = (nodeID: string) => {
+    const cached = ancestorCache.get(nodeID);
+    if (cached) return cached;
+    const ancestors = new Set<string>();
+    const queue = (incomingByTarget.get(nodeID) || []).map(
+      (edge) => edge.source,
+    );
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      if (ancestors.has(current)) continue;
+      ancestors.add(current);
+      for (const edge of incomingByTarget.get(current) || []) {
+        queue.push(edge.source);
+      }
+    }
+    ancestorCache.set(nodeID, ancestors);
+    return ancestors;
+  };
+  const producedVariables = (preview?: RSSAutomationNodePreview) => {
+    const output = preview?.output;
+    if (!output || typeof output !== 'object' || Array.isArray(output)) {
+      return undefined;
+    }
+    const variables = (output as Record<string, unknown>).variables;
+    if (
+      !variables ||
+      typeof variables !== 'object' ||
+      Array.isArray(variables)
+    ) {
+      return undefined;
+    }
+    return variables as Record<string, unknown>;
+  };
+  const contextForNode = (nodeID: string): Record<string, unknown> => {
+    const vars: Record<string, unknown> = {};
+    const nodeValues: Record<string, unknown> = {};
+    const ancestors = ancestorIDs(nodeID);
+    for (const ancestorID of orderedNodeIDs) {
+      const preview = previews[ancestorID];
+      if (!ancestors.has(ancestorID) || !preview?.active) continue;
+      nodeValues[ancestorID] = { output: preview.output };
+      Object.assign(vars, producedVariables(preview));
+    }
+    return { item, vars, nodes: nodeValues };
+  };
 
-  for (const nodeId of orderedNodes(definition)) {
+  for (const nodeId of orderedNodeIDs) {
     const node = nodes.get(nodeId);
     if (!node) continue;
-    const incoming = definition.edges.filter((edge) => edge.target === nodeId);
+    const incoming = incomingByTarget.get(nodeId) || [];
     const activeIncoming = incoming.filter((edge) => {
-      const ports = selectedPorts.get(edge.source) || [];
+      const ports = selectedPorts.get(edge.source);
       const active =
-        edge.source_port === 'always' ||
-        ports.includes('*') ||
-        ports.includes(edge.source_port);
+        ports !== undefined &&
+        (edge.source_port === 'always' ||
+          ports.includes('*') ||
+          ports.includes(edge.source_port));
       if (active) activeEdgeIds.add(edge.id);
       return active;
     });
@@ -1024,12 +1181,15 @@ export const simulateRSSAutomation = (
       };
       continue;
     }
+    const context = contextForNode(nodeId);
     const preview = previewNode(node, context, activeIncoming.length);
     previews[nodeId] = preview;
     selectedPorts.set(nodeId, preview.selectedPorts);
-    (context.nodes as Record<string, unknown>)[nodeId] = {
-      output: preview.output,
-    };
+  }
+
+  const variables: Record<string, unknown> = {};
+  for (const nodeID of orderedNodeIDs) {
+    Object.assign(variables, producedVariables(previews[nodeID]));
   }
 
   return {
@@ -1038,6 +1198,6 @@ export const simulateRSSAutomation = (
     activeNodeIds: Object.entries(previews)
       .filter(([, preview]) => preview.active)
       .map(([id]) => id),
-    variables: context.vars as Record<string, unknown>,
+    variables,
   };
 };

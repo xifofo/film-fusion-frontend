@@ -398,6 +398,11 @@ const AutomationHistory = ({
                   title: '尝试',
                   render: (_, node) => `${node.attempt}/${node.max_attempts}`,
                 },
+                {
+                  title: '计划继续',
+                  dataIndex: 'next_attempt_at',
+                  render: formatTime,
+                },
                 { title: '错误', dataIndex: 'error_message', ellipsis: true },
               ]}
               dataSource={detail.node_runs}

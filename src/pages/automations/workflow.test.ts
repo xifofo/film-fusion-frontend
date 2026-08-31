@@ -38,9 +38,31 @@ describe('115 directory automation workflow', () => {
     ]);
   });
 
+  it('inserts a durable delay directly after the trigger', () => {
+    const definition = buildAutomationDefinition({
+      ...defaultAutomationActions(),
+      delay_value: 2,
+      delay_unit: 'hours',
+      recognition: 'none',
+      notification_enabled: false,
+    });
+    expect(definition.nodes.map((node) => node.type)).toEqual([
+      'trigger',
+      'delay',
+      'end',
+    ]);
+    expect(definition.nodes[1].config).toEqual({ delay_seconds: 7200 });
+    expect(definition.edges).toMatchObject([
+      { source: 'trigger', source_port: 'next', target: 'delay' },
+      { source: 'delay', source_port: 'success', target: 'end' },
+    ]);
+  });
+
   it('reads the editable actions from a persisted workflow', () => {
     const definition = buildAutomationDefinition({
       ...defaultAutomationActions(),
+      delay_value: 10,
+      delay_unit: 'minutes',
       recognition: 'moviepilot',
       organize_enabled: true,
       cloud_directory_id: 12,
@@ -52,6 +74,8 @@ describe('115 directory automation workflow', () => {
       definition_json: JSON.stringify(definition),
     } as AutomationWorkflow;
     expect(readAutomationActions(workflow)).toMatchObject({
+      delay_value: 10,
+      delay_unit: 'minutes',
       recognition: 'moviepilot',
       organize_enabled: true,
       cloud_directory_id: 12,

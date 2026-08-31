@@ -18,11 +18,23 @@ export type RSSFlowEdge = Edge;
 
 export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   trigger: 'RSS 触发器',
+  delay: '延迟执行',
   regex: '正则提取',
   keyword: '关键词匹配',
   keyword_replace: '关键词替换',
   regex_replace: '正则替换',
   convert: '类型转换',
+  set_variable: '设置变量',
+  template: '文本模板',
+  json_extract: 'JSON 取值',
+  math: '数学运算',
+  datetime_operation: '日期时间运算',
+  list_operation: '列表运算',
+  switch: '多路分支',
+  coalesce: '候选值合并',
+  deduplicate: '运行去重',
+  rate_limit: '频率限制',
+  foreach: '遍历映射',
   if: 'IF 条件',
   parallel: '并行分支',
   join: '汇合',
@@ -86,6 +98,13 @@ export const PORT_LABELS: Record<string, string> = {
   not_found: '没有资源',
   valid: '有效',
   invalid: '无效',
+  empty: '空列表',
+  default: '默认',
+  new: '首次',
+  duplicate: '重复',
+  allowed: '允许',
+  throttled: '受限',
+  partial: '部分成功',
   always: '总是',
 };
 
@@ -104,6 +123,21 @@ export const sourcePortLabel = (
   if (source?.type === 'join') {
     if (port === 'failure') return '未满足';
     return joinHasConditionalOutcome(source) ? '满足' : '继续';
+  }
+  if (source?.type === 'switch' && port.startsWith('case-')) {
+    const caseID = port.slice('case-'.length);
+    const cases = Array.isArray(source.config?.cases)
+      ? source.config.cases
+      : [];
+    const matched = cases.find(
+      (candidate) =>
+        candidate &&
+        typeof candidate === 'object' &&
+        String(
+          (candidate as Record<string, unknown>).id || '',
+        ).toLowerCase() === caseID.toLowerCase(),
+    ) as Record<string, unknown> | undefined;
+    return String(matched?.label || `条件 ${caseID}`);
   }
   return PORT_LABELS[port] || port.replace(/^branch-/, '分支 ');
 };
@@ -190,6 +224,7 @@ export const createNodeDefinition = (
     .toString(36)
     .slice(2, 7)}`;
   const config: Record<string, unknown> = {};
+  if (type === 'delay') config.delay_seconds = 600;
   if (type === 'regex') {
     Object.assign(config, {
       input: '$item.title',
@@ -228,6 +263,145 @@ export const createNodeDefinition = (
       input: '$item.size_bytes',
       variable: 'size',
       value_type: 'integer',
+    });
+  }
+  if (type === 'set_variable') {
+    Object.assign(config, {
+      variable: 'result',
+      value: '',
+      value_type: 'auto',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'template') {
+    Object.assign(config, {
+      template: '{{item.title}}',
+      variable: 'rendered_text',
+      missing: 'error',
+      trim: false,
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'json_extract') {
+    Object.assign(config, {
+      input: '$item',
+      pointer: '',
+      variable: 'extracted_value',
+      missing: 'failure',
+      default_value: '',
+      value_type: 'auto',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'math') {
+    Object.assign(config, {
+      operation: 'add',
+      left: 0,
+      right: 0,
+      precision: 2,
+      result_type: 'number',
+      variable: 'result',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'datetime_operation') {
+    Object.assign(config, {
+      operation: 'parse',
+      input: '',
+      right: '',
+      input_format: 'auto',
+      output_format: 'rfc3339',
+      timezone: 'Asia/Shanghai',
+      amount: 0,
+      unit: 'second',
+      precision: 0,
+      variable: 'datetime_result',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'list_operation') {
+    Object.assign(config, {
+      operation: 'unique',
+      input: '',
+      separator: ',',
+      trim_items: true,
+      omit_empty: true,
+      pointer: '',
+      missing: 'failure',
+      direction: 'asc',
+      compare_as: 'auto',
+      offset: 0,
+      limit: 100,
+      variable: 'list_result',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'switch') {
+    Object.assign(config, {
+      input: '',
+      compare_as: 'auto',
+      case_sensitive: false,
+      cases: [
+        {
+          id: 'case1',
+          label: '条件 1',
+          operator: 'eq',
+          value: '',
+        },
+      ],
+    });
+  }
+  if (type === 'coalesce') {
+    Object.assign(config, {
+      candidates: [],
+      missing: 'skip',
+      skip_null: true,
+      skip_empty_string: true,
+      skip_empty_array: false,
+      skip_empty_object: false,
+      trim_strings: false,
+      on_empty: 'failure',
+      default_value: '',
+      value_type: 'auto',
+      variable: 'coalesced',
+      overwrite: 'overwrite',
+    });
+  }
+  if (type === 'deduplicate') {
+    Object.assign(config, {
+      key: '',
+      scope: 'workflow',
+      namespace: '',
+      normalize: 'trim',
+      ttl_seconds: 604800,
+      refresh_on_duplicate: false,
+      preview_assumption: 'new',
+    });
+  }
+  if (type === 'rate_limit') {
+    Object.assign(config, {
+      key: '',
+      scope: 'workflow',
+      namespace: '',
+      normalize: 'trim',
+      limit: 5,
+      window_seconds: 60,
+      behavior: 'defer',
+      max_wait_seconds: 60,
+      preview_assumption: 'allowed',
+    });
+  }
+  if (type === 'foreach') {
+    Object.assign(config, {
+      input: '',
+      transform: {
+        type: 'template',
+        config: { template: '{{each.item}}', missing: 'error', trim: false },
+      },
+      on_error: 'fail_fast',
+      max_items: 100,
+      variable: 'mapped_items',
+      overwrite: 'overwrite',
     });
   }
   if (type === 'if') {

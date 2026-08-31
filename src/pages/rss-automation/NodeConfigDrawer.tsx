@@ -1,6 +1,7 @@
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   Alert,
+  AutoComplete,
   Button,
   Divider,
   Form,
@@ -18,11 +19,42 @@ import type {
   RSSAutomationNodeProtocol,
   RSSAutomationTarget,
 } from '@/services/film-fusion';
+import {
+  AUTOMATION_DELAY_MAX_SECONDS,
+  type AutomationDelayUnit,
+  automationDelayMaxValue,
+  automationDelayParts,
+  automationDelayUnitOptions,
+  toAutomationDelaySeconds,
+} from '../automations/delay';
+import {
+  automationCompareAsOptions,
+  automationDatetimeDifferenceUnitOptions,
+  automationDatetimeDurationUnitOptions,
+  automationDatetimeInputFormatOptions,
+  automationDatetimeOperationOptions,
+  automationDatetimeOutputFormatOptions,
+  automationDatetimeStartUnitOptions,
+  automationForeachTransformOptions,
+  automationGuardNormalizeOptions,
+  automationGuardScopeOptions,
+  automationListOperationOptions,
+  automationSwitchOperatorOptions,
+} from './advancedNodes';
 import DirectoryIdInput from './DirectoryIdInput';
 import { NODE_LABELS } from './flow';
 import styles from './index.module.less';
 import type { RSSAutomationNodePreview } from './preview';
 import TemplateVariableInput from './TemplateVariableInput';
+import {
+  automationJSONPointerError,
+  automationMathOperationOptions,
+  automationUnaryMathOperations,
+  automationVariableNameError,
+  automationVariableOverwriteOptions,
+  automationVariableValueTypeOptions,
+  normalizeAutomationVariableName,
+} from './variableNodes';
 
 const { Text } = Typography;
 
@@ -40,7 +72,7 @@ type NodeConfigModalProps = {
 };
 
 export type NodeFieldReference = {
-  kind: 'item' | 'variable' | 'node';
+  kind: 'item' | 'variable' | 'node' | 'each';
   name: string;
   value: string;
   preview?: string;
@@ -115,6 +147,90 @@ const normalizeBranches = (raw: unknown) => {
     .filter((value, index, branches) => branches.indexOf(value) === index);
 };
 
+const normalizeSwitchCases = (raw: unknown) => {
+  const cases = Array.isArray(raw) ? raw : [];
+  const used = new Set<string>();
+  return cases.map((candidate, index) => {
+    const record =
+      candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+        ? (candidate as Record<string, unknown>)
+        : {};
+    let id = String(record.id || `case${index + 1}`)
+      .trim()
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+      .slice(0, 40);
+    if (!/^[A-Za-z0-9]/.test(id)) id = `case${index + 1}_${id}`.slice(0, 40);
+    if (!id) id = `case${index + 1}`;
+    const baseID = id;
+    let suffix = 2;
+    while (used.has(id.toLowerCase())) {
+      const addition = `_${suffix}`;
+      id = `${baseID.slice(0, 40 - addition.length)}${addition}`;
+      suffix += 1;
+    }
+    used.add(id.toLowerCase());
+    const operator = String(record.operator || 'eq');
+    let value = record.value ?? '';
+    if (operator === 'in' && typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) value = parsed;
+        } catch {
+          // Preserve invalid editor text; the form validator explains the issue.
+        }
+      }
+    } else {
+      value = variableEditorValue(value, 'auto');
+    }
+    return {
+      id,
+      label: String(record.label || `条件 ${index + 1}`).trim(),
+      operator,
+      value,
+    };
+  });
+};
+
+const foreachReferences: NodeFieldReference[] = [
+  {
+    kind: 'each',
+    name: '当前项',
+    value: '$each.item',
+    dataType: 'any',
+    description: '当前正在映射的列表项',
+  },
+  {
+    kind: 'each',
+    name: '索引',
+    value: '$each.index',
+    dataType: 'integer',
+    description: '从 0 开始的当前项索引',
+  },
+  {
+    kind: 'each',
+    name: '总数',
+    value: '$each.count',
+    dataType: 'integer',
+    description: '输入列表的总项数',
+  },
+  {
+    kind: 'each',
+    name: '是否首项',
+    value: '$each.first',
+    dataType: 'boolean',
+    description: '当前项是否为列表第一项',
+  },
+  {
+    kind: 'each',
+    name: '是否末项',
+    value: '$each.last',
+    dataType: 'boolean',
+    description: '当前项是否为列表最后一项',
+  },
+];
+
 const parseHTTPHeaders = (raw: unknown): Record<string, string> => {
   const text = String(raw ?? '').trim();
   if (!text) return {};
@@ -145,6 +261,26 @@ const conditionValue = (operator: string, raw: unknown) => {
   if (['gt', 'gte', 'lt', 'lte'].includes(operator)) {
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : raw;
+  }
+  return raw;
+};
+
+const variableEditorValue = (raw: unknown, valueType: unknown) => {
+  if (typeof raw !== 'string') return raw;
+  const text = raw.trim();
+  if (!text || text.startsWith('$') || text.includes('{{')) return raw;
+  if (valueType !== 'auto' && valueType !== 'json') return raw;
+  if (
+    valueType === 'json' ||
+    /^(?:null|true|false|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|\[|\{)/.test(
+      text,
+    )
+  ) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return raw;
+    }
   }
   return raw;
 };
@@ -182,6 +318,122 @@ const TemplateConfigField = ({
   </Form.Item>
 );
 
+const displayReferencePreview = (value?: string) => {
+  const preview = String(value || '').trim();
+  return preview ? ` · 当前样本：${preview}` : '';
+};
+
+const VariableNameField = ({
+  references,
+  label = '保存变量名',
+}: {
+  references: NodeFieldReference[];
+  label?: string;
+}) => {
+  const options = references
+    .filter((reference) => reference.kind === 'variable')
+    .map((reference) => ({
+      label: `${reference.name}${reference.description ? ` · ${reference.description}` : ''}${displayReferencePreview(reference.preview)}`,
+      value: reference.name,
+    }));
+  return (
+    <Form.Item
+      label={label}
+      name="variable"
+      rules={[
+        { required: true, message: '请输入变量名' },
+        {
+          validator: (_, value) => {
+            const error = automationVariableNameError(value);
+            return error ? Promise.reject(new Error(error)) : Promise.resolve();
+          },
+        },
+      ]}
+    >
+      <VariableNameInput options={options} />
+    </Form.Item>
+  );
+};
+
+const VariableNameInput = ({
+  options,
+  value,
+  onChange,
+}: {
+  options: Array<{ label: string; value: string }>;
+  value?: string;
+  onChange?: (value: string) => void;
+}) => (
+  <Space.Compact block>
+    <Input
+      aria-label="流程变量前缀"
+      readOnly
+      style={{ width: 76 }}
+      tabIndex={-1}
+      value="$vars."
+    />
+    <AutoComplete
+      onChange={onChange}
+      options={options}
+      placeholder="输入新变量名，或选择上游变量"
+      showSearch={{
+        filterOption: (input, option) =>
+          `${option?.label || ''} ${option?.value || ''}`
+            .toLowerCase()
+            .includes(input.toLowerCase()),
+      }}
+      style={{ width: 'calc(100% - 76px)' }}
+      value={value}
+    >
+      <Input maxLength={64} />
+    </AutoComplete>
+  </Space.Compact>
+);
+
+const VariableWriteFields = ({
+  references,
+  variable,
+  overwrite,
+}: {
+  references: NodeFieldReference[];
+  variable: unknown;
+  overwrite: unknown;
+}) => {
+  const normalized = normalizeAutomationVariableName(variable);
+  const existing = references.find(
+    (reference) =>
+      reference.kind === 'variable' && reference.name === normalized,
+  );
+  return (
+    <>
+      <VariableNameField references={references} />
+      <Form.Item
+        extra="目标变量不存在时，三种策略都会创建变量。"
+        label="已有变量时"
+        name="overwrite"
+        rules={[{ required: true }]}
+      >
+        <Select options={automationVariableOverwriteOptions} />
+      </Form.Item>
+      {existing && (
+        <Alert
+          className={styles.nodeConfigFull}
+          description={`${existing.description || '由上游节点写入'}${displayReferencePreview(existing.preview)}。当前策略：${
+            overwrite === 'keep'
+              ? '保留上游值，本节点不会写入'
+              : overwrite === 'error'
+                ? '运行到这里会走失败出口'
+                : '用本节点结果覆盖上游值'
+          }。`}
+          showIcon
+          title={`$vars.${normalized} 已由上游流程生成`}
+          type={overwrite === 'overwrite' ? 'warning' : 'info'}
+        />
+      )}
+    </>
+  );
+};
+
 const protocolExample = (value: unknown) => {
   if (value == null || value === '') return '';
   const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -215,8 +467,37 @@ const NodeConfigModal = ({
   const operator = Form.useWatch('condition_operator', form);
   const cloudStorageID = Form.useWatch('cloud_storage_id', form);
   const directoryPath = Form.useWatch('directory_path', form);
+  const delayUnit = (Form.useWatch('delay_unit', form) ||
+    'minutes') as AutomationDelayUnit;
   const filenameRegexEnabled = Form.useWatch('filename_regex_enabled', form);
   const recognitionMode = Form.useWatch('recognition_mode', form);
+  const variable = Form.useWatch('variable', form);
+  const overwrite = Form.useWatch('overwrite', form);
+  const variableValueType = Form.useWatch('value_type', form);
+  const jsonMissing = Form.useWatch('missing', form);
+  const coalesceOnEmpty = Form.useWatch('on_empty', form);
+  const mathOperation = Form.useWatch('operation', form);
+  const mathResultType = Form.useWatch('result_type', form);
+  const datetimeOperation = Form.useWatch('operation', form);
+  const listOperation = Form.useWatch('operation', form);
+  const guardScope = Form.useWatch('scope', form);
+  const rateBehavior = Form.useWatch('behavior', form);
+  const foreachTransformType = Form.useWatch('transform_type', form);
+  const foreachJSONMissing = Form.useWatch('transform_json_missing', form);
+  const foreachMathOperation = Form.useWatch('transform_math_operation', form);
+  const foreachMathResultType = Form.useWatch(
+    'transform_math_result_type',
+    form,
+  );
+  const foreachCoalesceOnEmpty = Form.useWatch(
+    'transform_coalesce_on_empty',
+    form,
+  );
+  const foreachDatetimeOperation = Form.useWatch(
+    'transform_datetime_operation',
+    form,
+  );
+  const foreachFieldReferences = [...fieldReferences, ...foreachReferences];
   const inputProtocols: NodeInputProtocolMap = new Map(
     (nodeProtocol?.inputs || []).map((protocol) => [protocol.name, protocol]),
   );
@@ -225,19 +506,96 @@ const NodeConfigModal = ({
     if (!node) return;
     form.resetFields();
     const config = node.config || {};
+    const delay = automationDelayParts(config.delay_seconds);
     const condition = (config.condition || {}) as Record<string, unknown>;
+    const transform =
+      config.transform &&
+      typeof config.transform === 'object' &&
+      !Array.isArray(config.transform)
+        ? (config.transform as Record<string, unknown>)
+        : {};
+    const transformConfig =
+      transform.config &&
+      typeof transform.config === 'object' &&
+      !Array.isArray(transform.config)
+        ? (transform.config as Record<string, unknown>)
+        : {};
     const rawConditionValue = condition.value;
+    const editorValue = (value: unknown) => {
+      if (value === undefined) return '';
+      if (value === null) return 'null';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object') return JSON.stringify(value, null, 2);
+      return String(value);
+    };
     form.setFieldsValue({
       name: node.name || NODE_LABELS[node.type],
       max_attempts: node.max_attempts || 1,
       ...config,
+      delay_value: delay.value,
+      delay_unit: delay.unit,
       branches: normalizeBranches(config.branches),
+      cases: normalizeSwitchCases(config.cases).map((candidate) => ({
+        ...candidate,
+        value: editorValue(candidate.value),
+      })),
+      candidates: Array.isArray(config.candidates)
+        ? config.candidates.map(editorValue)
+        : [],
       condition_field: condition.field,
       condition_operator: condition.operator || 'eq',
       condition_value: Array.isArray(rawConditionValue)
         ? rawConditionValue.join(', ')
         : rawConditionValue,
       headers_json: JSON.stringify(config.headers || {}, null, 2),
+      value: editorValue(config.value),
+      default_value: editorValue(config.default_value),
+      left: editorValue(config.left),
+      right: editorValue(config.right),
+      overwrite: config.overwrite || 'overwrite',
+      transform_type: transform.type || 'template',
+      transform_template: transformConfig.template ?? '{{each.item}}',
+      transform_template_missing: transformConfig.missing || 'error',
+      transform_template_trim: transformConfig.trim === true,
+      transform_json_input: editorValue(transformConfig.input ?? '$each.item'),
+      transform_json_pointer: transformConfig.pointer || '',
+      transform_json_missing: transformConfig.missing || 'failure',
+      transform_json_default_value: editorValue(transformConfig.default_value),
+      transform_json_value_type: transformConfig.value_type || 'auto',
+      transform_math_operation: transformConfig.operation || 'add',
+      transform_math_left: editorValue(transformConfig.left ?? '$each.item'),
+      transform_math_right: editorValue(transformConfig.right ?? 0),
+      transform_math_precision: transformConfig.precision ?? 2,
+      transform_math_result_type: transformConfig.result_type || 'number',
+      transform_coalesce_candidates: Array.isArray(transformConfig.candidates)
+        ? transformConfig.candidates.map(editorValue)
+        : ['$each.item'],
+      transform_coalesce_missing: transformConfig.missing || 'skip',
+      transform_coalesce_skip_null: transformConfig.skip_null !== false,
+      transform_coalesce_skip_empty_string:
+        transformConfig.skip_empty_string !== false,
+      transform_coalesce_skip_empty_array:
+        transformConfig.skip_empty_array === true,
+      transform_coalesce_skip_empty_object:
+        transformConfig.skip_empty_object === true,
+      transform_coalesce_trim_strings: transformConfig.trim_strings === true,
+      transform_coalesce_on_empty: transformConfig.on_empty || 'failure',
+      transform_coalesce_default_value: editorValue(
+        transformConfig.default_value,
+      ),
+      transform_coalesce_value_type: transformConfig.value_type || 'auto',
+      transform_datetime_operation: transformConfig.operation || 'parse',
+      transform_datetime_input: editorValue(
+        transformConfig.input ?? '$each.item',
+      ),
+      transform_datetime_right: editorValue(transformConfig.right),
+      transform_datetime_input_format: transformConfig.input_format || 'auto',
+      transform_datetime_output_format:
+        transformConfig.output_format || 'rfc3339',
+      transform_datetime_timezone: transformConfig.timezone || 'Asia/Shanghai',
+      transform_datetime_amount: editorValue(transformConfig.amount ?? 0),
+      transform_datetime_unit: transformConfig.unit || 'second',
+      transform_datetime_precision: transformConfig.precision ?? 0,
       directory_path:
         typeof node.ui?.directory_path === 'string'
           ? node.ui.directory_path
@@ -255,6 +613,50 @@ const NodeConfigModal = ({
       'group',
       'variable',
       'value_type',
+      'value',
+      'template',
+      'missing',
+      'trim',
+      'overwrite',
+      'pointer',
+      'default_value',
+      'operation',
+      'left',
+      'right',
+      'precision',
+      'result_type',
+      'input_format',
+      'output_format',
+      'timezone',
+      'amount',
+      'unit',
+      'separator',
+      'trim_items',
+      'omit_empty',
+      'direction',
+      'compare_as',
+      'offset',
+      'limit',
+      'candidates',
+      'skip_null',
+      'skip_empty_string',
+      'skip_empty_array',
+      'skip_empty_object',
+      'trim_strings',
+      'on_empty',
+      'cases',
+      'key',
+      'scope',
+      'namespace',
+      'normalize',
+      'ttl_seconds',
+      'refresh_on_duplicate',
+      'preview_assumption',
+      'window_seconds',
+      'behavior',
+      'max_wait_seconds',
+      'on_error',
+      'max_items',
       'keywords',
       'replacements',
       'replacement',
@@ -304,11 +706,21 @@ const NodeConfigModal = ({
     if (node.type === 'parallel') {
       config.branches = normalizeBranches(values.branches);
     }
+    if (node.type === 'delay') {
+      config.delay_seconds = toAutomationDelaySeconds(
+        values.delay_value,
+        values.delay_unit,
+      );
+    }
     if (node.type === 'keyword') {
       config.keywords = normalizeKeywords(values.keywords);
     }
     if (node.type === 'keyword_replace') {
       config.replacements = normalizeReplacementRules(values.replacements);
+    }
+    if (node.type === 'switch') {
+      config.cases = normalizeSwitchCases(values.cases);
+      config.input = variableEditorValue(values.input, 'auto');
     }
     if (node.type === 'if') {
       config.condition = {
@@ -326,6 +738,125 @@ const NodeConfigModal = ({
     }
     if (node.type === 'http_request') {
       config.headers = parseHTTPHeaders(values.headers_json);
+    }
+    if (
+      [
+        'regex',
+        'keyword_replace',
+        'regex_replace',
+        'convert',
+        'set_variable',
+        'template',
+        'json_extract',
+        'math',
+        'datetime_operation',
+        'list_operation',
+        'coalesce',
+        'foreach',
+      ].includes(node.type)
+    ) {
+      config.variable = normalizeAutomationVariableName(values.variable);
+    }
+    if (node.type === 'math' && values.result_type === 'integer') {
+      config.precision = 0;
+    }
+    if (node.type === 'set_variable') {
+      config.value = variableEditorValue(values.value, values.value_type);
+    }
+    if (node.type === 'json_extract' && values.missing === 'default') {
+      config.default_value = variableEditorValue(
+        values.default_value,
+        values.value_type,
+      );
+    }
+    if (node.type === 'coalesce') {
+      config.candidates = Array.isArray(values.candidates)
+        ? values.candidates.map((candidate: unknown) =>
+            variableEditorValue(candidate, 'auto'),
+          )
+        : [];
+      if (values.on_empty === 'default') {
+        config.default_value = variableEditorValue(
+          values.default_value,
+          values.value_type,
+        );
+      }
+    }
+    if (node.type === 'foreach') {
+      const transformType = String(values.transform_type || 'template');
+      const transformConfig: Record<string, unknown> = {};
+      if (transformType === 'template') {
+        Object.assign(transformConfig, {
+          template: values.transform_template,
+          missing: values.transform_template_missing,
+          trim: values.transform_template_trim === true,
+        });
+      }
+      if (transformType === 'json_extract') {
+        Object.assign(transformConfig, {
+          input: values.transform_json_input,
+          pointer: values.transform_json_pointer || '',
+          missing: values.transform_json_missing,
+          value_type: values.transform_json_value_type,
+        });
+        if (values.transform_json_missing === 'default') {
+          transformConfig.default_value = variableEditorValue(
+            values.transform_json_default_value,
+            values.transform_json_value_type,
+          );
+        }
+      }
+      if (transformType === 'math') {
+        Object.assign(transformConfig, {
+          operation: values.transform_math_operation,
+          left: variableEditorValue(values.transform_math_left, 'auto'),
+          right: variableEditorValue(values.transform_math_right, 'auto'),
+          precision:
+            values.transform_math_result_type === 'integer'
+              ? 0
+              : values.transform_math_precision,
+          result_type: values.transform_math_result_type,
+        });
+      }
+      if (transformType === 'coalesce') {
+        Object.assign(transformConfig, {
+          candidates: Array.isArray(values.transform_coalesce_candidates)
+            ? values.transform_coalesce_candidates.map((candidate: unknown) =>
+                variableEditorValue(candidate, 'auto'),
+              )
+            : [],
+          missing: values.transform_coalesce_missing,
+          skip_null: values.transform_coalesce_skip_null === true,
+          skip_empty_string:
+            values.transform_coalesce_skip_empty_string === true,
+          skip_empty_array: values.transform_coalesce_skip_empty_array === true,
+          skip_empty_object:
+            values.transform_coalesce_skip_empty_object === true,
+          trim_strings: values.transform_coalesce_trim_strings === true,
+          on_empty: values.transform_coalesce_on_empty,
+          value_type: values.transform_coalesce_value_type,
+        });
+        if (values.transform_coalesce_on_empty === 'default') {
+          transformConfig.default_value = variableEditorValue(
+            values.transform_coalesce_default_value,
+            values.transform_coalesce_value_type,
+          );
+        }
+      }
+      if (transformType === 'datetime_operation') {
+        Object.assign(transformConfig, {
+          operation: values.transform_datetime_operation,
+          input: values.transform_datetime_input,
+          right: values.transform_datetime_right,
+          input_format: values.transform_datetime_input_format,
+          output_format: values.transform_datetime_output_format,
+          timezone: values.transform_datetime_timezone,
+          amount: variableEditorValue(values.transform_datetime_amount, 'auto'),
+          unit: values.transform_datetime_unit,
+          precision: values.transform_datetime_precision,
+        });
+      }
+      config.transform = { type: transformType, config: transformConfig };
     }
     const ui = { ...(node.ui || {}) };
     if (node.type === 'offline115' || node.type === 'offline115_openapi') {
@@ -348,6 +879,63 @@ const NodeConfigModal = ({
   const renderConfig = () => {
     if (!node) return null;
     switch (node.type) {
+      case 'delay':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              到达节点后将等待固定时长，再从成功出口继续。等待状态会持久化，服务重启不会重新计时。
+            </Text>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="最长 30 天；样本预览只显示等待时长，不会真的暂停。"
+              label="等待时长"
+              required
+            >
+              <Space.Compact block>
+                <Form.Item
+                  name="delay_value"
+                  noStyle
+                  rules={[
+                    { required: true, message: '请输入等待时长' },
+                    {
+                      validator: (_, value) => {
+                        const numeric = Number(value);
+                        const seconds = toAutomationDelaySeconds(
+                          value,
+                          form.getFieldValue('delay_unit') || 'minutes',
+                        );
+                        if (!Number.isInteger(numeric) || numeric < 1) {
+                          return Promise.reject(
+                            new Error('等待时长必须是大于 0 的整数'),
+                          );
+                        }
+                        if (seconds > AUTOMATION_DELAY_MAX_SECONDS) {
+                          return Promise.reject(
+                            new Error('等待时长不能超过 30 天'),
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    max={automationDelayMaxValue(delayUnit)}
+                    min={1}
+                    precision={0}
+                    style={{ width: 'calc(100% - 110px)' }}
+                  />
+                </Form.Item>
+                <Form.Item name="delay_unit" noStyle>
+                  <Select
+                    options={automationDelayUnitOptions}
+                    style={{ width: 110 }}
+                  />
+                </Form.Item>
+              </Space.Compact>
+            </Form.Item>
+          </>
+        );
       case 'regex':
         return (
           <>
@@ -380,13 +968,7 @@ const NodeConfigModal = ({
             <Form.Item label="捕获组" name="group">
               <Input placeholder="1 或命名捕获组 episode" />
             </Form.Item>
-            <Form.Item
-              label="保存变量名"
-              name="variable"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="episode" />
-            </Form.Item>
+            <VariableNameField references={fieldReferences} />
             <Form.Item
               label="变量类型"
               name="value_type"
@@ -545,13 +1127,7 @@ const NodeConfigModal = ({
             >
               <Switch checkedChildren="区分" unCheckedChildren="忽略" />
             </Form.Item>
-            <Form.Item
-              label="保存变量名"
-              name="variable"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="normalized_title" />
-            </Form.Item>
+            <VariableNameField references={fieldReferences} />
           </>
         );
       case 'regex_replace':
@@ -582,13 +1158,7 @@ const NodeConfigModal = ({
             >
               <Input placeholder="例如：${name} 第${2}集" />
             </Form.Item>
-            <Form.Item
-              label="保存变量名"
-              name="variable"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="normalized_title" />
-            </Form.Item>
+            <VariableNameField references={fieldReferences} />
           </>
         );
       case 'convert':
@@ -610,13 +1180,7 @@ const NodeConfigModal = ({
                 references={fieldReferences}
               />
             </Form.Item>
-            <Form.Item
-              label="保存变量名"
-              name="variable"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="size" />
-            </Form.Item>
+            <VariableNameField references={fieldReferences} />
             <Form.Item
               label="转换类型"
               name="value_type"
@@ -626,6 +1190,1324 @@ const NodeConfigModal = ({
             </Form.Item>
           </>
         );
+      case 'set_variable':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              将固定值、RSS 字段或上游输出写入流程变量；精确引用会保留原始类型。
+            </Text>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="输入固定值，或点击“插入变量”。仅包含一个精确引用时会保留 object、array、number 等原始类型。"
+              label="变量值"
+              name="value"
+            >
+              <TemplateVariableInput
+                ariaLabel="变量值"
+                multiline={variableValueType === 'json'}
+                placeholder={
+                  variableValueType === 'json'
+                    ? '输入 JSON，或插入一个对象变量'
+                    : '输入固定值，或点击“插入变量”'
+                }
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              extra="自动模式会保留精确引用的原始类型；模板拼接的结果始终是文本。"
+              label="值类型"
+              name="value_type"
+              rules={[{ required: true }]}
+            >
+              <Select options={automationVariableValueTypeOptions} />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'template':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              用 RSS 字段和上游变量拼接文本，例如：
+              {'{{item.title}} · {{vars.quality}}'}。
+            </Text>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="点击“插入变量”会在当前光标位置插入 {{...}}；对象和数组会转换为 JSON 文本。"
+              label="模板内容"
+              name="template"
+            >
+              <TemplateVariableInput
+                ariaLabel="模板内容"
+                insertMode="template"
+                multiline
+                placeholder="例如：{{item.title}} · {{vars.quality}}"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              label="变量不存在时"
+              name="missing"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={[
+                  { label: '失败并走失败出口', value: 'error' },
+                  { label: '替换为空文本并继续', value: 'empty' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="去除首尾空白" name="trim" valuePropName="checked">
+              <Switch checkedChildren="去除" unCheckedChildren="保留" />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'json_extract':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              从 JSON 对象、数组或 JSON 文本中按 RFC 6901 JSON Pointer 读取值。
+            </Text>
+            <TemplateConfigField
+              field="input"
+              label="JSON 输入"
+              protocol={inputProtocol('input')}
+              references={fieldReferences}
+              required
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              extra="空值表示整个 JSON；例如 /items/0/title。属性名中的 / 写作 ~1，~ 写作 ~0。"
+              label="JSON Pointer"
+              name="pointer"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const error = automationJSONPointerError(value);
+                    return error
+                      ? Promise.reject(new Error(error))
+                      : Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <Input placeholder="/items/0/title" />
+            </Form.Item>
+            <Form.Item
+              label="路径不存在时"
+              name="missing"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={[
+                  { label: '失败并走失败出口', value: 'failure' },
+                  { label: '使用默认值', value: 'default' },
+                ]}
+              />
+            </Form.Item>
+            {jsonMissing === 'default' && (
+              <Form.Item
+                className={styles.nodeConfigFull}
+                extra="支持固定值和精确变量引用；false、0、null 都会作为有效默认值。"
+                label="默认值"
+                name="default_value"
+              >
+                <TemplateVariableInput
+                  ariaLabel="JSON 默认值"
+                  multiline={variableValueType === 'json'}
+                  placeholder="路径不存在时写入此值"
+                  references={fieldReferences}
+                />
+              </Form.Item>
+            )}
+            <Form.Item
+              label="结果类型"
+              name="value_type"
+              rules={[{ required: true }]}
+            >
+              <Select options={automationVariableValueTypeOptions} />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'math': {
+        const unary = automationUnaryMathOperations.has(mathOperation);
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              对固定数字或上游变量执行数学运算；除零、非数字和非有限结果会走失败出口。
+            </Text>
+            <Form.Item
+              label="运算"
+              name="operation"
+              rules={[{ required: true }]}
+            >
+              <Select options={automationMathOperationOptions} />
+            </Form.Item>
+            <Form.Item
+              label={unary ? '操作数' : '左操作数'}
+              name="left"
+              rules={[{ required: true }]}
+            >
+              <TemplateVariableInput
+                ariaLabel={unary ? '数学操作数' : '数学左操作数'}
+                placeholder="输入数字，或点击“插入变量”"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            {!unary && (
+              <Form.Item
+                label="右操作数"
+                name="right"
+                rules={[{ required: true }]}
+              >
+                <TemplateVariableInput
+                  ariaLabel="数学右操作数"
+                  placeholder="输入数字，或点击“插入变量”"
+                  references={fieldReferences}
+                />
+              </Form.Item>
+            )}
+            <Form.Item
+              extra={
+                mathResultType === 'integer'
+                  ? '整数结果不做隐式取整；需要取整时请选择 round、floor 或 ceil。'
+                  : '按 half-away-from-zero 规则保留小数。'
+              }
+              label="结果类型"
+              name="result_type"
+              rules={[{ required: true }]}
+            >
+              <Select
+                onChange={(value) => {
+                  if (value === 'integer') form.setFieldValue('precision', 0);
+                }}
+                options={[
+                  { label: '小数 number', value: 'number' },
+                  { label: '整数 integer', value: 'integer' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              label="小数精度"
+              name="precision"
+              rules={[
+                { required: true },
+                {
+                  validator: (_, value) =>
+                    Number.isInteger(Number(value)) &&
+                    Number(value) >= 0 &&
+                    Number(value) <= 12 &&
+                    (mathResultType !== 'integer' || Number(value) === 0)
+                      ? Promise.resolve()
+                      : Promise.reject(
+                          new Error(
+                            mathResultType === 'integer'
+                              ? '整数结果的小数精度必须为 0'
+                              : '小数精度必须是 0 到 12 的整数',
+                          ),
+                        ),
+                },
+              ]}
+            >
+              <InputNumber
+                disabled={mathResultType === 'integer'}
+                max={12}
+                min={0}
+                precision={0}
+              />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      }
+      case 'datetime_operation':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              解析、格式化或计算日期时间，并将结果保存到流程变量。无时区的日期会按配置时区解释。
+            </Text>
+            <Form.Item
+              label="日期操作"
+              name="operation"
+              rules={[{ required: true }]}
+            >
+              <Select options={automationDatetimeOperationOptions} />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="日期输入"
+              name="input"
+              rules={[{ required: true, message: '请输入日期或选择变量' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="日期输入"
+                placeholder="例如 2026-08-30T12:00:00+08:00，或插入变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            {datetimeOperation === 'diff' && (
+              <Form.Item
+                className={styles.nodeConfigFull}
+                extra="结果为“日期输入 − 对比日期”。"
+                label="对比日期"
+                name="right"
+                rules={[{ required: true, message: '请输入对比日期' }]}
+              >
+                <TemplateVariableInput
+                  ariaLabel="日期对比值"
+                  placeholder="输入日期，或插入变量"
+                  references={fieldReferences}
+                />
+              </Form.Item>
+            )}
+            <Form.Item label="输入格式" name="input_format">
+              <Select options={automationDatetimeInputFormatOptions} />
+            </Form.Item>
+            {datetimeOperation !== 'diff' && (
+              <Form.Item label="输出格式" name="output_format">
+                <Select options={automationDatetimeOutputFormatOptions} />
+              </Form.Item>
+            )}
+            <Form.Item
+              extra="使用 IANA 时区名称。"
+              label="时区"
+              name="timezone"
+              rules={[{ required: true, message: '请输入时区' }]}
+            >
+              <Input placeholder="Asia/Shanghai" />
+            </Form.Item>
+            {datetimeOperation === 'add' && (
+              <>
+                <Form.Item label="增减数量" name="amount" required>
+                  <TemplateVariableInput
+                    ariaLabel="日期增减数量"
+                    placeholder="正数增加，负数减少；可插入变量"
+                    references={fieldReferences}
+                  />
+                </Form.Item>
+                <Form.Item label="时间单位" name="unit">
+                  <Select options={automationDatetimeDurationUnitOptions} />
+                </Form.Item>
+              </>
+            )}
+            {datetimeOperation === 'diff' && (
+              <>
+                <Form.Item label="时间差单位" name="unit">
+                  <Select options={automationDatetimeDifferenceUnitOptions} />
+                </Form.Item>
+                <Form.Item label="小数精度" name="precision">
+                  <InputNumber max={6} min={0} precision={0} />
+                </Form.Item>
+              </>
+            )}
+            {datetimeOperation === 'start_of' && (
+              <Form.Item label="周期" name="unit">
+                <Select options={automationDatetimeStartUnitOptions} />
+              </Form.Item>
+            )}
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'list_operation':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              对文本或数组执行常用列表操作。列表去重只处理当前数组；跨运行去重请使用“运行去重”节点。
+            </Text>
+            <Form.Item label="列表操作" name="operation">
+              <Select options={automationListOperationOptions} />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label={listOperation === 'split' ? '文本输入' : '列表输入'}
+              name="input"
+              rules={[{ required: true, message: '请选择输入值' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="列表运算输入"
+                placeholder={
+                  listOperation === 'split'
+                    ? '输入文本，或插入变量'
+                    : '插入一个 array 类型变量'
+                }
+                references={fieldReferences}
+              />
+            </Form.Item>
+            {['split', 'join'].includes(listOperation) && (
+              <Form.Item
+                label={listOperation === 'split' ? '拆分符' : '连接符'}
+                name="separator"
+                extra={
+                  listOperation === 'split'
+                    ? '留空时按单个 Unicode 字符拆分。'
+                    : undefined
+                }
+              >
+                <Input placeholder="," />
+              </Form.Item>
+            )}
+            {['split', 'join'].includes(listOperation) && (
+              <Space className={styles.nodeConfigFull} size="large">
+                <Form.Item
+                  label="去除每项首尾空白"
+                  name="trim_items"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+                <Form.Item
+                  label="忽略空项"
+                  name="omit_empty"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              </Space>
+            )}
+            {['unique', 'sort', 'pluck'].includes(listOperation) && (
+              <>
+                <Form.Item
+                  className={styles.nodeConfigFull}
+                  extra="空值表示使用整个列表项；对象字段例如 /title。"
+                  label="比较 / 提取路径"
+                  name="pointer"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const error = automationJSONPointerError(value);
+                        return error
+                          ? Promise.reject(new Error(error))
+                          : Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="/title" />
+                </Form.Item>
+                <Form.Item label="路径不存在时" name="missing">
+                  <Select
+                    options={[
+                      { label: '节点失败', value: 'failure' },
+                      { label: '跳过该项', value: 'skip' },
+                      { label: '按 null 处理', value: 'null' },
+                    ]}
+                  />
+                </Form.Item>
+              </>
+            )}
+            {['unique', 'sort'].includes(listOperation) && (
+              <>
+                {listOperation === 'sort' && (
+                  <Form.Item label="排序方向" name="direction">
+                    <Select
+                      options={[
+                        { label: '升序', value: 'asc' },
+                        { label: '降序', value: 'desc' },
+                      ]}
+                    />
+                  </Form.Item>
+                )}
+                <Form.Item label="比较类型" name="compare_as">
+                  <Select options={automationCompareAsOptions} />
+                </Form.Item>
+              </>
+            )}
+            {listOperation === 'slice' && (
+              <>
+                <Form.Item label="起始索引" name="offset">
+                  <InputNumber max={10000} min={-10000} precision={0} />
+                </Form.Item>
+                <Form.Item label="最多保留" name="limit">
+                  <InputNumber max={10000} min={0} precision={0} />
+                </Form.Item>
+              </>
+            )}
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'switch':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              按顺序检查条件，第一条命中后从对应出口继续；全部未命中时走“默认”出口。
+            </Text>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="比较输入"
+              name="input"
+              rules={[{ required: true, message: '请选择比较输入' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="多路分支比较输入"
+                placeholder="选择 RSS 字段或上游变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item label="比较类型" name="compare_as">
+              <Select options={automationCompareAsOptions} />
+            </Form.Item>
+            <Form.Item
+              label="区分大小写"
+              name="case_sensitive"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Form.Item>
+            <Form.List
+              name="cases"
+              rules={[
+                {
+                  validator: (_, cases) =>
+                    Array.isArray(cases) && cases.length > 0
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('请至少添加一个分支条件')),
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <div className={styles.nodeConfigFull}>
+                  <Text strong>分支条件（顺序优先）</Text>
+                  {fields.map((field, index) => (
+                    <Space
+                      align="start"
+                      key={field.key}
+                      style={{ display: 'flex', marginTop: 10 }}
+                      wrap
+                    >
+                      <Form.Item hidden name={[field.name, 'id']}>
+                        <Input />
+                      </Form.Item>
+                      <Form.Item
+                        label={`条件 ${index + 1} 名称`}
+                        name={[field.name, 'label']}
+                        rules={[{ required: true, message: '请输入出口名称' }]}
+                      >
+                        <Input maxLength={120} placeholder="例如：电影" />
+                      </Form.Item>
+                      <Form.Item
+                        label="比较符"
+                        name={[field.name, 'operator']}
+                        rules={[{ required: true }]}
+                      >
+                        <Select
+                          options={automationSwitchOperatorOptions}
+                          style={{ width: 150 }}
+                        />
+                      </Form.Item>
+                      <Form.Item noStyle shouldUpdate>
+                        {({ getFieldValue }) => {
+                          const selectedOperator = getFieldValue([
+                            'cases',
+                            field.name,
+                            'operator',
+                          ]);
+                          return ['exists', 'not_exists'].includes(
+                            selectedOperator,
+                          ) ? null : (
+                            <Form.Item
+                              label="比较值"
+                              name={[field.name, 'value']}
+                              rules={[
+                                { required: true, message: '请输入比较值' },
+                                {
+                                  validator: (_, value) => {
+                                    if (selectedOperator !== 'in') {
+                                      return Promise.resolve();
+                                    }
+                                    const text = String(value ?? '').trim();
+                                    if (
+                                      /^\$(?:item|vars|nodes|each)(?:\.|$)/.test(
+                                        text,
+                                      ) ||
+                                      text.includes('{{')
+                                    ) {
+                                      return Promise.resolve();
+                                    }
+                                    try {
+                                      return Array.isArray(JSON.parse(text))
+                                        ? Promise.resolve()
+                                        : Promise.reject(
+                                            new Error('请输入 JSON 数组'),
+                                          );
+                                    } catch {
+                                      return Promise.reject(
+                                        new Error('请输入 JSON 数组或数组变量'),
+                                      );
+                                    }
+                                  },
+                                },
+                              ]}
+                            >
+                              <TemplateVariableInput
+                                ariaLabel={`条件 ${index + 1} 比较值`}
+                                placeholder={
+                                  selectedOperator === 'in'
+                                    ? '["电影", "剧集"] 或数组变量'
+                                    : '固定值或变量'
+                                }
+                                references={fieldReferences}
+                              />
+                            </Form.Item>
+                          );
+                        }}
+                      </Form.Item>
+                      <Button
+                        aria-label={`删除条件 ${index + 1}`}
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                        style={{ marginTop: 30 }}
+                        type="text"
+                      />
+                    </Space>
+                  ))}
+                  <Button
+                    block
+                    disabled={fields.length >= 20}
+                    icon={<PlusOutlined />}
+                    onClick={() =>
+                      add({
+                        id: `case${Date.now().toString(36)}`,
+                        label: `条件 ${fields.length + 1}`,
+                        operator: 'eq',
+                        value: '',
+                      })
+                    }
+                    type="dashed"
+                  >
+                    添加分支条件
+                  </Button>
+                  <Form.ErrorList errors={errors} />
+                </div>
+              )}
+            </Form.List>
+          </>
+        );
+      case 'coalesce':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              按顺序选择第一个存在且未被跳过的值；数字 0 和布尔 false
+              始终是有效值。
+            </Text>
+            <Form.List
+              name="candidates"
+              rules={[
+                {
+                  validator: (_, candidates) =>
+                    Array.isArray(candidates) && candidates.length > 0
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('请至少添加一个候选值')),
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <div className={styles.nodeConfigFull}>
+                  <Text strong>候选值（顺序优先）</Text>
+                  {fields.map((field, index) => (
+                    <Space.Compact
+                      block
+                      key={field.key}
+                      style={{ marginTop: 10 }}
+                    >
+                      <Form.Item
+                        name={field.name}
+                        noStyle
+                        rules={[{ required: true, message: '请输入候选值' }]}
+                      >
+                        <TemplateVariableInput
+                          ariaLabel={`候选值 ${index + 1}`}
+                          placeholder="固定值或变量"
+                          references={fieldReferences}
+                        />
+                      </Form.Item>
+                      <Button
+                        aria-label={`删除候选值 ${index + 1}`}
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                      />
+                    </Space.Compact>
+                  ))}
+                  <Button
+                    block
+                    disabled={fields.length >= 32}
+                    icon={<PlusOutlined />}
+                    onClick={() => add('')}
+                    style={{ marginTop: 10 }}
+                    type="dashed"
+                  >
+                    添加候选值
+                  </Button>
+                  <Form.ErrorList errors={errors} />
+                </div>
+              )}
+            </Form.List>
+            <Form.Item label="引用不存在时" name="missing">
+              <Select
+                options={[
+                  { label: '跳过并继续检查', value: 'skip' },
+                  { label: '节点失败', value: 'failure' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="全部为空时" name="on_empty">
+              <Select
+                options={[
+                  { label: '节点失败', value: 'failure' },
+                  { label: '使用默认值', value: 'default' },
+                ]}
+              />
+            </Form.Item>
+            {coalesceOnEmpty === 'default' && (
+              <Form.Item
+                className={styles.nodeConfigFull}
+                label="默认值"
+                name="default_value"
+              >
+                <TemplateVariableInput
+                  ariaLabel="候选值默认值"
+                  placeholder="固定值或变量"
+                  references={fieldReferences}
+                />
+              </Form.Item>
+            )}
+            <Space className={styles.nodeConfigFull} size="large" wrap>
+              <Form.Item
+                label="跳过 null"
+                name="skip_null"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                label="跳过空文本"
+                name="skip_empty_string"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                label="跳过空数组"
+                name="skip_empty_array"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                label="跳过空对象"
+                name="skip_empty_object"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                label="文本先去首尾空白"
+                name="trim_strings"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+            </Space>
+            <Form.Item label="结果类型" name="value_type">
+              <Select options={automationVariableValueTypeOptions} />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      case 'deduplicate':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="样本预览只按下方假设显示分支；真实执行会查询持久去重状态，结果可能不同。"
+              showIcon
+              title="这是跨运行的持久去重门"
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="去重键"
+              name="key"
+              rules={[{ required: true, message: '请输入去重键' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="运行去重键"
+                placeholder="例如 $item.guid 或 {{item.title}}"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item label="状态范围" name="scope">
+              <Select options={automationGuardScopeOptions} />
+            </Form.Item>
+            <Form.Item
+              extra={
+                guardScope === 'global'
+                  ? '全局范围必须填写；相同命名空间会跨流程共享状态。'
+                  : '留空时自动使用当前节点 ID。'
+              }
+              label="命名空间"
+              name="namespace"
+              rules={[
+                {
+                  validator: (_, value) =>
+                    guardScope !== 'global' || String(value || '').trim()
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('全局范围必须填写命名空间')),
+                },
+              ]}
+            >
+              <Input maxLength={80} placeholder="可选" />
+            </Form.Item>
+            <Form.Item label="键标准化" name="normalize">
+              <Select options={automationGuardNormalizeOptions} />
+            </Form.Item>
+            <Form.Item
+              extra="允许 60 秒到 365 天。"
+              label="去重有效期（秒）"
+              name="ttl_seconds"
+              rules={[{ required: true }]}
+            >
+              <InputNumber max={31536000} min={60} precision={0} />
+            </Form.Item>
+            <Form.Item
+              label="重复时刷新有效期"
+              name="refresh_on_duplicate"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Form.Item>
+            <Form.Item
+              extra="只影响本地样本预览，不改变真实去重结果。"
+              label="预览假设"
+              name="preview_assumption"
+            >
+              <Select
+                options={[
+                  { label: '假设首次出现', value: 'new' },
+                  { label: '假设已经重复', value: 'duplicate' },
+                ]}
+              />
+            </Form.Item>
+          </>
+        );
+      case 'rate_limit':
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="样本预览只按下方假设显示；真实执行会查询持久限流状态，结果可能不同。"
+              showIcon
+              title="限流状态跨运行保存"
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="限流键"
+              name="key"
+              rules={[{ required: true, message: '请输入限流键' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="频率限制键"
+                placeholder="例如 $item.category；全流程共用时可输入固定值"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item label="状态范围" name="scope">
+              <Select options={automationGuardScopeOptions} />
+            </Form.Item>
+            <Form.Item
+              extra={
+                guardScope === 'global'
+                  ? '全局范围必须填写；相同命名空间会跨流程共享额度。'
+                  : '留空时自动使用当前节点 ID。'
+              }
+              label="命名空间"
+              name="namespace"
+              rules={[
+                {
+                  validator: (_, value) =>
+                    guardScope !== 'global' || String(value || '').trim()
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('全局范围必须填写命名空间')),
+                },
+              ]}
+            >
+              <Input maxLength={80} placeholder="可选" />
+            </Form.Item>
+            <Form.Item label="键标准化" name="normalize">
+              <Select options={automationGuardNormalizeOptions} />
+            </Form.Item>
+            <Form.Item label="窗口内最多次数" name="limit">
+              <InputNumber max={10000} min={1} precision={0} />
+            </Form.Item>
+            <Form.Item label="统计窗口（秒）" name="window_seconds">
+              <InputNumber max={2592000} min={1} precision={0} />
+            </Form.Item>
+            <Form.Item label="达到限额时" name="behavior">
+              <Select
+                options={[
+                  { label: '等待额度恢复', value: 'defer' },
+                  { label: '立即走“受限”出口', value: 'branch' },
+                ]}
+              />
+            </Form.Item>
+            {rateBehavior === 'defer' && (
+              <Form.Item
+                extra="等待超过此时长会走失败出口。"
+                label="最长等待（秒）"
+                name="max_wait_seconds"
+              >
+                <InputNumber max={2592000} min={1} precision={0} />
+              </Form.Item>
+            )}
+            <Form.Item
+              extra="只影响本地样本预览，不改变真实限流结果。等待模式下，受限假设会停在当前节点。"
+              label="预览假设"
+              name="preview_assumption"
+            >
+              <Select
+                options={[
+                  { label: '假设仍有额度', value: 'allowed' },
+                  { label: '假设已经受限', value: 'throttled' },
+                ]}
+              />
+            </Form.Item>
+          </>
+        );
+      case 'foreach': {
+        const transformMathUnary =
+          automationUnaryMathOperations.has(foreachMathOperation);
+        return (
+          <>
+            <Alert
+              className={styles.nodeConfigFull}
+              description="每项只能执行模板、JSON 取值、数学、候选值或日期时间变换，不会创建子画布或流程回边。单项失败时保留 null，从而保持原列表索引。"
+              showIcon
+              title="有界纯映射"
+              type="info"
+            />
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="输入列表"
+              name="input"
+              rules={[{ required: true, message: '请选择 array 类型变量' }]}
+            >
+              <TemplateVariableInput
+                ariaLabel="遍历输入列表"
+                placeholder="插入一个 array 类型变量"
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item label="单项变换" name="transform_type">
+              <Select options={automationForeachTransformOptions} />
+            </Form.Item>
+            <Form.Item label="单项失败时" name="on_error">
+              <Select
+                options={[
+                  { label: '立即失败', value: 'fail_fast' },
+                  { label: '以 null 占位并继续', value: 'collect' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              extra="输入超过上限时节点失败，避免单次运行失控。"
+              label="最大项数"
+              name="max_items"
+            >
+              <InputNumber max={1000} min={1} precision={0} />
+            </Form.Item>
+
+            {foreachTransformType === 'template' && (
+              <>
+                <Form.Item
+                  className={styles.nodeConfigFull}
+                  label="模板内容"
+                  name="transform_template"
+                  rules={[{ required: true }]}
+                >
+                  <TemplateVariableInput
+                    ariaLabel="遍历文本模板"
+                    insertMode="template"
+                    multiline
+                    placeholder="例如 {{each.index}}. {{each.item}}"
+                    references={foreachFieldReferences}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="引用不存在时"
+                  name="transform_template_missing"
+                >
+                  <Select
+                    options={[
+                      { label: '单项失败', value: 'error' },
+                      { label: '替换为空文本', value: 'empty' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="去除首尾空白"
+                  name="transform_template_trim"
+                  valuePropName="checked"
+                >
+                  <Switch />
+                </Form.Item>
+              </>
+            )}
+
+            {foreachTransformType === 'json_extract' && (
+              <>
+                <Form.Item
+                  className={styles.nodeConfigFull}
+                  label="JSON 输入"
+                  name="transform_json_input"
+                  rules={[{ required: true }]}
+                >
+                  <TemplateVariableInput
+                    ariaLabel="遍历 JSON 输入"
+                    placeholder="$each.item"
+                    references={foreachFieldReferences}
+                  />
+                </Form.Item>
+                <Form.Item
+                  className={styles.nodeConfigFull}
+                  label="JSON Pointer"
+                  name="transform_json_pointer"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const error = automationJSONPointerError(value);
+                        return error
+                          ? Promise.reject(new Error(error))
+                          : Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <Input placeholder="/title" />
+                </Form.Item>
+                <Form.Item label="路径不存在时" name="transform_json_missing">
+                  <Select
+                    options={[
+                      { label: '单项失败', value: 'failure' },
+                      { label: '使用默认值', value: 'default' },
+                    ]}
+                  />
+                </Form.Item>
+                {foreachJSONMissing === 'default' && (
+                  <Form.Item label="默认值" name="transform_json_default_value">
+                    <TemplateVariableInput
+                      ariaLabel="遍历 JSON 默认值"
+                      placeholder="固定值或变量"
+                      references={foreachFieldReferences}
+                    />
+                  </Form.Item>
+                )}
+                <Form.Item label="结果类型" name="transform_json_value_type">
+                  <Select options={automationVariableValueTypeOptions} />
+                </Form.Item>
+              </>
+            )}
+
+            {foreachTransformType === 'math' && (
+              <>
+                <Form.Item label="运算" name="transform_math_operation">
+                  <Select options={automationMathOperationOptions} />
+                </Form.Item>
+                <Form.Item
+                  label={transformMathUnary ? '操作数' : '左操作数'}
+                  name="transform_math_left"
+                  rules={[{ required: true }]}
+                >
+                  <TemplateVariableInput
+                    ariaLabel="遍历数学左操作数"
+                    placeholder="$each.item"
+                    references={foreachFieldReferences}
+                  />
+                </Form.Item>
+                {!transformMathUnary && (
+                  <Form.Item
+                    label="右操作数"
+                    name="transform_math_right"
+                    rules={[{ required: true }]}
+                  >
+                    <TemplateVariableInput
+                      ariaLabel="遍历数学右操作数"
+                      placeholder="固定数字或变量"
+                      references={foreachFieldReferences}
+                    />
+                  </Form.Item>
+                )}
+                <Form.Item label="结果类型" name="transform_math_result_type">
+                  <Select
+                    onChange={(value) => {
+                      if (value === 'integer') {
+                        form.setFieldValue('transform_math_precision', 0);
+                      }
+                    }}
+                    options={[
+                      { label: '小数 number', value: 'number' },
+                      { label: '整数 integer', value: 'integer' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item label="小数精度" name="transform_math_precision">
+                  <InputNumber
+                    disabled={foreachMathResultType === 'integer'}
+                    max={12}
+                    min={0}
+                    precision={0}
+                  />
+                </Form.Item>
+              </>
+            )}
+
+            {foreachTransformType === 'coalesce' && (
+              <>
+                <Form.List name="transform_coalesce_candidates">
+                  {(fields, { add, remove }) => (
+                    <div className={styles.nodeConfigFull}>
+                      <Text strong>候选值（顺序优先）</Text>
+                      {fields.map((field, index) => (
+                        <Space.Compact
+                          block
+                          key={field.key}
+                          style={{ marginTop: 10 }}
+                        >
+                          <Form.Item name={field.name} noStyle>
+                            <TemplateVariableInput
+                              ariaLabel={`遍历候选值 ${index + 1}`}
+                              placeholder="$each.item 或其他值"
+                              references={foreachFieldReferences}
+                            />
+                          </Form.Item>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => remove(field.name)}
+                          />
+                        </Space.Compact>
+                      ))}
+                      <Button
+                        block
+                        disabled={fields.length >= 32}
+                        icon={<PlusOutlined />}
+                        onClick={() => add('')}
+                        style={{ marginTop: 10 }}
+                        type="dashed"
+                      >
+                        添加候选值
+                      </Button>
+                    </div>
+                  )}
+                </Form.List>
+                <Form.Item
+                  label="引用不存在时"
+                  name="transform_coalesce_missing"
+                >
+                  <Select
+                    options={[
+                      { label: '跳过', value: 'skip' },
+                      { label: '单项失败', value: 'failure' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="全部为空时"
+                  name="transform_coalesce_on_empty"
+                >
+                  <Select
+                    options={[
+                      { label: '单项失败', value: 'failure' },
+                      { label: '使用默认值', value: 'default' },
+                    ]}
+                  />
+                </Form.Item>
+                {foreachCoalesceOnEmpty === 'default' && (
+                  <Form.Item
+                    label="默认值"
+                    name="transform_coalesce_default_value"
+                  >
+                    <TemplateVariableInput
+                      ariaLabel="遍历候选默认值"
+                      placeholder="固定值或变量"
+                      references={foreachFieldReferences}
+                    />
+                  </Form.Item>
+                )}
+                <Space className={styles.nodeConfigFull} size="large" wrap>
+                  <Form.Item
+                    label="跳过 null"
+                    name="transform_coalesce_skip_null"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item
+                    label="跳过空文本"
+                    name="transform_coalesce_skip_empty_string"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item
+                    label="跳过空数组"
+                    name="transform_coalesce_skip_empty_array"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item
+                    label="跳过空对象"
+                    name="transform_coalesce_skip_empty_object"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item
+                    label="文本先去空白"
+                    name="transform_coalesce_trim_strings"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                </Space>
+                <Form.Item
+                  label="结果类型"
+                  name="transform_coalesce_value_type"
+                >
+                  <Select options={automationVariableValueTypeOptions} />
+                </Form.Item>
+              </>
+            )}
+
+            {foreachTransformType === 'datetime_operation' && (
+              <>
+                <Form.Item label="日期操作" name="transform_datetime_operation">
+                  <Select options={automationDatetimeOperationOptions} />
+                </Form.Item>
+                <Form.Item
+                  className={styles.nodeConfigFull}
+                  label="日期输入"
+                  name="transform_datetime_input"
+                  rules={[{ required: true }]}
+                >
+                  <TemplateVariableInput
+                    ariaLabel="遍历日期输入"
+                    placeholder="$each.item"
+                    references={foreachFieldReferences}
+                  />
+                </Form.Item>
+                {foreachDatetimeOperation === 'diff' && (
+                  <Form.Item
+                    className={styles.nodeConfigFull}
+                    label="对比日期"
+                    name="transform_datetime_right"
+                    rules={[{ required: true }]}
+                  >
+                    <TemplateVariableInput
+                      ariaLabel="遍历日期对比值"
+                      placeholder="固定日期或变量"
+                      references={foreachFieldReferences}
+                    />
+                  </Form.Item>
+                )}
+                <Form.Item
+                  label="输入格式"
+                  name="transform_datetime_input_format"
+                >
+                  <Select options={automationDatetimeInputFormatOptions} />
+                </Form.Item>
+                {foreachDatetimeOperation !== 'diff' && (
+                  <Form.Item
+                    label="输出格式"
+                    name="transform_datetime_output_format"
+                  >
+                    <Select options={automationDatetimeOutputFormatOptions} />
+                  </Form.Item>
+                )}
+                <Form.Item label="时区" name="transform_datetime_timezone">
+                  <Input placeholder="Asia/Shanghai" />
+                </Form.Item>
+                {foreachDatetimeOperation === 'add' && (
+                  <>
+                    <Form.Item
+                      label="增减数量"
+                      name="transform_datetime_amount"
+                    >
+                      <TemplateVariableInput
+                        ariaLabel="遍历日期增减数量"
+                        placeholder="固定数字或变量"
+                        references={foreachFieldReferences}
+                      />
+                    </Form.Item>
+                    <Form.Item label="单位" name="transform_datetime_unit">
+                      <Select options={automationDatetimeDurationUnitOptions} />
+                    </Form.Item>
+                  </>
+                )}
+                {foreachDatetimeOperation === 'diff' && (
+                  <>
+                    <Form.Item label="单位" name="transform_datetime_unit">
+                      <Select
+                        options={automationDatetimeDifferenceUnitOptions}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      label="小数精度"
+                      name="transform_datetime_precision"
+                    >
+                      <InputNumber max={6} min={0} precision={0} />
+                    </Form.Item>
+                  </>
+                )}
+                {foreachDatetimeOperation === 'start_of' && (
+                  <Form.Item label="周期" name="transform_datetime_unit">
+                    <Select options={automationDatetimeStartUnitOptions} />
+                  </Form.Item>
+                )}
+              </>
+            )}
+
+            <Divider className={styles.nodeConfigFull} />
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
+          </>
+        );
+      }
       case 'if':
         return (
           <>
@@ -1764,9 +3646,26 @@ const NodeConfigModal = ({
             <Input maxLength={120} />
           </Form.Item>
           {renderConfig()}
-          {!['trigger', 'end', 'parallel', 'join', 'if', 'keyword'].includes(
-            node.type,
-          ) && (
+          {![
+            'trigger',
+            'delay',
+            'end',
+            'parallel',
+            'join',
+            'if',
+            'keyword',
+            'set_variable',
+            'template',
+            'json_extract',
+            'math',
+            'datetime_operation',
+            'list_operation',
+            'switch',
+            'coalesce',
+            'deduplicate',
+            'rate_limit',
+            'foreach',
+          ].includes(node.type) && (
             <>
               <Divider className={styles.nodeConfigFull} />
               <Space className={styles.nodeConfigRetryFields} size="large">

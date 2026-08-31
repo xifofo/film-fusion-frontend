@@ -4,6 +4,10 @@ import type {
   RSSAutomationNodeDefinition,
   RSSAutomationNodeType,
 } from '@/services/film-fusion';
+import {
+  automationJSONPointerError,
+  automationVariableNameError,
+} from './variableNodes';
 
 export const RSS_WORKFLOW_TRANSFER_FORMAT = 'film-fusion-rss-workflow';
 export const RSS_WORKFLOW_TRANSFER_VERSION = 1;
@@ -11,11 +15,23 @@ export const RSS_WORKFLOW_TRANSFER_MAX_BYTES = 1024 * 1024;
 
 const nodeTypes: RSSAutomationNodeType[] = [
   'trigger',
+  'delay',
   'regex',
   'keyword',
   'keyword_replace',
   'regex_replace',
   'convert',
+  'set_variable',
+  'template',
+  'json_extract',
+  'math',
+  'datetime_operation',
+  'list_operation',
+  'switch',
+  'coalesce',
+  'deduplicate',
+  'rate_limit',
+  'foreach',
   'if',
   'parallel',
   'join',
@@ -92,6 +108,433 @@ const optionalRecord = (value: unknown, label: string) => {
   return structuredClone(value);
 };
 
+const switchOperators = new Set([
+  'eq',
+  'neq',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'contains',
+  'not_contains',
+  'starts_with',
+  'ends_with',
+  'regex',
+  'in',
+  'exists',
+  'not_exists',
+]);
+
+const foreachTransformTypes = new Set([
+  'template',
+  'json_extract',
+  'math',
+  'coalesce',
+  'datetime_operation',
+]);
+
+const compareAsValues = new Set([
+  'auto',
+  'string',
+  'number',
+  'boolean',
+  'datetime',
+]);
+const variableValueTypes = new Set([
+  'auto',
+  'string',
+  'integer',
+  'number',
+  'boolean',
+  'datetime',
+  'json',
+]);
+const datetimeFormats = new Set([
+  'rfc3339',
+  'rfc1123',
+  'date',
+  'datetime',
+  'unix_seconds',
+  'unix_milliseconds',
+]);
+const listOperations = new Set([
+  'split',
+  'join',
+  'unique',
+  'sort',
+  'reverse',
+  'slice',
+  'pluck',
+  'length',
+]);
+
+const configEnum = (
+  config: Record<string, unknown> | undefined,
+  key: string,
+  fallback: string,
+  allowed: Set<string>,
+  label: string,
+) => {
+  const value = String(config?.[key] || fallback)
+    .trim()
+    .toLowerCase();
+  if (!allowed.has(value)) throw new Error(`${label}无效`);
+  return value;
+};
+
+const optionalBoolean = (
+  config: Record<string, unknown> | undefined,
+  key: string,
+  label: string,
+) => {
+  if (config && key in config && typeof config[key] !== 'boolean') {
+    throw new Error(`${label}必须是布尔值`);
+  }
+};
+
+const optionalInteger = (
+  config: Record<string, unknown> | undefined,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  label: string,
+) => {
+  const configured = config?.[key];
+  const value =
+    configured === undefined ||
+    configured === null ||
+    (typeof configured === 'string' && !configured.trim())
+      ? fallback
+      : Number(configured);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${label}必须是 ${minimum} 到 ${maximum} 的整数`);
+  }
+  return value;
+};
+
+const validateVariableWriter = (
+  id: string,
+  config: Record<string, unknown> | undefined,
+) => {
+  const error = automationVariableNameError(config?.variable);
+  if (error) throw new Error(`节点 ${id}：${error}`);
+  configEnum(
+    config,
+    'overwrite',
+    'overwrite',
+    new Set(['overwrite', 'keep', 'error']),
+    `节点 ${id} 的变量覆盖策略`,
+  );
+};
+
+const validateCoalesceTransferConfig = (
+  id: string,
+  config: Record<string, unknown> | undefined,
+) => {
+  const candidates = config?.candidates ?? [];
+  if (!Array.isArray(candidates) || candidates.length > 32) {
+    throw new Error(`节点 ${id} 的候选值必须是最多 32 项的数组`);
+  }
+  configEnum(
+    config,
+    'missing',
+    'skip',
+    new Set(['skip', 'failure']),
+    `节点 ${id} 的缺失策略`,
+  );
+  configEnum(
+    config,
+    'on_empty',
+    'failure',
+    new Set(['failure', 'default']),
+    `节点 ${id} 的空值策略`,
+  );
+  configEnum(
+    config,
+    'value_type',
+    'auto',
+    variableValueTypes,
+    `节点 ${id} 的结果类型`,
+  );
+  for (const key of [
+    'skip_null',
+    'skip_empty_string',
+    'skip_empty_array',
+    'skip_empty_object',
+    'trim_strings',
+  ]) {
+    optionalBoolean(config, key, `节点 ${id} 的 ${key}`);
+  }
+};
+
+const validateDatetimeTransferConfig = (
+  id: string,
+  config: Record<string, unknown> | undefined,
+) => {
+  const operation = configEnum(
+    config,
+    'operation',
+    'parse',
+    new Set(['parse', 'format', 'add', 'diff', 'start_of']),
+    `节点 ${id} 的日期操作`,
+  );
+  const inputFormat = String(config?.input_format || 'auto')
+    .trim()
+    .toLowerCase();
+  if (inputFormat !== 'auto' && !datetimeFormats.has(inputFormat)) {
+    throw new Error(`节点 ${id} 的日期输入格式无效`);
+  }
+  configEnum(
+    config,
+    'output_format',
+    'rfc3339',
+    datetimeFormats,
+    `节点 ${id} 的日期输出格式`,
+  );
+  const unit = String(config?.unit || 'second')
+    .trim()
+    .toLowerCase();
+  const units =
+    operation === 'start_of'
+      ? new Set(['day', 'week', 'month', 'year'])
+      : operation === 'diff'
+        ? new Set(['millisecond', 'second', 'minute', 'hour', 'day', 'week'])
+        : new Set([
+            'millisecond',
+            'second',
+            'minute',
+            'hour',
+            'day',
+            'week',
+            'month',
+            'year',
+          ]);
+  if (['add', 'diff', 'start_of'].includes(operation) && !units.has(unit)) {
+    throw new Error(`节点 ${id} 的日期单位无效`);
+  }
+  if (operation === 'diff') {
+    if (!config || !('right' in config)) {
+      throw new Error(`节点 ${id} 的日期差缺少 right`);
+    }
+    optionalInteger(config, 'precision', 0, 0, 6, `节点 ${id} 的日期精度`);
+  }
+  const timezone = String(config?.timezone || 'Asia/Shanghai');
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(0);
+  } catch {
+    throw new Error(`节点 ${id} 的时区无效`);
+  }
+};
+
+const validateTransferNodeConfig = (
+  id: string,
+  type: RSSAutomationNodeType,
+  config?: Record<string, unknown>,
+) => {
+  if (
+    ['datetime_operation', 'list_operation', 'coalesce', 'foreach'].includes(
+      type,
+    )
+  ) {
+    validateVariableWriter(id, config);
+  }
+  if (type === 'datetime_operation') validateDatetimeTransferConfig(id, config);
+  if (type === 'list_operation') {
+    configEnum(
+      config,
+      'operation',
+      'unique',
+      listOperations,
+      `节点 ${id} 的列表操作`,
+    );
+    configEnum(
+      config,
+      'missing',
+      'failure',
+      new Set(['failure', 'skip', 'null']),
+      `节点 ${id} 的列表缺失策略`,
+    );
+    configEnum(
+      config,
+      'direction',
+      'asc',
+      new Set(['asc', 'desc']),
+      `节点 ${id} 的排序方向`,
+    );
+    configEnum(
+      config,
+      'compare_as',
+      'auto',
+      compareAsValues,
+      `节点 ${id} 的比较类型`,
+    );
+    for (const key of ['trim_items', 'omit_empty']) {
+      optionalBoolean(config, key, `节点 ${id} 的 ${key}`);
+    }
+    const pointerError = automationJSONPointerError(config?.pointer);
+    if (pointerError) throw new Error(`节点 ${id}：${pointerError}`);
+    optionalInteger(config, 'offset', 0, -10000, 10000, `节点 ${id} 的 offset`);
+    optionalInteger(config, 'limit', 100, 0, 10000, `节点 ${id} 的 limit`);
+  }
+  if (type === 'switch') {
+    configEnum(
+      config,
+      'compare_as',
+      'auto',
+      compareAsValues,
+      `节点 ${id} 的比较类型`,
+    );
+    optionalBoolean(config, 'case_sensitive', `节点 ${id} 的大小写配置`);
+    if (!Array.isArray(config?.cases) || config.cases.length === 0) {
+      throw new Error(`节点 ${id} 至少需要一个多路分支条件`);
+    }
+    if (config.cases.length > 20) {
+      throw new Error(`节点 ${id} 的多路分支条件不能超过 20 个`);
+    }
+    const caseIDs = new Set<string>();
+    for (const candidate of config.cases) {
+      if (!isRecord(candidate)) {
+        throw new Error(`节点 ${id} 的多路分支条件格式不正确`);
+      }
+      const caseID = requiredString(candidate.id, `节点 ${id} 条件 ID`);
+      if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(caseID)) {
+        throw new Error(`节点 ${id} 的条件 ID 无效`);
+      }
+      const normalizedCaseID = caseID.toLowerCase();
+      if (caseIDs.has(normalizedCaseID)) {
+        throw new Error(`节点 ${id} 存在重复条件 ID`);
+      }
+      caseIDs.add(normalizedCaseID);
+      requiredString(candidate.label, `节点 ${id} 条件名称`);
+      const operator = requiredString(
+        candidate.operator,
+        `节点 ${id} 条件比较符`,
+      );
+      if (!switchOperators.has(operator)) {
+        throw new Error(`节点 ${id} 使用了未知比较符`);
+      }
+      if (
+        !['exists', 'not_exists'].includes(operator) &&
+        !('value' in candidate)
+      ) {
+        throw new Error(`节点 ${id} 的条件 ${caseID} 缺少比较值`);
+      }
+      if (
+        operator === 'in' &&
+        !Array.isArray(candidate.value) &&
+        !(
+          typeof candidate.value === 'string' &&
+          (candidate.value.trim().startsWith('$') ||
+            candidate.value.includes('{{'))
+        )
+      ) {
+        throw new Error(`节点 ${id} 的条件 ${caseID} 必须使用数组比较值`);
+      }
+    }
+  }
+  if (type === 'coalesce') validateCoalesceTransferConfig(id, config);
+  if (type === 'deduplicate' || type === 'rate_limit') {
+    if (!config || !('key' in config)) throw new Error(`节点 ${id} 缺少状态键`);
+    const scope = configEnum(
+      config,
+      'scope',
+      'workflow',
+      new Set(['source', 'workflow', 'global']),
+      `节点 ${id} 的状态范围`,
+    );
+    const namespace = String(config.namespace || '').trim();
+    if (scope === 'global' && !namespace) {
+      throw new Error(`节点 ${id} 的全局范围必须填写命名空间`);
+    }
+    if (namespace && Array.from(namespace).length > 80) {
+      throw new Error(`节点 ${id} 的命名空间不能超过 80 个字符`);
+    }
+    configEnum(
+      config,
+      'normalize',
+      'trim',
+      new Set(['none', 'trim', 'trim_lower']),
+      `节点 ${id} 的键标准化方式`,
+    );
+  }
+  if (type === 'deduplicate') {
+    optionalInteger(
+      config,
+      'ttl_seconds',
+      604800,
+      60,
+      31536000,
+      `节点 ${id} 的 TTL`,
+    );
+    optionalBoolean(config, 'refresh_on_duplicate', `节点 ${id} 的刷新配置`);
+  }
+  if (type === 'rate_limit') {
+    optionalInteger(config, 'limit', 1, 1, 10000, `节点 ${id} 的限额`);
+    const window = optionalInteger(
+      config,
+      'window_seconds',
+      60,
+      1,
+      2592000,
+      `节点 ${id} 的窗口`,
+    );
+    optionalInteger(
+      config,
+      'max_wait_seconds',
+      window,
+      1,
+      2592000,
+      `节点 ${id} 的最长等待`,
+    );
+    configEnum(
+      config,
+      'behavior',
+      'defer',
+      new Set(['defer', 'branch']),
+      `节点 ${id} 的限流行为`,
+    );
+  }
+  if (type === 'foreach') {
+    if (!isRecord(config?.transform)) {
+      throw new Error(`节点 ${id} 缺少遍历变换`);
+    }
+    const transformType = requiredString(
+      config.transform.type,
+      `节点 ${id} 遍历变换类型`,
+    );
+    if (!foreachTransformTypes.has(transformType)) {
+      throw new Error(`节点 ${id} 使用了不允许的遍历变换`);
+    }
+    if (!isRecord(config.transform.config)) {
+      throw new Error(`节点 ${id} 的遍历变换配置不正确`);
+    }
+    if (
+      'variable' in config.transform.config ||
+      'overwrite' in config.transform.config
+    ) {
+      throw new Error(`节点 ${id} 的遍历变换不能写入流程变量`);
+    }
+    configEnum(
+      config,
+      'on_error',
+      'fail_fast',
+      new Set(['fail_fast', 'collect']),
+      `节点 ${id} 的遍历失败策略`,
+    );
+    if (transformType === 'coalesce') {
+      validateCoalesceTransferConfig(id, config.transform.config);
+    }
+    if (transformType === 'datetime_operation') {
+      validateDatetimeTransferConfig(id, config.transform.config);
+    }
+    const maxItems = Number(config.max_items ?? 100);
+    if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > 1000) {
+      throw new Error(`节点 ${id} 的最大遍历数量无效`);
+    }
+  }
+};
+
 const parseNode = (value: unknown): RSSAutomationNodeDefinition => {
   if (!isRecord(value)) throw new Error('流程节点格式不正确');
   const id = requiredString(value.id, '节点 ID');
@@ -111,7 +554,10 @@ const parseNode = (value: unknown): RSSAutomationNodeDefinition => {
   };
   if (typeof value.name === 'string') node.name = value.name.slice(0, 120);
   const config = optionalRecord(value.config, `节点 ${id} 配置`);
-  if (config) node.config = config;
+  validateTransferNodeConfig(id, node.type, config);
+  if (config) {
+    node.config = config;
+  }
   const ui = optionalRecord(value.ui, `节点 ${id} 界面配置`);
   if (ui) node.ui = ui;
   if (value.max_attempts !== undefined) {
@@ -174,6 +620,51 @@ export const validateWorkflowTransferDefinition = (
   const edges = value.edges.map((edge) => parseEdge(edge, nodeIDs));
   const edgeIDs = new Set(edges.map((edge) => edge.id));
   if (edgeIDs.size !== edges.length) throw new Error('流程中存在重复连线 ID');
+
+  const nodesByID = new Map(nodes.map((node) => [node.id, node]));
+  for (const edge of edges) {
+    const source = nodesByID.get(edge.source);
+    if (!source) continue;
+    const port = [
+      'datetime_operation',
+      'list_operation',
+      'switch',
+      'coalesce',
+      'deduplicate',
+      'rate_limit',
+      'foreach',
+    ].includes(source.type)
+      ? edge.source_port.trim().toLowerCase()
+      : edge.source_port;
+    if (port !== edge.source_port) edge.source_port = port;
+    if (port === 'always') continue;
+    const fixedPorts: Partial<Record<RSSAutomationNodeType, string[]>> = {
+      datetime_operation: ['success', 'failure'],
+      list_operation: ['success', 'empty', 'failure'],
+      coalesce: ['success', 'failure'],
+      deduplicate: ['new', 'duplicate', 'failure'],
+      rate_limit: ['allowed', 'throttled', 'failure'],
+      foreach: ['success', 'partial', 'empty', 'failure'],
+    };
+    if (source.type === 'switch') {
+      const casePorts = new Set(
+        (Array.isArray(source.config?.cases) ? source.config.cases : [])
+          .filter(isRecord)
+          .map(
+            (candidate) => `case-${String(candidate.id || '').toLowerCase()}`,
+          )
+          .concat(['default', 'failure']),
+      );
+      if (!casePorts.has(port)) {
+        throw new Error(`连线 ${edge.id} 使用了不存在的多路分支出口`);
+      }
+      continue;
+    }
+    const allowed = fixedPorts[source.type];
+    if (allowed && !allowed.includes(port)) {
+      throw new Error(`连线 ${edge.id} 的出口不适用于 ${source.type} 节点`);
+    }
+  }
 
   let viewport: RSSAutomationDefinition['viewport'];
   if (value.viewport !== undefined) {
