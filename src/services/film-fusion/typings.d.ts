@@ -691,8 +691,15 @@ declare namespace API {
     moviepilot_target_path?: string;
     local_target_path?: string;
     local_target_error?: string;
+    rename_variables?: Array<{
+      name: string;
+      label: string;
+      moviepilot: string;
+      local: string;
+      matched: boolean;
+    }>;
     differences: Array<{
-      stage: 'recognition' | 'transfer' | 'target';
+      stage: 'recognition' | 'variable' | 'transfer' | 'target';
       field: string;
       label: string;
       moviepilot: string;

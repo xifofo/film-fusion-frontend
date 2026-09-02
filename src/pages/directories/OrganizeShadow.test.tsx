@@ -102,4 +102,50 @@ describe('organize shadow comparison rows', () => {
       'target:target_path',
     ]);
   });
+
+  it('lists every rename variable including empty values and webSource', () => {
+    const comparison = matchedComparison();
+    comparison.rename_variables = [
+      {
+        name: 'title',
+        label: '标题',
+        moviepilot: '乌云背后的幸福线',
+        local: '乌云背后的幸福线',
+        matched: true,
+      },
+      {
+        name: 'webSource',
+        label: '流媒体平台',
+        moviepilot: 'Netflix',
+        local: '',
+        matched: false,
+      },
+      {
+        name: 'customization',
+        label: '自定义占位符',
+        moviepilot: '',
+        local: '',
+        matched: true,
+      },
+    ];
+    comparison.differences.push({
+      stage: 'variable',
+      field: 'webSource',
+      label: '流媒体平台',
+      moviepilot: 'Netflix',
+      local: '',
+    });
+
+    const rows = buildOrganizeShadowFieldRows(comparison);
+    expect(rows.filter((row) => row.stage === '变量')).toHaveLength(3);
+    expect(rows.find((row) => row.key === 'variable:webSource')).toMatchObject({
+      label: '流媒体平台 (webSource)',
+      moviepilot: 'Netflix',
+      local: '-',
+      status: 'different',
+    });
+    expect(
+      rows.find((row) => row.key === 'variable:customization'),
+    ).toMatchObject({ moviepilot: '-', local: '-', status: 'matched' });
+  });
 });

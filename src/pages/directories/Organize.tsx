@@ -300,6 +300,18 @@ export function buildOrganizeShadowFieldRows(
       });
     }
   }
+  for (const variable of comparison.rename_variables || []) {
+    rows.push({
+      key: `variable:${variable.name}`,
+      stage: '变量',
+      label: `${variable.label} (${variable.name})`,
+      moviepilot: organizeShadowValue(variable.moviepilot),
+      local: organizeShadowValue(variable.local),
+      status: differenceKeys.has(`variable:${variable.name}`)
+        ? 'different'
+        : 'matched',
+    });
+  }
   if (comparison.transfer) {
     rows.push({
       key: 'transfer:transfer_name',
@@ -373,7 +385,7 @@ function renderOrganizeShadowStatus(
 
 const organizeShadowFieldColumns: TableColumnsType<OrganizeShadowFieldRow> = [
   { title: '阶段', dataIndex: 'stage', key: 'stage', width: 80 },
-  { title: '字段', dataIndex: 'label', key: 'label', width: 110 },
+  { title: '字段', dataIndex: 'label', key: 'label', width: 190 },
   {
     title: 'MP2（主结果）',
     dataIndex: 'moviepilot',
@@ -454,7 +466,7 @@ function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
         size="small"
         rowKey="key"
         pagination={false}
-        scroll={{ x: 910 }}
+        scroll={{ x: 990 }}
         columns={organizeShadowFieldColumns}
         dataSource={buildOrganizeShadowFieldRows(comparison)}
       />

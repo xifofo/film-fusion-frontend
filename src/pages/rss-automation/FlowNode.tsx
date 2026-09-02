@@ -1,4 +1,9 @@
-import { Handle, type NodeProps, Position } from '@xyflow/react';
+import {
+  Handle,
+  type NodeProps,
+  Position,
+  useUpdateNodeInternals,
+} from '@xyflow/react';
 import {
   Bell,
   Binary,
@@ -38,12 +43,16 @@ import {
   Variable,
   Webhook,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import type { RSSAutomationNodeType } from '@/services/film-fusion';
 import {
-  joinHasConditionalOutcome,
+  flowNodeHeight,
+  flowPortTop,
   NODE_LABELS,
-  nodeBranches,
+  nodeSourcePorts,
   type RSSFlowNode,
+  type RSSFlowVariableView,
+  sourcePortLabel,
 } from './flow';
 import styles from './index.module.less';
 
@@ -101,6 +110,34 @@ const statusLabel: Record<string, string> = {
   cancelled: '已取消',
 };
 
+const VariableChip = ({
+  label,
+  count,
+  onOpen,
+  tone,
+}: {
+  label: string;
+  count: number;
+  onOpen: () => void;
+  tone: 'receive' | 'return';
+}) => (
+  <button
+    aria-haspopup="dialog"
+    aria-label={`${label}变量，共 ${count} 个`}
+    className={`${styles.nodeVariableChip} ${styles[`nodeVariableChip_${tone}`]} nodrag nopan`}
+    onClick={(event) => {
+      event.stopPropagation();
+      onOpen();
+    }}
+    onDoubleClick={(event) => event.stopPropagation()}
+    onPointerDown={(event) => event.stopPropagation()}
+    type="button"
+  >
+    <span>{label}</span>
+    <b>{count}</b>
+  </button>
+);
+
 const SourceHandle = ({
   id,
   label,
@@ -111,10 +148,11 @@ const SourceHandle = ({
   top: string;
 }) => (
   <>
-    <span className={styles.portLabel} style={{ top }}>
+    <span className={styles.portLabel} style={{ top }} title={label}>
       {label}
     </span>
     <Handle
+      aria-label={`出口：${label}`}
       className={styles.portHandle}
       id={id}
       position={Position.Right}
@@ -124,156 +162,34 @@ const SourceHandle = ({
   </>
 );
 
-const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
+const FlowNode = ({ data, id, selected }: NodeProps<RSSFlowNode>) => {
+  const updateNodeInternals = useUpdateNodeInternals();
   const definition = data.definition;
   const type = definition.type;
-  const branches = nodeBranches(definition);
   const preview = data.preview;
-  const switchCases =
-    type === 'switch' && Array.isArray(definition.config?.cases)
-      ? definition.config.cases
-          .filter(
-            (candidate): candidate is Record<string, unknown> =>
-              Boolean(candidate) &&
-              typeof candidate === 'object' &&
-              !Array.isArray(candidate),
-          )
-          .filter((candidate) => String(candidate.id || '').trim())
-      : [];
+  const variableSummary = data.variableSummary || {
+    protocolAvailable: false,
+    received: [],
+    configuredInputs: [],
+    returned: [],
+  };
+  const sourcePorts = nodeSourcePorts(definition);
+  const openVariablePanel = (view: RSSFlowVariableView) =>
+    data.openVariablePanel?.(id, view);
+  const targetHandles = data.targetHandles?.length
+    ? data.targetHandles
+    : type === 'trigger'
+      ? []
+      : [{ id: 'input', top: 50 }];
 
-  const handles = (() => {
-    if (type === 'end') return null;
-    if (type === 'trigger') {
-      return <SourceHandle id="next" label="继续" top="50%" />;
-    }
-    if (type === 'if') {
-      return (
-        <>
-          <SourceHandle id="true" label="是" top="31%" />
-          <SourceHandle id="false" label="否" top="60%" />
-          <SourceHandle id="failure" label="异常" top="84%" />
-        </>
-      );
-    }
-    if (type === 'keyword') {
-      return (
-        <>
-          <SourceHandle id="matched" label="匹配" top="31%" />
-          <SourceHandle id="unmatched" label="不匹配" top="60%" />
-          <SourceHandle id="failure" label="异常" top="84%" />
-        </>
-      );
-    }
-    if (type === 'switch') {
-      const ports = [
-        ...switchCases.map((candidate) => ({
-          id: `case-${String(candidate.id).toLowerCase()}`,
-          label: String(candidate.label || candidate.id),
-        })),
-        { id: 'default', label: '默认' },
-        { id: 'failure', label: '异常' },
-      ];
-      return ports.map((port, index) => (
-        <SourceHandle
-          id={port.id}
-          key={port.id}
-          label={port.label}
-          top={`${((index + 1) / (ports.length + 1)) * 100}%`}
-        />
-      ));
-    }
-    if (type === 'list_operation') {
-      return (
-        <>
-          <SourceHandle id="success" label="成功" top="28%" />
-          <SourceHandle id="empty" label="空列表" top="55%" />
-          <SourceHandle id="failure" label="异常" top="82%" />
-        </>
-      );
-    }
-    if (type === 'deduplicate') {
-      return (
-        <>
-          <SourceHandle id="new" label="首次" top="28%" />
-          <SourceHandle id="duplicate" label="重复" top="55%" />
-          <SourceHandle id="failure" label="异常" top="82%" />
-        </>
-      );
-    }
-    if (type === 'rate_limit') {
-      return (
-        <>
-          <SourceHandle id="allowed" label="允许" top="28%" />
-          <SourceHandle id="throttled" label="受限" top="55%" />
-          <SourceHandle id="failure" label="异常" top="82%" />
-        </>
-      );
-    }
-    if (type === 'foreach') {
-      return (
-        <>
-          <SourceHandle id="success" label="成功" top="25%" />
-          <SourceHandle id="partial" label="部分" top="50%" />
-          <SourceHandle id="empty" label="空列表" top="70%" />
-          <SourceHandle id="failure" label="异常" top="88%" />
-        </>
-      );
-    }
-    if (type === 'media_exists') {
-      return (
-        <>
-          <SourceHandle id="exists" label="已存在" top="31%" />
-          <SourceHandle id="missing" label="不存在" top="60%" />
-          <SourceHandle id="failure" label="异常" top="84%" />
-        </>
-      );
-    }
-    if (type === 'hdhive_query') {
-      return (
-        <>
-          <SourceHandle id="found" label="找到" top="31%" />
-          <SourceHandle id="not_found" label="没有" top="60%" />
-          <SourceHandle id="failure" label="异常" top="84%" />
-        </>
-      );
-    }
-    if (type === 'strm_verify') {
-      return (
-        <>
-          <SourceHandle id="valid" label="有效" top="31%" />
-          <SourceHandle id="invalid" label="无效" top="60%" />
-          <SourceHandle id="failure" label="异常" top="84%" />
-        </>
-      );
-    }
-    if (type === 'parallel') {
-      return branches.map((branch, index) => (
-        <SourceHandle
-          id={branch}
-          key={branch}
-          label={branch.replace(/^branch-/, '')}
-          top={`${((index + 1) / (branches.length + 1)) * 100}%`}
-        />
-      ));
-    }
-    if (type === 'join') {
-      if (joinHasConditionalOutcome(definition)) {
-        return (
-          <>
-            <SourceHandle id="success" label="满足" top="36%" />
-            <SourceHandle id="failure" label="未满足" top="72%" />
-          </>
-        );
-      }
-      return <SourceHandle id="success" label="继续" top="50%" />;
-    }
-    return (
-      <>
-        <SourceHandle id="success" label="成功" top="36%" />
-        <SourceHandle id="failure" label="失败" top="72%" />
-      </>
-    );
-  })();
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [
+    id,
+    sourcePorts.join('|'),
+    targetHandles.map((handle) => `${handle.id}:${handle.top}`).join('|'),
+    updateNodeInternals,
+  ]);
 
   return (
     <div
@@ -282,24 +198,28 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
       } ${data.status ? styles[`status_${data.status}`] : ''} ${
         preview && !preview.active ? styles.flowNodePreviewInactive : ''
       }`}
-      style={
-        type === 'switch'
-          ? { minHeight: Math.max(92, (switchCases.length + 2) * 28) }
-          : undefined
-      }
+      style={{
+        minHeight: flowNodeHeight(definition, data.targetHandles?.length || 0),
+      }}
     >
-      {type !== 'trigger' && (
+      {targetHandles.map((handle) => (
         <Handle
+          aria-label="入口"
           className={styles.portHandle}
-          id="input"
+          id={handle.id}
+          key={handle.id}
           position={Position.Left}
+          style={{ top: `${handle.top}%` }}
           type="target"
         />
-      )}
+      ))}
       <div className={styles.flowNodeIcon}>{icons[type]}</div>
       <div className={styles.flowNodeBody}>
         <div className={styles.flowNodeType}>{NODE_LABELS[type]}</div>
-        <div className={styles.flowNodeName}>
+        <div
+          className={styles.flowNodeName}
+          title={definition.name || NODE_LABELS[type]}
+        >
           {definition.name || NODE_LABELS[type]}
         </div>
         {preview && (
@@ -310,13 +230,34 @@ const FlowNode = ({ data, selected }: NodeProps<RSSFlowNode>) => {
             {preview.label}
           </div>
         )}
+        <div className={styles.nodeVariableSummary}>
+          <VariableChip
+            count={variableSummary.received.length}
+            label="接收"
+            onOpen={() => openVariablePanel('received')}
+            tone="receive"
+          />
+          <VariableChip
+            count={variableSummary.returned.length}
+            label="返回"
+            onOpen={() => openVariablePanel('returned')}
+            tone="return"
+          />
+        </div>
       </div>
       {data.status && (
         <span className={styles.nodeStatus}>
           {statusLabel[data.status] || data.status}
         </span>
       )}
-      {handles}
+      {sourcePorts.map((port, index) => (
+        <SourceHandle
+          id={port}
+          key={port}
+          label={sourcePortLabel(port, definition)}
+          top={`${flowPortTop(index, sourcePorts.length)}%`}
+        />
+      ))}
     </div>
   );
 };

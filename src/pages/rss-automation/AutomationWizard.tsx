@@ -3,6 +3,7 @@ import {
   ArrowRightOutlined,
   CheckCircleFilled,
   LinkOutlined,
+  QuestionCircleOutlined,
   RocketOutlined,
 } from '@ant-design/icons';
 import {
@@ -22,6 +23,7 @@ import {
   Steps,
   Switch,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
@@ -46,6 +48,16 @@ import styles from './index.module.less';
 import WorkflowPanel from './WorkflowPanel';
 
 const { Paragraph, Text, Title } = Typography;
+
+const SAMPLE_FIELD_HELP: Record<string, string> = {
+  category: 'RSS 提供的分类信息。',
+  detail_url: '条目详情页面的链接。',
+  download_url: '可交给下载节点的种子、磁力或文件链接。',
+  guid: '用于识别重复条目的唯一标识。',
+  published_at: 'RSS 条目的发布时间。',
+  size_bytes: '资源大小，单位为字节。',
+  title: '条目标题，可用于命名、筛选和通知。',
+};
 
 type FeedPreset = 'auto' | 'rss' | 'atom';
 
@@ -244,12 +256,20 @@ const AutomationWizard = ({
             <div className={styles.wizardStepIcon}>
               <LinkOutlined />
             </div>
-            <div>
-              <Title level={4}>先粘贴 RSS 链接</Title>
-              <Text type="secondary">
-                我们会先读取最多 20
-                条内容作为流程设计样本，不会创建任务或触发下载。
-              </Text>
+            <div className={styles.wizardStepTitle}>
+              <Title level={4}>RSS 来源</Title>
+              <Tooltip
+                title="只读取最多 20 条内容作为设计样本，不会创建任务或触发下载。"
+                trigger={['hover', 'focus', 'click']}
+              >
+                <Button
+                  aria-label="查看 RSS 解析说明"
+                  className={styles.wizardHelpButton}
+                  icon={<QuestionCircleOutlined />}
+                  size="small"
+                  type="text"
+                />
+              </Tooltip>
             </div>
           </div>
           <Form
@@ -270,24 +290,20 @@ const AutomationWizard = ({
                 { required: true, message: '请输入 RSS 链接' },
                 { type: 'url', message: '请输入完整的 HTTP/HTTPS 链接' },
               ]}
+              tooltip="支持 RSS 2.0 和 Atom；解析后可先确认真实条目，再设计流程。"
             >
-              <Input
+              <Input.Search
+                allowClear
                 className={styles.wizardURLInput}
+                enterButton="解析"
+                loading={sampling}
+                onSearch={() => parseFeed()}
                 placeholder="https://example.com/rss.xml"
                 prefix={<LinkOutlined />}
+                searchIcon={<RocketOutlined />}
                 size="large"
-                onPressEnter={() => parseFeed()}
               />
             </Form.Item>
-            <Button
-              icon={<RocketOutlined />}
-              loading={sampling}
-              onClick={parseFeed}
-              size="large"
-              type="primary"
-            >
-              解析 RSS 内容
-            </Button>
 
             <Collapse
               className={styles.wizardAdvanced}
@@ -295,17 +311,25 @@ const AutomationWizard = ({
               items={[
                 {
                   key: 'advanced',
-                  label: '高级设置（可选）',
+                  label: '解析选项',
                   forceRender: true,
                   children: (
                     <Row gutter={16}>
                       <Col md={10} xs={24}>
-                        <Form.Item label="源名称" name="name">
-                          <Input placeholder="解析后自动使用 RSS 标题" />
+                        <Form.Item
+                          label="源名称"
+                          name="name"
+                          tooltip="留空时自动使用 RSS 标题。"
+                        >
+                          <Input placeholder="自动使用 RSS 标题" />
                         </Form.Item>
                       </Col>
                       <Col md={7} xs={12}>
-                        <Form.Item label="格式" name="preset">
+                        <Form.Item
+                          label="格式"
+                          name="preset"
+                          tooltip="通常保持自动识别；解析失败时再手动指定。"
+                        >
                           <Select
                             options={[
                               { label: '自动识别', value: 'auto' },
@@ -316,32 +340,38 @@ const AutomationWizard = ({
                         </Form.Item>
                       </Col>
                       <Col md={7} xs={12}>
-                        <Form.Item label="刷新间隔" name="interval_minutes">
-                          <InputNumber suffix="分钟" max={1440} min={1} />
+                        <Form.Item
+                          label="刷新间隔"
+                          name="interval_minutes"
+                          tooltip="创建后按此频率检查新条目，可设置 1 到 1440 分钟。"
+                        >
+                          <InputNumber
+                            className={styles.wizardIntervalInput}
+                            suffix="分钟"
+                            max={1440}
+                            min={1}
+                          />
                         </Form.Item>
                       </Col>
                     </Row>
                   ),
                 },
               ]}
+              size="small"
             />
           </Form>
 
           {sample && (
             <div className={styles.wizardSampleResult}>
               <div className={styles.wizardSampleHeading}>
-                <div>
-                  <Space>
-                    <CheckCircleFilled className={styles.successIcon} />
-                    <Text strong>{sample.title || source?.name}</Text>
-                  </Space>
-                  <div>
-                    <Text type="secondary">
-                      已读取 {sample.items.length} 条样本，选择一条查看解析结果
-                    </Text>
-                  </div>
-                </div>
-                <Tag color="success">连接正常</Tag>
+                <Space>
+                  <CheckCircleFilled className={styles.successIcon} />
+                  <Text strong>{sample.title || source?.name}</Text>
+                </Space>
+                <Space size={6} wrap>
+                  <Tag>{sample.items.length} 条样本</Tag>
+                  <Tag color="success">解析成功</Tag>
+                </Space>
               </div>
               <Select
                 aria-label="选择预览样本"
@@ -354,20 +384,55 @@ const AutomationWizard = ({
                 showSearch={{ optionFilterProp: 'label' }}
                 value={selectedSample}
               />
-              <div className={styles.sampleFieldGrid}>
-                {Object.entries(selectedFields).map(([name, value]) => (
-                  <div className={styles.sampleFieldCard} key={name}>
-                    <Text code>{name}</Text>
-                    <Paragraph copyable ellipsis={{ rows: 2 }}>
-                      {String(value ?? '—')}
-                    </Paragraph>
-                  </div>
-                ))}
-              </div>
-              <Alert
-                title="这些字段会直接出现在下一步的流程预览中"
-                showIcon
-                type="info"
+              <Collapse
+                className={styles.sampleFieldCollapse}
+                expandIconPlacement="end"
+                items={[
+                  {
+                    key: 'fields',
+                    label: (
+                      <Space size={8}>
+                        <Text strong>解析字段</Text>
+                        <Tag>{Object.keys(selectedFields).length}</Tag>
+                      </Space>
+                    ),
+                    extra: (
+                      <Tooltip
+                        title="这些字段会作为变量传入下一步流程；展开后可复制原始值。"
+                        trigger={['hover', 'focus', 'click']}
+                      >
+                        <Button
+                          aria-label="查看解析字段说明"
+                          className={styles.wizardHelpButton}
+                          icon={<QuestionCircleOutlined />}
+                          onClick={(event) => event.stopPropagation()}
+                          size="small"
+                          type="text"
+                        />
+                      </Tooltip>
+                    ),
+                    children: (
+                      <div className={styles.sampleFieldGrid}>
+                        {Object.entries(selectedFields).map(([name, value]) => (
+                          <div className={styles.sampleFieldCard} key={name}>
+                            <Tooltip
+                              title={
+                                SAMPLE_FIELD_HELP[name] ||
+                                'RSS 解析出的原始字段。'
+                              }
+                            >
+                              <Text code>{name}</Text>
+                            </Tooltip>
+                            <Paragraph copyable ellipsis={{ rows: 2 }}>
+                              {String(value ?? '—')}
+                            </Paragraph>
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
+                size="small"
               />
             </div>
           )}

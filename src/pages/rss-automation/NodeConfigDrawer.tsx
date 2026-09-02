@@ -1,8 +1,13 @@
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+} from '@ant-design/icons';
 import {
   Alert,
   AutoComplete,
   Button,
+  Collapse,
   Divider,
   Form,
   Input,
@@ -11,6 +16,7 @@ import {
   Select,
   Space,
   Switch,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useEffect } from 'react';
@@ -669,8 +675,17 @@ const NodeConfigModal = ({
       'save_path',
       'category',
       'tags',
+      'rename',
       'paused',
       'sequential',
+      'skip_checking',
+      'first_last_piece_priority',
+      'root_folder',
+      'auto_tmm',
+      'download_limit_kib',
+      'upload_limit_kib',
+      'ratio_limit',
+      'seeding_time_limit',
       'directory_id',
       'poll_interval_seconds',
       'max_wait_minutes',
@@ -2626,7 +2641,7 @@ const NodeConfigModal = ({
           <>
             <Alert
               className={styles.nodeConfigFull}
-              description="直接连接 qBittorrent 下载节点的成功出口。FilmFusion 会用提交时附加的内部标签定位任务，服务重启后仍可继续等待。"
+              description="直接连接“添加 qBittorrent 任务”的成功出口。新版 WebAPI 优先按返回 Hash 精确定位，旧版自动回退到内部标签，服务重启后仍可继续等待。"
               title="只有 qBittorrent 下载完成后才走成功出口"
               showIcon
               type="info"
@@ -3800,6 +3815,158 @@ const ActionFields = ({
             <Switch />
           </Form.Item>
         </Space>
+        <Collapse
+          className={`${styles.nodeConfigFull} ${styles.qbApiOptions}`}
+          items={[
+            {
+              key: 'qb-api-options',
+              label: (
+                <Space size={4}>
+                  <Text strong>高级 API 参数</Text>
+                  <Tooltip
+                    title="这些字段会直接映射到 qBittorrent /api/v2/torrents/add；留空或选择“跟随全局”时不会覆盖下载器配置。"
+                    trigger={['hover', 'focus', 'click']}
+                  >
+                    <Button
+                      aria-label="查看 qBittorrent 高级 API 参数说明"
+                      className={styles.nodeConfigHelpButton}
+                      icon={<QuestionCircleOutlined />}
+                      onClick={(event) => event.stopPropagation()}
+                      size="small"
+                      type="text"
+                    />
+                  </Tooltip>
+                </Space>
+              ),
+              children: (
+                <div className={styles.qbApiOptionsGrid}>
+                  <Form.Item
+                    className={styles.qbApiOptionFull}
+                    label="任务名称"
+                    name="rename"
+                  >
+                    <TemplateVariableInput
+                      ariaLabel="qBittorrent 任务名称"
+                      insertMode="template"
+                      placeholder="留空使用种子名称，或插入变量"
+                      references={fieldReferences}
+                    />
+                  </Form.Item>
+                  <Form.Item label="根目录策略" name="root_folder">
+                    <Select
+                      options={[
+                        { label: '跟随全局', value: 'default' },
+                        { label: '创建根目录', value: 'true' },
+                        { label: '不创建根目录', value: 'false' },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label="自动 Torrent 管理" name="auto_tmm">
+                    <Select
+                      options={[
+                        { label: '跟随全局', value: 'default' },
+                        { label: '启用', value: 'true' },
+                        { label: '停用', value: 'false' },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label="下载限速" name="download_limit_kib">
+                    <Space.Compact block>
+                      <InputNumber
+                        className={styles.qbApiNumberInput}
+                        max={1048576}
+                        min={0}
+                        placeholder="跟随全局"
+                      />
+                      <Space.Addon>KiB/s</Space.Addon>
+                    </Space.Compact>
+                  </Form.Item>
+                  <Form.Item label="上传限速" name="upload_limit_kib">
+                    <Space.Compact block>
+                      <InputNumber
+                        className={styles.qbApiNumberInput}
+                        max={1048576}
+                        min={0}
+                        placeholder="跟随全局"
+                      />
+                      <Space.Addon>KiB/s</Space.Addon>
+                    </Space.Compact>
+                  </Form.Item>
+                  <Form.Item
+                    label="分享率限制"
+                    name="ratio_limit"
+                    rules={[
+                      {
+                        validator: (_, value) =>
+                          value == null ||
+                          value === -2 ||
+                          value === -1 ||
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject(
+                                new Error('请输入 -2、-1 或非负数'),
+                              ),
+                      },
+                    ]}
+                  >
+                    <InputNumber
+                      max={1000}
+                      min={-2}
+                      placeholder="-2 全局 / -1 不限"
+                      step={0.1}
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    label="做种时间限制"
+                    name="seeding_time_limit"
+                    rules={[
+                      {
+                        validator: (_, value) =>
+                          value == null ||
+                          value === -2 ||
+                          value === -1 ||
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject(
+                                new Error('请输入 -2、-1 或非负分钟数'),
+                              ),
+                      },
+                    ]}
+                  >
+                    <Space.Compact block>
+                      <InputNumber
+                        className={styles.qbApiNumberInput}
+                        max={5256000}
+                        min={-2}
+                        placeholder="跟随全局"
+                        precision={0}
+                      />
+                      <Space.Addon>分钟</Space.Addon>
+                    </Space.Compact>
+                  </Form.Item>
+                  <div className={styles.qbApiSwitches}>
+                    <Form.Item
+                      label="跳过完整性校验"
+                      name="skip_checking"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item
+                      label="优先下载首尾块"
+                      name="first_last_piece_priority"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+          size="small"
+        />
       </>
     )}
     {show115 && (

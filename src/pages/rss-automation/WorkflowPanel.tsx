@@ -71,26 +71,33 @@ import {
 import EntryHistoryPanel from './EntryHistoryPanel';
 import FlowNode from './FlowNode';
 import {
+  buildFlowNodeVariableSummaries,
+  buildFlowRoutingPlan,
   createNodeDefinition,
   definitionToFlow,
   edgeDefinitionToFlowEdge,
+  flowNodeHeight,
   flowToDefinition,
   joinHasConditionalOutcome,
   NODE_LABELS,
   nodeBranches,
+  normalizeFlowTargetHandle,
   parseWorkflowDefinition,
   type RSSFlowEdge,
   type RSSFlowNode,
-  sourcePortLabel,
+  type RSSFlowVariableView,
 } from './flow';
 import styles from './index.module.less';
 import NodeConfigModal, { type NodeFieldReference } from './NodeConfigDrawer';
+import NodeVariableDrawer from './NodeVariableDrawer';
+import { NODE_PALETTE_COLUMNS } from './nodePalette';
 import { simulateRSSAutomation } from './preview';
 import {
   buildRSSItemReferences,
   parseRSSSourceMapping,
 } from './rssFieldReferences';
 import SamplePreviewPanel from './SamplePreviewPanel';
+import WorkflowEdge from './WorkflowEdge';
 import {
   createWorkflowTransferPackage,
   type ParsedWorkflowTransfer,
@@ -101,6 +108,9 @@ import {
 
 const { Text, Title } = Typography;
 const nodeTypes = { rssAutomationNode: FlowNode };
+const edgeTypes = { workflow: WorkflowEdge };
+const FLOW_NODE_WIDTH = 224;
+const FLOW_FIT_VIEW_OPTIONS = { padding: 0.18, maxZoom: 1 };
 
 const referencePreview = (value: unknown) => {
   if (value == null || value === '') return undefined;
@@ -189,59 +199,6 @@ const bindingRequirements = (value: ParsedWorkflowTransfer['requirements']) =>
       ? `${value.organizeDirectories} 个整理目录配置`
       : '',
   ].filter(Boolean);
-
-const palette: Array<{
-  title: string;
-  types: RSSAutomationNodeType[];
-}> = [
-  {
-    title: '变量与数据',
-    types: [
-      'set_variable',
-      'template',
-      'json_extract',
-      'math',
-      'datetime_operation',
-      'list_operation',
-      'coalesce',
-      'convert',
-    ],
-  },
-  {
-    title: '文本处理',
-    types: ['keyword', 'keyword_replace', 'regex', 'regex_replace'],
-  },
-  {
-    title: '流程控制',
-    types: ['delay', 'if', 'switch', 'foreach', 'parallel', 'join', 'end'],
-  },
-  { title: '流程保护', types: ['deduplicate', 'rate_limit'] },
-  {
-    title: '执行动作',
-    types: [
-      'qbittorrent',
-      'wait_qbittorrent',
-      'moviepilot_transfer',
-      'delete_qbittorrent',
-      'offline115_openapi',
-      'offline115',
-      'wait115',
-      'rename115_openapi',
-      'moviepilot_title_recognize',
-      'filmfusion_recognize',
-      'media_exists',
-      'hdhive_query',
-      'hdhive_unlock',
-      'moviepilot_recognize',
-      'organize_strm',
-      'strm_verify',
-      'strm_regenerate',
-      'emby_refresh_wait',
-      'http_request',
-      'notification',
-    ],
-  },
-];
 
 const emptyMeta = (): WorkflowMeta => ({
   name: '新的 RSS 自动化流程',
@@ -421,6 +378,10 @@ const WorkflowPanelInner = ({
   const [meta, setMeta] = useState<WorkflowMeta>(emptyMeta);
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
+  const [variablePanel, setVariablePanel] = useState<{
+    nodeId: string;
+    view: RSSFlowVariableView;
+  }>();
   const [validation, setValidation] = useState<RSSAutomationValidationResult>();
   const [saving, setSaving] = useState(false);
   const [layingOut, setLayingOut] = useState(false);
@@ -442,6 +403,7 @@ const WorkflowPanelInner = ({
   > | null>(null);
   const initialized = useRef(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const nodePickerContentRef = useRef<HTMLDivElement>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const sourceByID = useMemo(
     () => new Map(sources.map((source) => [source.id, source])),
@@ -449,6 +411,14 @@ const WorkflowPanelInner = ({
   );
   const effectivePreviewFeed =
     mode === 'manage' ? selectedPreviewFeed : previewFeed;
+  const openVariablePanel = useCallback(
+    (nodeId: string, view: RSSFlowVariableView) => {
+      setSelectedNodeId(undefined);
+      setSelectedEdgeId(undefined);
+      setVariablePanel({ nodeId, view });
+    },
+    [],
+  );
 
   const loadDefinition = useCallback(
     (definition: RSSAutomationDefinition) => {
@@ -458,6 +428,7 @@ const WorkflowPanelInner = ({
       setValidation(undefined);
       setSelectedNodeId(undefined);
       setSelectedEdgeId(undefined);
+      setVariablePanel(undefined);
       const nextViewport = definition.viewport || { x: 0, y: 0, zoom: 1 };
       setViewportState(nextViewport);
       window.setTimeout(() => {
@@ -734,6 +705,26 @@ const WorkflowPanelInner = ({
     simulation?.variables,
     nodeProtocols,
   ]);
+  const routingPlan = useMemo(
+    () => buildFlowRoutingPlan(nodes, edges),
+    [edges, nodes],
+  );
+  const variableSummaries = useMemo(
+    () =>
+      buildFlowNodeVariableSummaries(nodes, edges, nodeProtocols, {
+        previews: simulation?.nodes,
+        triggerFields:
+          effectivePreviewFeed?.items[previewItemIndex]?.fields || undefined,
+      }),
+    [
+      edges,
+      effectivePreviewFeed,
+      nodeProtocols,
+      nodes,
+      previewItemIndex,
+      simulation,
+    ],
+  );
   const displayNodes = useMemo(
     () =>
       nodes.map((node) => ({
@@ -741,39 +732,49 @@ const WorkflowPanelInner = ({
         data: {
           ...node.data,
           preview: simulation?.nodes[node.id],
+          targetHandles: routingPlan.targetHandles.get(node.id),
+          variableSummary: variableSummaries.get(node.id),
+          openVariablePanel,
         },
       })),
-    [nodes, simulation],
+    [nodes, openVariablePanel, routingPlan, simulation, variableSummaries],
   );
-  const displayEdges = useMemo(() => {
-    const sourceByID = new Map(
-      nodes.map((node) => [node.id, node.data.definition]),
-    );
-    if (!simulation) {
-      return edges.map((edge) => ({
+  const variablePanelNode = useMemo(
+    () =>
+      nodes.find((node) => node.id === variablePanel?.nodeId)?.data.definition,
+    [nodes, variablePanel?.nodeId],
+  );
+  const variablePanelSummary = variablePanel
+    ? variableSummaries.get(variablePanel.nodeId)
+    : undefined;
+  const displayEdges = useMemo<RSSFlowEdge[]>(() => {
+    const active = new Set(simulation?.activeEdgeIds || []);
+    return edges.map((edge) => {
+      const route = routingPlan.routes.get(edge.id);
+      const isActive = active.has(edge.id);
+      return {
         ...edge,
-        label: sourcePortLabel(
-          edge.sourceHandle || 'success',
-          sourceByID.get(edge.source),
-        ),
-      }));
-    }
-    const active = new Set(simulation.activeEdgeIds);
-    return edges.map((edge) => ({
-      ...edge,
-      label: sourcePortLabel(
-        edge.sourceHandle || 'success',
-        sourceByID.get(edge.source),
-      ),
-      animated: active.has(edge.id),
-      style: {
-        ...edge.style,
-        opacity: active.has(edge.id) ? 1 : 0.22,
-        stroke: active.has(edge.id) ? '#16a34a' : '#94a3b8',
-        strokeWidth: active.has(edge.id) ? 2.6 : 1.2,
-      },
-    }));
-  }, [edges, nodes, simulation]);
+        type: 'workflow',
+        label: undefined,
+        targetHandle: route?.targetHandle || edge.targetHandle,
+        data: {
+          ...edge.data,
+          laneOffset: route?.laneOffset || 0,
+        },
+        ...(simulation
+          ? {
+              animated: isActive,
+              style: {
+                ...edge.style,
+                opacity: isActive ? 1 : 0.22,
+                stroke: isActive ? '#16a34a' : '#94a3b8',
+                strokeWidth: isActive ? 2.4 : 1.2,
+              },
+            }
+          : {}),
+      };
+    });
+  }, [edges, routingPlan, simulation]);
 
   const isValidConnection = useCallback(
     (connection: Connection | RSSFlowEdge) => {
@@ -844,7 +845,7 @@ const WorkflowPanelInner = ({
         source: connection.source,
         source_port: connection.sourceHandle,
         target: connection.target,
-        target_port: connection.targetHandle || 'input',
+        target_port: normalizeFlowTargetHandle(connection.targetHandle),
       };
       const sourceDefinition = nodes.find(
         (node) => node.id === connection.source,
@@ -983,6 +984,9 @@ const WorkflowPanelInner = ({
     );
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
+    setVariablePanel((current) =>
+      current?.nodeId === definition.id ? undefined : current,
+    );
     setValidation(undefined);
   };
 
@@ -1073,14 +1077,22 @@ const WorkflowPanelInner = ({
         layoutOptions: {
           'elk.algorithm': 'layered',
           'elk.direction': 'RIGHT',
-          'elk.spacing.nodeNode': '70',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '120',
+          'elk.edgeRouting': 'ORTHOGONAL',
+          'elk.spacing.edgeEdge': '18',
+          'elk.spacing.edgeNode': '24',
+          'elk.spacing.nodeNode': '60',
+          'elk.layered.spacing.edgeEdgeBetweenLayers': '18',
+          'elk.layered.spacing.edgeNodeBetweenLayers': '24',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '150',
           'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
         },
         children: nodes.map((node) => ({
           id: node.id,
-          width: 230,
-          height: 92,
+          width: FLOW_NODE_WIDTH,
+          height: flowNodeHeight(
+            node.data.definition,
+            routingPlan.incomingCounts.get(node.id) || 0,
+          ),
         })),
         edges: edges.map((edge) => ({
           id: edge.id,
@@ -1100,7 +1112,12 @@ const WorkflowPanelInner = ({
           position: positions.get(node.id) || node.position,
         })),
       );
-      window.setTimeout(() => instanceRef.current?.fitView({ padding: 0.2 }));
+      window.setTimeout(() =>
+        instanceRef.current?.fitView({
+          ...FLOW_FIT_VIEW_OPTIONS,
+          duration: 240,
+        }),
+      );
     } catch (error: any) {
       messageApi.error(error?.message || '自动排版失败');
     } finally {
@@ -1314,9 +1331,12 @@ const WorkflowPanelInner = ({
                 <ReactFlow<RSSFlowNode, RSSFlowEdge>
                   colorMode="light"
                   deleteKeyCode={['Backspace', 'Delete']}
+                  edgeTypes={edgeTypes}
                   edges={displayEdges}
                   fitView
+                  fitViewOptions={FLOW_FIT_VIEW_OPTIONS}
                   isValidConnection={isValidConnection}
+                  maxZoom={1.6}
                   minZoom={0.2}
                   nodeTypes={nodeTypes}
                   nodes={displayNodes}
@@ -1340,6 +1360,7 @@ const WorkflowPanelInner = ({
                     setViewportState(nextViewport)
                   }
                   onNodeClick={(_, node) => {
+                    setVariablePanel(undefined);
                     setSelectedNodeId(node.id);
                     setSelectedEdgeId(undefined);
                   }}
@@ -1473,7 +1494,10 @@ const WorkflowPanelInner = ({
                         aria-label="居中显示"
                         icon={<AimOutlined />}
                         onClick={() =>
-                          instanceRef.current?.fitView({ padding: 0.2 })
+                          instanceRef.current?.fitView({
+                            ...FLOW_FIT_VIEW_OPTIONS,
+                            duration: 240,
+                          })
                         }
                       />
                     </Tooltip>
@@ -1529,8 +1553,15 @@ const WorkflowPanelInner = ({
       </section>
 
       <Modal
+        afterOpenChange={(open) => {
+          if (!open) return;
+          const modalBody =
+            nodePickerContentRef.current?.closest('.ant-modal-body');
+          if (modalBody instanceof HTMLElement) modalBody.scrollTop = 0;
+        }}
         centered
         className={styles.nodePickerModal}
+        destroyOnHidden
         footer={null}
         onCancel={() => setNodePickerOpen(false)}
         open={nodePickerOpen}
@@ -1540,32 +1571,43 @@ const WorkflowPanelInner = ({
             <span>添加节点</span>
           </Space>
         }
-        width={760}
+        width="min(900px, 94vw)"
       >
         <Text className={styles.nodePickerIntro} type="secondary">
-          选择节点类型，添加后将直接打开节点配置。
+          按用途选择节点，添加后将直接打开节点配置。
         </Text>
-        <div className={styles.nodePickerGroups}>
-          {palette.map((group) => (
-            <section className={styles.nodePickerGroup} key={group.title}>
-              <Text className={styles.nodePickerGroupTitle} strong>
-                {group.title}
-              </Text>
-              <div className={styles.nodePickerOptions}>
-                {group.types.map((type) => (
-                  <Button
-                    className={styles.nodePickerOption}
-                    key={type}
-                    onClick={() => {
-                      setNodePickerOpen(false);
-                      addNode(type);
-                    }}
+        <div className={styles.nodePickerGroups} ref={nodePickerContentRef}>
+          {NODE_PALETTE_COLUMNS.map((groups) => (
+            <div className={styles.nodePickerColumn} key={groups[0].title}>
+              {groups.map((group) => {
+                const headingID = `node-picker-${group.types[0]}`;
+                return (
+                  <section
+                    aria-labelledby={headingID}
+                    className={styles.nodePickerGroup}
+                    key={group.title}
                   >
-                    {NODE_LABELS[type]}
-                  </Button>
-                ))}
-              </div>
-            </section>
+                    <h3 className={styles.nodePickerGroupTitle} id={headingID}>
+                      {group.title}
+                    </h3>
+                    <div className={styles.nodePickerOptions}>
+                      {group.types.map((type) => (
+                        <Button
+                          className={styles.nodePickerOption}
+                          key={type}
+                          onClick={() => {
+                            setNodePickerOpen(false);
+                            addNode(type);
+                          }}
+                        >
+                          {NODE_LABELS[type]}
+                        </Button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
           ))}
         </div>
       </Modal>
@@ -1679,6 +1721,15 @@ const WorkflowPanelInner = ({
         onDelete={deleteNode}
         preview={selectedNodeId ? simulation?.nodes[selectedNodeId] : undefined}
         targets={targets}
+      />
+      <NodeVariableDrawer
+        node={variablePanelNode}
+        onClose={() => setVariablePanel(undefined)}
+        open={Boolean(
+          variablePanel && variablePanelNode && variablePanelSummary,
+        )}
+        summary={variablePanelSummary}
+        view={variablePanel?.view || 'received'}
       />
     </div>
   );

@@ -3,18 +3,56 @@ import type {
   RSSAutomationDefinition,
   RSSAutomationEdgeDefinition,
   RSSAutomationNodeDefinition,
+  RSSAutomationNodeProtocol,
   RSSAutomationNodeType,
+  RSSAutomationVariableProtocol,
+  RSSAutomationVariableType,
 } from '@/services/film-fusion';
 import type { RSSAutomationNodePreview } from './preview';
+
+export type RSSFlowVariableInfo = {
+  key: string;
+  name: string;
+  label: string;
+  type: RSSAutomationVariableType;
+  description: string;
+  reference: string;
+  source?: string;
+  required?: boolean;
+  value?: unknown;
+  valueKind?: 'configured';
+};
+
+export type RSSFlowNodeVariableSummary = {
+  protocolAvailable: boolean;
+  received: RSSFlowVariableInfo[];
+  configuredInputs: RSSFlowVariableInfo[];
+  returned: RSSFlowVariableInfo[];
+};
+
+export type RSSFlowVariableView = 'received' | 'returned';
 
 export type RSSFlowNodeData = Record<string, unknown> & {
   definition: RSSAutomationNodeDefinition;
   status?: string;
   preview?: RSSAutomationNodePreview;
+  targetHandles?: RSSFlowTargetHandle[];
+  variableSummary?: RSSFlowNodeVariableSummary;
+  openVariablePanel?: (nodeID: string, view: RSSFlowVariableView) => void;
+};
+
+export type RSSFlowTargetHandle = {
+  id: string;
+  top: number;
+};
+
+export type RSSFlowEdgeData = Record<string, unknown> & {
+  laneOffset?: number;
+  sourcePortLabel?: string;
 };
 
 export type RSSFlowNode = Node<RSSFlowNodeData, 'rssAutomationNode'>;
-export type RSSFlowEdge = Edge;
+export type RSSFlowEdge = Edge<RSSFlowEdgeData, 'workflow'>;
 
 export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   trigger: 'RSS 触发器',
@@ -38,10 +76,10 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   if: 'IF 条件',
   parallel: '并行分支',
   join: '汇合',
-  qbittorrent: 'qBittorrent',
+  qbittorrent: '添加 qBittorrent 任务',
   wait_qbittorrent: '等待 qBittorrent 完成',
   moviepilot_transfer: 'MP2 整理入库',
-  delete_qbittorrent: '删除 qB 做种任务',
+  delete_qbittorrent: '删除 qBittorrent 任务',
   offline115: '115 Cookie 离线',
   offline115_openapi: '115 OpenAPI 离线',
   wait115: '等待 115 下载完成',
@@ -142,6 +180,195 @@ export const sourcePortLabel = (
   return PORT_LABELS[port] || port.replace(/^branch-/, '分支 ');
 };
 
+const VISUAL_TARGET_HANDLE_PREFIX = 'flow-target-';
+
+export const normalizeFlowTargetHandle = (handle?: string | null) =>
+  handle?.startsWith(VISUAL_TARGET_HANDLE_PREFIX) ? 'input' : handle || 'input';
+
+const hasOwn = (value: object, key: string) => Object.hasOwn(value, key);
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+const configuredValue = (
+  config: Record<string, unknown> | undefined,
+  path: string,
+) => {
+  let current: unknown = config;
+  for (const segment of path.split('.')) {
+    const record = asRecord(current);
+    if (!record || !hasOwn(record, segment)) {
+      return { found: false, value: undefined };
+    }
+    current = record[segment];
+  }
+  return { found: true, value: current };
+};
+
+const inferVariableType = (value: unknown): RSSAutomationVariableType => {
+  if (Array.isArray(value)) return 'array';
+  if (value instanceof Date) return 'datetime';
+  switch (typeof value) {
+    case 'string':
+      return 'string';
+    case 'number':
+      return Number.isInteger(value) ? 'integer' : 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'object':
+      return value == null ? 'any' : 'object';
+    default:
+      return 'any';
+  }
+};
+
+const protocolVariableInfo = (
+  variable: RSSAutomationVariableProtocol,
+  options: {
+    key: string;
+    reference: string;
+    source?: string;
+  },
+): RSSFlowVariableInfo => {
+  const { key, reference, source } = options;
+  return {
+    key,
+    name: variable.name,
+    label: variable.label,
+    type: variable.type,
+    description: variable.description,
+    reference,
+    source,
+    required: variable.required,
+  };
+};
+
+const nodeOutputVariables = (
+  node: RSSFlowNode,
+  protocol: RSSAutomationNodeProtocol | undefined,
+  preview: RSSAutomationNodePreview | undefined,
+  triggerFields: Record<string, unknown> | undefined,
+) => {
+  const previewRecord = asRecord(preview?.output);
+  const fallbackRecord =
+    node.data.definition.type === 'trigger' ? triggerFields : undefined;
+  const referenceFor = (name: string) =>
+    node.data.definition.type === 'trigger' && name !== 'selected_port'
+      ? `$item.${name}`
+      : `$nodes.${node.id}.output.${name}`;
+  const variables = (protocol?.outputs || []).map((variable) =>
+    protocolVariableInfo(variable, {
+      key: `${node.id}:output:${variable.name}`,
+      reference: referenceFor(variable.name),
+    }),
+  );
+  const seen = new Set(variables.map((variable) => variable.name));
+  const dynamicRecords = [previewRecord, fallbackRecord];
+  for (const record of dynamicRecords) {
+    for (const [name, value] of Object.entries(record || {})) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      variables.push({
+        key: `${node.id}:output:${name}`,
+        name,
+        label: name,
+        type: inferVariableType(value),
+        description:
+          node.data.definition.type === 'trigger'
+            ? '当前触发样本携带的扩展字段。'
+            : '当前样本预览返回的扩展字段。',
+        reference: referenceFor(name),
+      });
+    }
+  }
+  return variables;
+};
+
+export const buildFlowNodeVariableSummaries = (
+  nodes: RSSFlowNode[],
+  edges: RSSFlowEdge[],
+  protocols: RSSAutomationNodeProtocol[],
+  options?: {
+    previews?: Record<string, RSSAutomationNodePreview>;
+    triggerFields?: Record<string, unknown>;
+  },
+) => {
+  const nodesByID = new Map(nodes.map((node) => [node.id, node]));
+  const protocolByType = new Map(
+    protocols.map((protocol) => [protocol.type, protocol]),
+  );
+  const incomingByTarget = new Map<string, RSSFlowEdge[]>();
+  for (const edge of edges) {
+    incomingByTarget.set(edge.target, [
+      ...(incomingByTarget.get(edge.target) || []),
+      edge,
+    ]);
+  }
+  const outputByNodeID = new Map(
+    nodes.map((node) => [
+      node.id,
+      nodeOutputVariables(
+        node,
+        protocolByType.get(node.data.definition.type),
+        options?.previews?.[node.id],
+        options?.triggerFields,
+      ),
+    ]),
+  );
+
+  return new Map<string, RSSFlowNodeVariableSummary>(
+    nodes.map((node) => {
+      const definition = node.data.definition;
+      const protocol = protocolByType.get(definition.type);
+      const configuredInputs = (protocol?.inputs || []).map((variable) => {
+        const configured = configuredValue(definition.config, variable.name);
+        return {
+          ...protocolVariableInfo(variable, {
+            key: `${node.id}:input:${variable.name}`,
+            reference: variable.name,
+          }),
+          ...(configured.found
+            ? { value: configured.value, valueKind: 'configured' as const }
+            : {}),
+        };
+      });
+      let received: RSSFlowVariableInfo[];
+      if (definition.type === 'trigger') {
+        received = (outputByNodeID.get(node.id) || [])
+          .filter((variable) => variable.name !== 'selected_port')
+          .map((variable) => ({ ...variable, source: '触发事件' }));
+      } else {
+        const seen = new Set<string>();
+        received = [];
+        for (const edge of incomingByTarget.get(node.id) || []) {
+          const sourceNode = nodesByID.get(edge.source);
+          if (!sourceNode) continue;
+          const sourceName =
+            sourceNode.data.definition.name ||
+            NODE_LABELS[sourceNode.data.definition.type];
+          for (const variable of outputByNodeID.get(sourceNode.id) || []) {
+            if (seen.has(variable.reference)) continue;
+            seen.add(variable.reference);
+            received.push({ ...variable, source: sourceName });
+          }
+        }
+      }
+
+      return [
+        node.id,
+        {
+          protocolAvailable: Boolean(protocol),
+          received,
+          configuredInputs,
+          returned: outputByNodeID.get(node.id) || [],
+        },
+      ];
+    }),
+  );
+};
+
 export const nodeDefinitionToFlowNode = (
   definition: RSSAutomationNodeDefinition,
   status?: string,
@@ -156,16 +383,22 @@ export const nodeDefinitionToFlowNode = (
 export const edgeDefinitionToFlowEdge = (
   edge: RSSAutomationEdgeDefinition,
   source?: RSSAutomationNodeDefinition,
-): RSSFlowEdge => ({
-  id: edge.id,
-  source: edge.source,
-  sourceHandle: edge.source_port,
-  target: edge.target,
-  targetHandle: edge.target_port || 'input',
-  label: sourcePortLabel(edge.source_port, source),
-  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-  type: 'smoothstep',
-});
+): RSSFlowEdge => {
+  const portLabel = sourcePortLabel(edge.source_port, source);
+  return {
+    id: edge.id,
+    source: edge.source,
+    sourceHandle: edge.source_port,
+    target: edge.target,
+    targetHandle: normalizeFlowTargetHandle(edge.target_port),
+    ariaLabel: `${portLabel}：${edge.source} 到 ${edge.target}`,
+    data: { sourcePortLabel: portLabel },
+    interactionWidth: 18,
+    markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+    style: { stroke: '#94a3b8', strokeWidth: 1.5 },
+    type: 'workflow',
+  };
+};
 
 export const definitionToFlow = (
   definition: RSSAutomationDefinition,
@@ -197,7 +430,7 @@ export const flowToDefinition = (
     source: edge.source,
     source_port: edge.sourceHandle || 'success',
     target: edge.target,
-    target_port: edge.targetHandle || 'input',
+    target_port: normalizeFlowTargetHandle(edge.targetHandle),
   })),
   viewport,
 });
@@ -413,6 +646,17 @@ export const createNodeDefinition = (
   }
   if (type === 'parallel') config.branches = ['branch-1', 'branch-2'];
   if (type === 'join') config.policy = 'all_completed';
+  if (type === 'qbittorrent') {
+    Object.assign(config, {
+      paused: false,
+      sequential: false,
+      skip_checking: false,
+      first_last_piece_priority: false,
+      root_folder: 'default',
+      auto_tmm: 'default',
+      timeout_seconds: 30,
+    });
+  }
   if (type === 'wait115') {
     Object.assign(config, {
       poll_interval_seconds: 30,
@@ -556,4 +800,160 @@ export const nodeBranches = (definition: RSSAutomationNodeDefinition) => {
       .filter((item) => item.startsWith('branch-'));
   }
   return ['branch-1', 'branch-2'];
+};
+
+export const nodeSourcePorts = (
+  definition: RSSAutomationNodeDefinition,
+): string[] => {
+  switch (definition.type) {
+    case 'end':
+      return [];
+    case 'trigger':
+      return ['next'];
+    case 'if':
+      return ['true', 'false', 'failure'];
+    case 'keyword':
+      return ['matched', 'unmatched', 'failure'];
+    case 'list_operation':
+      return ['success', 'empty', 'failure'];
+    case 'deduplicate':
+      return ['new', 'duplicate', 'failure'];
+    case 'rate_limit':
+      return ['allowed', 'throttled', 'failure'];
+    case 'foreach':
+      return ['success', 'partial', 'empty', 'failure'];
+    case 'media_exists':
+      return ['exists', 'missing', 'failure'];
+    case 'hdhive_query':
+      return ['found', 'not_found', 'failure'];
+    case 'strm_verify':
+      return ['valid', 'invalid', 'failure'];
+    case 'parallel':
+      return nodeBranches(definition);
+    case 'switch': {
+      const cases = Array.isArray(definition.config?.cases)
+        ? definition.config.cases
+        : [];
+      return cases
+        .filter(
+          (candidate): candidate is Record<string, unknown> =>
+            Boolean(candidate) &&
+            typeof candidate === 'object' &&
+            !Array.isArray(candidate) &&
+            Boolean(String(candidate.id || '').trim()),
+        )
+        .map((candidate) => `case-${String(candidate.id).toLowerCase()}`)
+        .concat(['default', 'failure']);
+    }
+    case 'join':
+      return joinHasConditionalOutcome(definition)
+        ? ['success', 'failure']
+        : ['success'];
+    default:
+      return ['success', 'failure'];
+  }
+};
+
+export const flowPortTop = (index: number, count: number) => {
+  if (count <= 1) return 50;
+  return 18 + (64 * index) / (count - 1);
+};
+
+export const flowNodeHeight = (
+  definition: RSSAutomationNodeDefinition,
+  incomingCount = 0,
+) => {
+  const portCount = Math.max(nodeSourcePorts(definition).length, incomingCount);
+  return portCount <= 2 ? 90 : 58 + portCount * 16;
+};
+
+export type RSSFlowEdgeRoute = {
+  laneOffset: number;
+  targetHandle: string;
+};
+
+export type RSSFlowRoutingPlan = {
+  incomingCounts: Map<string, number>;
+  routes: Map<string, RSSFlowEdgeRoute>;
+  targetHandles: Map<string, RSSFlowTargetHandle[]>;
+};
+
+const sourceAnchorY = (
+  node: RSSFlowNode | undefined,
+  sourceHandle: string | null | undefined,
+  incomingCount: number,
+) => {
+  if (!node) return 0;
+  const ports = nodeSourcePorts(node.data.definition);
+  const index = Math.max(0, ports.indexOf(sourceHandle || ''));
+  return (
+    node.position.y +
+    (flowNodeHeight(node.data.definition, incomingCount) *
+      flowPortTop(index, Math.max(ports.length, 1))) /
+      100
+  );
+};
+
+export const buildFlowRoutingPlan = (
+  nodes: RSSFlowNode[],
+  edges: RSSFlowEdge[],
+): RSSFlowRoutingPlan => {
+  const nodesByID = new Map(nodes.map((node) => [node.id, node]));
+  const incomingEdges = new Map<string, RSSFlowEdge[]>();
+  for (const edge of edges) {
+    incomingEdges.set(edge.target, [
+      ...(incomingEdges.get(edge.target) || []),
+      edge,
+    ]);
+  }
+
+  const incomingCounts = new Map(
+    [...incomingEdges].map(([nodeID, incoming]) => [nodeID, incoming.length]),
+  );
+  const routes = new Map<string, RSSFlowEdgeRoute>();
+  const targetHandles = new Map<string, RSSFlowTargetHandle[]>();
+
+  for (const [targetID, incoming] of incomingEdges) {
+    const sorted = [...incoming].sort((left, right) => {
+      const leftNode = nodesByID.get(left.source);
+      const rightNode = nodesByID.get(right.source);
+      const leftY = sourceAnchorY(
+        leftNode,
+        left.sourceHandle,
+        incomingCounts.get(left.source) || 0,
+      );
+      const rightY = sourceAnchorY(
+        rightNode,
+        right.sourceHandle,
+        incomingCounts.get(right.source) || 0,
+      );
+      return (
+        leftY - rightY ||
+        (leftNode?.position.x || 0) - (rightNode?.position.x || 0) ||
+        left.id.localeCompare(right.id)
+      );
+    });
+    const splitTarget = sorted.length > 1;
+    const handles: RSSFlowTargetHandle[] = [];
+
+    sorted.forEach((edge, index) => {
+      const targetHandle = splitTarget
+        ? `${VISUAL_TARGET_HANDLE_PREFIX}${edge.id}`
+        : normalizeFlowTargetHandle(edge.targetHandle);
+      routes.set(edge.id, {
+        laneOffset: (index - (sorted.length - 1) / 2) * 18,
+        targetHandle,
+      });
+      if (splitTarget) {
+        handles.push({
+          id: targetHandle,
+          top: flowPortTop(index, sorted.length),
+        });
+      }
+    });
+
+    if (handles.length > 0) targetHandles.set(targetID, handles);
+  }
+
+  return { incomingCounts, routes, targetHandles };
 };

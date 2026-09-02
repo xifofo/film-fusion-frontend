@@ -618,16 +618,35 @@ const previewNode = (
           label: `${activeInputs} 条有效路径在此汇合`,
           selectedPorts: ['success'],
         };
-      case 'qbittorrent':
+      case 'qbittorrent': {
+        const url = resolveConfiguredString(context, config.url);
+        return {
+          active: true,
+          tone: url ? 'success' : 'warning',
+          label: '将调用 qBittorrent 添加任务 API',
+          detail: String(url || '下载 URL 尚未解析'),
+          selectedPorts: [url ? 'success' : 'failure'],
+          output: url
+            ? {
+                submitted: true,
+                accepted: true,
+                pending: false,
+                success_count: 1,
+                pending_count: 0,
+                failure_count: 0,
+                response_format: 'preview',
+                content_key: '运行时计算',
+                torrent_tag: '运行时生成',
+              }
+            : undefined,
+        };
+      }
       case 'offline115': {
         const url = resolveConfiguredString(context, config.url);
         return {
           active: true,
           tone: url ? 'success' : 'warning',
-          label:
-            node.type === 'qbittorrent'
-              ? '将提交到 qBittorrent'
-              : '将通过 Cookie 提交到 115 离线',
+          label: '将通过 Cookie 提交到 115 离线',
           detail: String(url || '下载 URL 尚未解析'),
           selectedPorts: [url ? 'success' : 'failure'],
           output: url,
@@ -701,15 +720,24 @@ const previewNode = (
           detail: '样本预览不会连接真实 qBittorrent',
           selectedPorts: ['success'],
           output: {
+            waiting: false,
             completed: true,
+            failed: false,
+            timed_out: false,
             progress: 100,
             state: 'uploading',
             hash: '运行时返回',
+            torrent_hashes: ['运行时返回'],
             name: '运行时返回',
             save_path: '运行时返回',
             content_path: '运行时返回',
             content_type: 'dir',
             file_count: 1,
+            category: '运行时返回',
+            tags: '运行时返回',
+            tracker: '运行时返回',
+            waiting_since: '运行时返回',
+            last_checked_at: '运行时返回',
           },
         };
       case 'moviepilot_transfer': {
@@ -744,8 +772,8 @@ const previewNode = (
           active: true,
           tone: deleteFiles ? 'warning' : 'success',
           label: deleteFiles
-            ? 'MP2 整理成功后将删除 qB 任务和下载文件'
-            : '将删除 qB 做种任务并保留下载文件',
+            ? 'MP2 整理成功后将删除 qBittorrent 任务和下载文件'
+            : '将删除 qBittorrent 任务并保留下载文件',
           detail: deleteFiles
             ? '只有直接连接 MP2 整理成功出口才能保存并执行'
             : '样本预览不会删除真实 qBittorrent 任务',
@@ -755,8 +783,11 @@ const previewNode = (
             already_missing: false,
             delete_files: deleteFiles,
             hash: '运行时透传',
+            name: '运行时返回',
+            content_path: '运行时返回',
             target_id: '运行时透传',
             target_name: '运行时透传',
+            response_status: 200,
           },
         };
       }

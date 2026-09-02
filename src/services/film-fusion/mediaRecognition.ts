@@ -76,6 +76,7 @@ export type MediaRecognitionMetaInfo = {
   video_encode?: string;
   video_bit?: string;
   audio_encode?: string;
+  web_source?: string;
   resource_effect?: string[];
   resource_team?: string;
   applied_words: string[];

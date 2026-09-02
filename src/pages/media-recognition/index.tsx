@@ -1149,8 +1149,11 @@ const RecognitionResult = ({
             <ResultField label="分辨率">
               {optionalText(meta.resource_pix)}
             </ResultField>
-            <ResultField label="来源">
+            <ResultField label="资源类型">
               {optionalText(meta.resource_type)}
+            </ResultField>
+            <ResultField label="流媒体平台">
+              {optionalText(meta.web_source)}
             </ResultField>
             <ResultField label="视频编码">
               {[meta.video_encode, meta.video_bit].filter(Boolean).join(' ') ||
