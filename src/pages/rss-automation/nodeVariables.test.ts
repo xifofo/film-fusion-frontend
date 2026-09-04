@@ -100,9 +100,18 @@ describe('RSS workflow node variables', () => {
     ]);
     expect(summary?.received.at(-1)).toMatchObject({
       type: 'integer',
+      value: 1024,
+      valueKind: 'preview',
     });
-    expect(summary?.received.at(-1)).not.toHaveProperty('value');
-    expect(summary?.returned[0]).not.toHaveProperty('value');
+    expect(summary?.received[0]).toMatchObject({
+      value: 'Example S01E01',
+      valueKind: 'preview',
+    });
+    expect(summary?.returned[0]).toMatchObject({
+      name: 'selected_port',
+      value: 'next',
+      valueKind: 'preview',
+    });
   });
 
   it('uses direct upstream outputs for received variables and keeps config inputs separate', () => {
@@ -152,6 +161,8 @@ describe('RSS workflow node variables', () => {
         expect.objectContaining({
           reference: '$nodes.add.output.hash',
           source: 'add',
+          value: 'abc123',
+          valueKind: 'preview',
         }),
       ]),
     );

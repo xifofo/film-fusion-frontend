@@ -45,8 +45,6 @@ import {
 } from '@/pages/system-settings/settingsScope';
 import {
   getAppConfig,
-  getHDHiveAuthorizeURL,
-  refreshHDHiveToken,
   saveAppConfig,
   testNotificationChannel,
   uploadLoginBackground,
@@ -76,7 +74,6 @@ const SETTINGS_TAB_ICON_COLORS: Record<SettingsTabKey, string> = {
   mediaRecognition: '#111827',
   moviepilot: '#4c1d95',
   tmdb: '#032541',
-  hdhive: '#050505',
   log: '#000000',
   jwt: '#000000',
 };
@@ -476,8 +473,6 @@ const SystemSettingsPage: React.FC = () => {
   const [savingTab, setSavingTab] = useState<SettingsTabKey>();
   const [config, setConfig] = useState<API.AppConfig>();
   const [secrets, setSecrets] = useState<Record<string, boolean>>({});
-  const [hdhiveAuthorizing, setHdhiveAuthorizing] = useState(false);
-  const [hdhiveRefreshing, setHdhiveRefreshing] = useState(false);
   const [notificationChannelTesting, setNotificationChannelTesting] =
     useState<API.NotificationChannelID>();
   const [backgroundUploading, setBackgroundUploading] = useState(false);
@@ -649,45 +644,6 @@ const SystemSettingsPage: React.FC = () => {
       messageApi.error(error?.message || '保存失败');
     } finally {
       setSavingTab(undefined);
-    }
-  };
-
-  const handleHDHiveAuthorize = async () => {
-    setHdhiveAuthorizing(true);
-    try {
-      const res = await getHDHiveAuthorizeURL({ response_mode: 'redirect' });
-      if (res.code === 0 && res.data?.authorize_url) {
-        window.localStorage.setItem('hdhive_oauth_state', res.data.state || '');
-        window.open(res.data.authorize_url, '_blank', 'noopener,noreferrer');
-        messageApi.info(
-          '已打开 HDHive 授权页，授权完成后会回到回调页写入 Token',
-        );
-      } else {
-        messageApi.error(res.message || '生成 HDHive 授权链接失败');
-      }
-    } catch (error: any) {
-      messageApi.error(error?.message || '生成 HDHive 授权链接失败');
-    } finally {
-      setHdhiveAuthorizing(false);
-    }
-  };
-
-  const handleHDHiveRefresh = async () => {
-    setHdhiveRefreshing(true);
-    try {
-      const res = await refreshHDHiveToken();
-      if (res.code === 0 && res.data?.success) {
-        messageApi.success('HDHive Token 已刷新');
-        await load();
-      } else {
-        messageApi.error(
-          res.message || res.data?.message || '刷新 HDHive Token 失败',
-        );
-      }
-    } catch (error: any) {
-      messageApi.error(error?.message || '刷新 HDHive Token 失败');
-    } finally {
-      setHdhiveRefreshing(false);
     }
   };
 
@@ -1991,161 +1947,6 @@ const SystemSettingsPage: React.FC = () => {
                               width="md"
                               name={['tmdb', 'cache_minutes']}
                               label="缓存时间 (分钟)"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                          </div>
-                        </SettingsSection>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'hdhive',
-                    label: 'HDHive',
-                    icon: renderBrandTabIcon(
-                      '/brands/hdhive.png',
-                      SETTINGS_TAB_ICON_COLORS.hdhive,
-                    ),
-                    forceRender: true,
-                    children: (
-                      <div className={styles.tabPanel}>
-                        <SettingsSection
-                          title="应用授权"
-                          description="保存应用参数后，再打开 HDHive 授权页获取用户 Token。"
-                        >
-                          <Alert
-                            className={styles.sectionAlert}
-                            type="warning"
-                            showIcon
-                            title="保存配置不会自动获得 Token"
-                            description="完成应用配置并保存后，打开授权页确认授权；回调页会自动换取并保存 Access Token 与 Refresh Token。"
-                            action={
-                              <Space wrap>
-                                <Button
-                                  size="small"
-                                  type="primary"
-                                  loading={hdhiveAuthorizing}
-                                  onClick={handleHDHiveAuthorize}
-                                >
-                                  打开授权页
-                                </Button>
-                                <Button
-                                  size="small"
-                                  loading={hdhiveRefreshing}
-                                  onClick={handleHDHiveRefresh}
-                                >
-                                  刷新 Token
-                                </Button>
-                              </Space>
-                            }
-                          />
-                          <div className={styles.toggleGrid}>
-                            <SettingsToggle
-                              name={['hdhive', 'enabled']}
-                              title="HDHive OpenAPI"
-                              description="允许 FilmFusion 使用下方应用参数调用 HDHive。"
-                            />
-                          </div>
-                          <div className={styles.fieldGrid}>
-                            <ProFormText
-                              width="lg"
-                              name={['hdhive', 'base_url']}
-                              label="服务地址"
-                              placeholder="https://hdhive.com"
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['hdhive', 'client_id']}
-                              label="Client ID"
-                              placeholder="app_xxx"
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['hdhive', 'redirect_uri']}
-                              label="Redirect URI"
-                              placeholder="https://your.domain/hdhive/callback"
-                            />
-                            <ProFormText
-                              width="md"
-                              name={['hdhive', 'scope']}
-                              label="授权 Scope"
-                              placeholder="query unlock"
-                            />
-                            <ProFormText.Password
-                              width="lg"
-                              name={['hdhive', 'api_key']}
-                              label="应用 Secret (X-API-Key)"
-                              fieldProps={{
-                                placeholder:
-                                  secretPlaceholder('hdhive.api_key'),
-                              }}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['hdhive', 'timeout_seconds']}
-                              label="请求超时 (秒)"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                          </div>
-                        </SettingsSection>
-
-                        <SettingsSection
-                          title="Token 生命周期"
-                          description="管理用户 Token 及其自动续期策略。"
-                        >
-                          <div className={styles.toggleGrid}>
-                            <SettingsToggle
-                              name={['hdhive', 'auto_refresh']}
-                              title="自动刷新 Access Token"
-                              description="到期前使用已保存的 Refresh Token 自动续期。"
-                            />
-                          </div>
-                          <div className={styles.fieldGrid}>
-                            <ProFormText.Password
-                              width="lg"
-                              name={['hdhive', 'access_token']}
-                              label="用户 Access Token"
-                              fieldProps={{
-                                placeholder: secretPlaceholder(
-                                  'hdhive.access_token',
-                                ),
-                              }}
-                            />
-                            <ProFormText.Password
-                              width="lg"
-                              name={['hdhive', 'refresh_token']}
-                              label="用户 Refresh Token"
-                              tooltip="后端自动刷新任务会使用该 Token 续期 Access Token。"
-                              fieldProps={{
-                                placeholder: secretPlaceholder(
-                                  'hdhive.refresh_token',
-                                ),
-                              }}
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['hdhive', 'access_token_expires_at']}
-                              label="Access Token 过期时间"
-                              fieldProps={{ disabled: true }}
-                            />
-                            <ProFormText
-                              width="lg"
-                              name={['hdhive', 'refresh_token_expires_at']}
-                              label="Refresh Token 过期时间"
-                              fieldProps={{ disabled: true }}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['hdhive', 'refresh_before_minutes']}
-                              label="提前刷新 (分钟)"
-                              min={1}
-                              fieldProps={{ precision: 0 }}
-                            />
-                            <ProFormDigit
-                              width="md"
-                              name={['hdhive', 'refresh_check_minutes']}
-                              label="检查间隔 (分钟)"
                               min={1}
                               fieldProps={{ precision: 0 }}
                             />

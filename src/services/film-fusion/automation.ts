@@ -57,6 +57,7 @@ export type AutomationNodeType =
   | 'trigger'
   | 'delay'
   | 'regex'
+  | 'extract_between'
   | 'keyword'
   | 'keyword_replace'
   | 'regex_replace'
@@ -86,8 +87,6 @@ export type AutomationNodeType =
   | 'moviepilot_title_recognize'
   | 'filmfusion_recognize'
   | 'media_exists'
-  | 'hdhive_query'
-  | 'hdhive_unlock'
   | 'moviepilot_recognize'
   | 'organize_strm'
   | 'strm_verify'
@@ -244,6 +243,9 @@ export type AutomationRun = {
   workflow_name: string;
   workflow_version: number;
   entry_id: number;
+  execution_no: number;
+  trigger_mode: 'event' | 'manual';
+  repeated_from_run_id?: number;
   definition_json: string;
   context_json: string;
   status: AutomationRunStatus;
@@ -640,9 +642,19 @@ export const getAutomationRun = (id: number) =>
     `/api/automations/runs/${id}`,
   );
 
+export const runAutomationEntry = (id: number) =>
+  apiClient.post<API.Response<AutomationRun>>(
+    `/api/automations/entries/${id}/run`,
+  );
+
 export const retryAutomationRun = (id: number) =>
   apiClient.post<API.Response<Record<string, never>>>(
     `/api/automations/runs/${id}/retry`,
+  );
+
+export const repeatAutomationRun = (id: number) =>
+  apiClient.post<API.Response<AutomationRun>>(
+    `/api/automations/runs/${id}/repeat`,
   );
 
 export const cancelAutomationRun = (id: number) =>

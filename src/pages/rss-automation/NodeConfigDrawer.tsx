@@ -53,6 +53,7 @@ import styles from './index.module.less';
 import type { RSSAutomationNodePreview } from './preview';
 import TemplateVariableInput from './TemplateVariableInput';
 import {
+  automationExtractBetweenValueTypeOptions,
   automationJSONPointerError,
   automationMathOperationOptions,
   automationUnaryMathOperations,
@@ -60,6 +61,7 @@ import {
   automationVariableOverwriteOptions,
   automationVariableValueTypeOptions,
   normalizeAutomationVariableName,
+  stableAutomationJSONStringify,
 } from './variableNodes';
 
 const { Text } = Typography;
@@ -82,6 +84,8 @@ export type NodeFieldReference = {
   name: string;
   value: string;
   preview?: string;
+  previewAvailable?: boolean;
+  previewValue?: unknown;
   dataType?: string;
   description?: string;
 };
@@ -291,6 +295,77 @@ const variableEditorValue = (raw: unknown, valueType: unknown) => {
   return raw;
 };
 
+const nodeFieldPreviewValueText = (value: unknown) => {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (value === '') return '""';
+  try {
+    return typeof value === 'string'
+      ? value
+      : (stableAutomationJSONStringify(value) ?? String(value));
+  } catch {
+    return String(value);
+  }
+};
+
+const nodeFieldTemplateValueText = (value: unknown) => {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    return stableAutomationJSONStringify(value);
+  }
+  return String(value);
+};
+
+const nodeFieldPreview = (
+  raw: unknown,
+  references: NodeFieldReference[],
+): { available: boolean; message?: string; value?: string } => {
+  const input = String(raw ?? '');
+  const trimmed = input.trim();
+  if (!trimmed) return { available: false, message: '等待输入内容' };
+
+  const exactReference = references.find(
+    (reference) => reference.value === trimmed,
+  );
+  if (exactReference) {
+    return exactReference.previewAvailable
+      ? {
+          available: true,
+          value: nodeFieldPreviewValueText(exactReference.previewValue),
+        }
+      : { available: false, message: '当前样本暂无该变量值' };
+  }
+  if (/^\$(?:item|vars|nodes|each)(?:\..+)?$/.test(trimmed)) {
+    return { available: false, message: '当前样本暂无该变量值' };
+  }
+
+  let matchedTemplate = false;
+  let missingReference = '';
+  const value = input.replace(
+    /\{\{\s*([^{}]+?)\s*\}\}/g,
+    (_, rawPath: string) => {
+      matchedTemplate = true;
+      const path = rawPath.trim().replace(/^\$/, '');
+      const referenceValue = `$${path}`;
+      const reference = references.find(
+        (candidate) => candidate.value === referenceValue,
+      );
+      if (!reference?.previewAvailable) {
+        missingReference ||= referenceValue;
+        return '';
+      }
+      return nodeFieldTemplateValueText(reference.previewValue);
+    },
+  );
+  if (matchedTemplate && missingReference) {
+    return {
+      available: false,
+      message: `当前样本暂无 ${missingReference} 的值`,
+    };
+  }
+  return { available: true, value };
+};
+
 const TemplateConfigField = ({
   field,
   label,
@@ -299,6 +374,7 @@ const TemplateConfigField = ({
   placeholder,
   required = false,
   insertMode = 'reference',
+  showPreview = false,
 }: {
   field: string;
   label: string;
@@ -307,22 +383,49 @@ const TemplateConfigField = ({
   placeholder?: string;
   required?: boolean;
   insertMode?: 'reference' | 'template';
-}) => (
-  <Form.Item
-    className={styles.nodeConfigFull}
-    extra={protocol ? protocolFieldExtra(protocol) : undefined}
-    label={label}
-    name={field}
-    rules={required ? [{ required: true }] : undefined}
-  >
-    <TemplateVariableInput
-      ariaLabel={label}
-      insertMode={insertMode}
-      placeholder={placeholder || '输入内容，或点击“插入变量”'}
-      references={references}
-    />
-  </Form.Item>
-);
+  showPreview?: boolean;
+}) => {
+  const fieldValue = Form.useWatch(field);
+  const currentPreview = nodeFieldPreview(fieldValue, references);
+  const protocolExtra = protocol ? protocolFieldExtra(protocol) : undefined;
+  return (
+    <Form.Item
+      className={styles.nodeConfigFull}
+      extra={
+        protocolExtra || showPreview ? (
+          <div className={styles.nodeConfigFieldExtra}>
+            {protocolExtra && <div>{protocolExtra}</div>}
+            {showPreview && (
+              <div className={styles.nodeConfigFieldPreview}>
+                <span>当前值</span>
+                {currentPreview.available ? (
+                  <Tooltip
+                    placement="topLeft"
+                    title={currentPreview.value || '""'}
+                  >
+                    <code>{currentPreview.value || '""'}</code>
+                  </Tooltip>
+                ) : (
+                  <em>{currentPreview.message}</em>
+                )}
+              </div>
+            )}
+          </div>
+        ) : undefined
+      }
+      label={label}
+      name={field}
+      rules={required ? [{ required: true }] : undefined}
+    >
+      <TemplateVariableInput
+        ariaLabel={label}
+        insertMode={insertMode}
+        placeholder={placeholder || '输入内容，或点击“插入变量”'}
+        references={references}
+      />
+    </Form.Item>
+  );
+};
 
 const displayReferencePreview = (value?: string) => {
   const preview = String(value || '').trim();
@@ -617,6 +720,8 @@ const NodeConfigModal = ({
       'input',
       'pattern',
       'group',
+      'start_marker',
+      'end_marker',
       'variable',
       'value_type',
       'value',
@@ -757,6 +862,7 @@ const NodeConfigModal = ({
     if (
       [
         'regex',
+        'extract_between',
         'keyword_replace',
         'regex_replace',
         'convert',
@@ -991,6 +1097,55 @@ const NodeConfigModal = ({
             >
               <Select options={valueTypeOptions} />
             </Form.Item>
+          </>
+        );
+      case 'extract_between':
+        return (
+          <>
+            <Text className={styles.nodeConfigHint} type="secondary">
+              按区分大小写的字面量定位，截取第一次出现的前定位词与其后第一个后定位词之间的内容。
+            </Text>
+            <TemplateConfigField
+              field="input"
+              label="输入文本"
+              protocol={inputProtocol('input')}
+              references={fieldReferences}
+              required
+              showPreview
+            />
+            <Form.Item
+              label="前定位词"
+              name="start_marker"
+              rules={[
+                { required: true, whitespace: true, message: '请输入前定位词' },
+                { max: 200, message: '前定位词不能超过 200 个字符' },
+              ]}
+            >
+              <Input placeholder="例如：[" />
+            </Form.Item>
+            <Form.Item
+              label="后定位词"
+              name="end_marker"
+              rules={[
+                { required: true, whitespace: true, message: '请输入后定位词' },
+                { max: 200, message: '后定位词不能超过 200 个字符' },
+              ]}
+            >
+              <Input placeholder="例如：]" />
+            </Form.Item>
+            <Form.Item
+              extra="数组类型要求截取内容是合法 JSON 数组；JSON 类型可输出对象、数组或标量。"
+              label="输出类型"
+              name="value_type"
+              rules={[{ required: true }]}
+            >
+              <Select options={automationExtractBetweenValueTypeOptions} />
+            </Form.Item>
+            <VariableWriteFields
+              overwrite={overwrite}
+              references={fieldReferences}
+              variable={variable}
+            />
           </>
         );
       case 'keyword':
@@ -3160,67 +3315,6 @@ const NodeConfigModal = ({
             />
           </>
         );
-      case 'hdhive_query':
-        return (
-          <>
-            <Alert
-              className={styles.nodeConfigFull}
-              description="按 TMDB ID 查询 HDHive，可按分辨率和网盘类型筛选。找到资源走“找到资源”，否则走“没有资源”。"
-              title="这里只查询资源，不会扣积分或解锁"
-              showIcon
-              type="info"
-            />
-            <TemplateConfigField
-              field="tmdb_id"
-              label="TMDB ID"
-              protocol={inputProtocol('tmdb_id')}
-              references={fieldReferences}
-              required
-            />
-            <TemplateConfigField
-              field="media_type"
-              label="媒体类型"
-              placeholder="movie、tv 或上游变量"
-              protocol={inputProtocol('media_type')}
-              references={fieldReferences}
-              required
-            />
-            <TemplateConfigField
-              field="resolution"
-              label="分辨率筛选（可选）"
-              placeholder="例如 2160p"
-              protocol={inputProtocol('resolution')}
-              references={fieldReferences}
-            />
-            <TemplateConfigField
-              field="pan_type"
-              label="网盘类型筛选（可选）"
-              placeholder="例如 115"
-              protocol={inputProtocol('pan_type')}
-              references={fieldReferences}
-            />
-          </>
-        );
-      case 'hdhive_unlock':
-        return (
-          <>
-            <Alert
-              className={styles.nodeConfigFull}
-              description="连接 HDHive 查询节点的“找到资源”出口。运行时会真实解锁资源，可能消耗 HDHive 积分。"
-              title="这是实际解锁动作"
-              showIcon
-              type="warning"
-            />
-            <TemplateConfigField
-              field="slug"
-              label="资源 slug"
-              placeholder="点击“插入变量”选择查询节点的 selected_slug"
-              protocol={inputProtocol('slug')}
-              references={fieldReferences}
-              required
-            />
-          </>
-        );
       case 'organize_strm':
         return (
           <>
@@ -3669,6 +3763,7 @@ const NodeConfigModal = ({
             'join',
             'if',
             'keyword',
+            'extract_between',
             'set_variable',
             'template',
             'json_extract',
@@ -3723,8 +3818,6 @@ const NodeConfigModal = ({
                   'moviepilot_title_recognize',
                   'filmfusion_recognize',
                   'media_exists',
-                  'hdhive_query',
-                  'hdhive_unlock',
                   'moviepilot_recognize',
                   'organize_strm',
                   'strm_verify',

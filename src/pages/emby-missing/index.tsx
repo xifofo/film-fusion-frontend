@@ -39,7 +39,6 @@ import {
 } from 'antd';
 import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import {
   addEmbyMissingBlacklist,
   embyWatchImageUrl,
@@ -300,12 +299,6 @@ const MissingSeriesCard: React.FC<MissingSeriesCardProps> = ({
                   查看位置
                 </Button>
                 <ExternalLinksButton seriesId={record.series_id} />
-                <div
-                  className={styles.cardActionMenuItem}
-                  onClick={() => setMoreOpen(false)}
-                >
-                  <HDHiveResourcesButton seriesId={record.series_id} />
-                </div>
                 <div
                   className={styles.cardActionMenuItem}
                   onClick={() => setMoreOpen(false)}

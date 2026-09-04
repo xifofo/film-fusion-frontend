@@ -1,4 +1,10 @@
-import { EyeOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import {
+  EyeOutlined,
+  PlayCircleOutlined,
+  RedoOutlined,
+  ReloadOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import type { TableProps } from 'antd';
 import {
   Alert,
@@ -29,7 +35,9 @@ import {
   getAutomationRun,
   listAutomationEntries,
   listAutomationRuns,
+  repeatAutomationRun,
   retryAutomationRun,
+  runAutomationEntry,
 } from '@/services/film-fusion';
 
 const { Text } = Typography;
@@ -78,6 +86,8 @@ const AutomationHistory = ({
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<AutomationRunDetail>();
   const [detailLoading, setDetailLoading] = useState(false);
+  const [repeatingRunID, setRepeatingRunID] = useState<number>();
+  const [runningEntryID, setRunningEntryID] = useState<number>();
   const [messageApi, contextHolder] = message.useMessage();
 
   const workflowID = useMemo(
@@ -93,7 +103,7 @@ const AutomationHistory = ({
         listAutomationRuns({ workflowId: workflowID, limit: 50 }),
       ]);
       if (entryResponse.code !== 0 || !entryResponse.data) {
-        throw new Error(entryResponse.message || '获取目录事件失败');
+        throw new Error(entryResponse.message || '获取条目记录失败');
       }
       if (runResponse.code !== 0 || !runResponse.data) {
         throw new Error(runResponse.message || '获取运行记录失败');
@@ -148,6 +158,38 @@ const AutomationHistory = ({
     await load();
   };
 
+  const repeatRun = async (run: AutomationRun) => {
+    setRepeatingRunID(run.id);
+    try {
+      const response = await repeatAutomationRun(run.id);
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '重新运行失败');
+      }
+      messageApi.success(`已创建新的运行 #${response.data.id}`);
+      await load();
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '重新运行失败');
+    } finally {
+      setRepeatingRunID(undefined);
+    }
+  };
+
+  const runBaselineEntry = async (item: AutomationEntryHistoryItem) => {
+    setRunningEntryID(item.entry.id);
+    try {
+      const response = await runAutomationEntry(item.entry.id);
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '手动执行失败');
+      }
+      messageApi.success(`已创建手动运行 #${response.data.id}`);
+      await load();
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '手动执行失败');
+    } finally {
+      setRunningEntryID(undefined);
+    }
+  };
+
   const entryColumns: TableProps<AutomationEntryHistoryItem>['columns'] = [
     {
       title: '发现时间',
@@ -160,6 +202,7 @@ const AutomationHistory = ({
       render: (_, item) => (
         <Space orientation="vertical" size={0}>
           <Space>
+            {item.entry.baseline && <Tag color="gold">存量基线</Tag>}
             <Tag color={item.entry.is_directory ? 'blue' : 'cyan'}>
               {item.entry.is_directory ? '目录' : '文件'}
             </Tag>
@@ -197,9 +240,56 @@ const AutomationHistory = ({
     },
     {
       title: '流程',
-      width: 120,
+      width: 170,
       render: (_, item) => {
-        if (!item.latest_run) return <Text type="secondary">未创建</Text>;
+        if (!item.latest_run) {
+          if (!item.entry.baseline) {
+            return <Text type="secondary">未创建</Text>;
+          }
+          const workflow = workflows.find(
+            (candidate) => candidate.source_id === item.entry.source_id,
+          );
+          if (!workflow) {
+            return <Text type="secondary">无可用流程</Text>;
+          }
+          return (
+            <Space orientation="vertical" size={2}>
+              <Text type="secondary">未运行</Text>
+              <Popconfirm
+                cancelText="取消"
+                description={
+                  <>
+                    将使用当前流程“{workflow.name}”v{workflow.version}
+                    和该条目的原始数据，从头执行所有节点。
+                    <br />
+                    下载、通知等动作可能发生。
+                    {!workflow.enabled && (
+                      <>
+                        <br />
+                        自动化当前已停用，但本次手动执行仍会运行。
+                      </>
+                    )}
+                  </>
+                }
+                okButtonProps={{
+                  loading: runningEntryID === item.entry.id,
+                }}
+                okText="手动执行"
+                onConfirm={() => runBaselineEntry(item)}
+                title="执行这条存量基线？"
+              >
+                <Button
+                  icon={<PlayCircleOutlined />}
+                  loading={runningEntryID === item.entry.id}
+                  size="small"
+                  type="primary"
+                >
+                  手动执行
+                </Button>
+              </Popconfirm>
+            </Space>
+          );
+        }
         const meta = runStatusMeta[item.latest_run.status];
         const runID = item.latest_run.id;
         return (
@@ -221,8 +311,28 @@ const AutomationHistory = ({
     {
       title: '版本',
       dataIndex: 'workflow_version',
-      width: 80,
-      render: (version: number) => `v${version}`,
+      width: 120,
+      render: (version: number, run) => (
+        <Space orientation="vertical" size={0}>
+          <Text>v{version}</Text>
+          {(run.execution_no || 1) > 1 && (
+            <Text type="secondary">第 {run.execution_no} 次</Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '触发',
+      dataIndex: 'trigger_mode',
+      width: 110,
+      render: (mode: AutomationRun['trigger_mode'], run) =>
+        mode === 'manual' ? (
+          <Tag color="blue">
+            {run.repeated_from_run_id ? '手动重跑' : '手动执行'}
+          </Tag>
+        ) : (
+          <Text type="secondary">自动触发</Text>
+        ),
     },
     {
       title: '状态',
@@ -241,7 +351,7 @@ const AutomationHistory = ({
     },
     {
       title: '操作',
-      width: 220,
+      width: 330,
       render: (_, run) => (
         <Space>
           <Button
@@ -260,6 +370,33 @@ const AutomationHistory = ({
             >
               重试
             </Button>
+          )}
+          {['succeeded', 'partial', 'failed', 'cancelled'].includes(
+            run.status,
+          ) && (
+            <Popconfirm
+              cancelText="取消"
+              description={
+                <>
+                  将使用运行 #{run.id} 保存的流程 v{run.workflow_version}{' '}
+                  和事件数据，从头执行所有节点。
+                  <br />
+                  下载、通知等动作可能再次发生；流程内配置的去重和频率限制仍然有效。
+                </>
+              }
+              okButtonProps={{ loading: repeatingRunID === run.id }}
+              okText="重新运行"
+              onConfirm={() => repeatRun(run)}
+              title="重新运行这条记录？"
+            >
+              <Button
+                icon={<RedoOutlined />}
+                loading={repeatingRunID === run.id}
+                size="small"
+              >
+                重新运行
+              </Button>
+            </Popconfirm>
           )}
           {(run.status === 'pending' || run.status === 'running') && (
             <Popconfirm
@@ -281,9 +418,9 @@ const AutomationHistory = ({
       {contextHolder}
       <Space orientation="vertical" size={16} style={{ width: '100%' }}>
         <Alert
-          description="事件只在新增对象完成上传并持续稳定后产生。同一个 115 对象只会创建一次事件和一次初始运行。"
+          description="首次扫描发现的存量条目不会自动运行，但会保留在列表中，可逐条手动执行；已经结束的运行也可以重新运行。"
           showIcon
-          title="这里不包含首次扫描建立的存量基线"
+          title="存量基线不会自动运行"
           type="info"
         />
         <Select
@@ -302,13 +439,13 @@ const AutomationHistory = ({
           items={[
             {
               key: 'events',
-              label: `目录事件 ${entryTotal}`,
+              label: `条目记录 ${entryTotal}`,
               children: (
                 <Table<AutomationEntryHistoryItem>
                   columns={entryColumns}
                   dataSource={entries}
                   loading={loading}
-                  locale={{ emptyText: <Empty description="暂无新增事件" /> }}
+                  locale={{ emptyText: <Empty description="暂无条目记录" /> }}
                   pagination={false}
                   rowKey={(item) => item.entry.id}
                   scroll={{ x: 1000 }}
@@ -326,7 +463,7 @@ const AutomationHistory = ({
                   locale={{ emptyText: <Empty description="暂无运行记录" /> }}
                   pagination={false}
                   rowKey="id"
-                  scroll={{ x: 900 }}
+                  scroll={{ x: 1100 }}
                 />
               ),
             },
@@ -353,6 +490,27 @@ const AutomationHistory = ({
                   children: `${detail.run.workflow_name} · v${detail.run.workflow_version}`,
                 },
                 {
+                  key: 'trigger',
+                  label: '触发方式',
+                  children:
+                    detail.run.trigger_mode === 'manual' ? (
+                      <Space>
+                        <Tag color="blue">
+                          {detail.run.repeated_from_run_id
+                            ? '手动重跑'
+                            : '手动执行'}
+                        </Tag>
+                        {detail.run.repeated_from_run_id && (
+                          <Text type="secondary">
+                            来源运行 #{detail.run.repeated_from_run_id}
+                          </Text>
+                        )}
+                      </Space>
+                    ) : (
+                      '自动触发'
+                    ),
+                },
+                {
                   key: 'status',
                   label: '状态',
                   children: (
@@ -360,6 +518,11 @@ const AutomationHistory = ({
                       {runStatusMeta[detail.run.status].label}
                     </Tag>
                   ),
+                },
+                {
+                  key: 'execution',
+                  label: '执行次数',
+                  children: `第 ${detail.run.execution_no || 1} 次`,
                 },
                 {
                   key: 'item',

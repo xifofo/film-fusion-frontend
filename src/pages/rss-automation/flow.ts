@@ -20,7 +20,7 @@ export type RSSFlowVariableInfo = {
   source?: string;
   required?: boolean;
   value?: unknown;
-  valueKind?: 'configured';
+  valueKind?: 'configured' | 'preview';
 };
 
 export type RSSFlowNodeVariableSummary = {
@@ -58,6 +58,7 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   trigger: 'RSS 触发器',
   delay: '延迟执行',
   regex: '正则提取',
+  extract_between: '文本区间提取',
   keyword: '关键词匹配',
   keyword_replace: '关键词替换',
   regex_replace: '正则替换',
@@ -87,8 +88,6 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   moviepilot_title_recognize: 'MP 标题识别',
   filmfusion_recognize: 'FilmFusion 本地识别',
   media_exists: '本地 / Emby 查重',
-  hdhive_query: 'HDHive 资源查询',
-  hdhive_unlock: 'HDHive 资源解锁',
   moviepilot_recognize: 'MP 媒体识别',
   organize_strm: '整理生成 STRM',
   strm_verify: 'STRM 校验',
@@ -111,8 +110,6 @@ export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'moviepilot_title_recognize',
   'filmfusion_recognize',
   'media_exists',
-  'hdhive_query',
-  'hdhive_unlock',
   'moviepilot_recognize',
   'organize_strm',
   'strm_verify',
@@ -254,18 +251,47 @@ const nodeOutputVariables = (
   const previewRecord = asRecord(preview?.output);
   const fallbackRecord =
     node.data.definition.type === 'trigger' ? triggerFields : undefined;
+  const dynamicRecords = [previewRecord, fallbackRecord];
+  const previewValue = (name: string) => {
+    for (const record of dynamicRecords) {
+      if (record && hasOwn(record, name)) {
+        return { found: true, value: record[name] };
+      }
+    }
+    if (name === 'selected_port' && preview?.active) {
+      return preview.selectedPorts.length > 0
+        ? { found: true, value: preview.selectedPorts[0] }
+        : { found: false, value: undefined };
+    }
+    if (
+      name === 'selected_port' &&
+      node.data.definition.type === 'trigger' &&
+      fallbackRecord
+    ) {
+      return { found: true, value: 'next' };
+    }
+    if (preview?.active && name === 'selected_ports') {
+      return { found: true, value: preview.selectedPorts };
+    }
+    return { found: false, value: undefined };
+  };
   const referenceFor = (name: string) =>
     node.data.definition.type === 'trigger' && name !== 'selected_port'
       ? `$item.${name}`
       : `$nodes.${node.id}.output.${name}`;
-  const variables = (protocol?.outputs || []).map((variable) =>
-    protocolVariableInfo(variable, {
-      key: `${node.id}:output:${variable.name}`,
-      reference: referenceFor(variable.name),
-    }),
-  );
+  const variables = (protocol?.outputs || []).map((variable) => {
+    const current = previewValue(variable.name);
+    return {
+      ...protocolVariableInfo(variable, {
+        key: `${node.id}:output:${variable.name}`,
+        reference: referenceFor(variable.name),
+      }),
+      ...(current.found
+        ? { value: current.value, valueKind: 'preview' as const }
+        : {}),
+    };
+  });
   const seen = new Set(variables.map((variable) => variable.name));
-  const dynamicRecords = [previewRecord, fallbackRecord];
   for (const record of dynamicRecords) {
     for (const [name, value] of Object.entries(record || {})) {
       if (seen.has(name)) continue;
@@ -280,6 +306,8 @@ const nodeOutputVariables = (
             ? '当前触发样本携带的扩展字段。'
             : '当前样本预览返回的扩展字段。',
         reference: referenceFor(name),
+        value,
+        valueKind: 'preview',
       });
     }
   }
@@ -465,6 +493,16 @@ export const createNodeDefinition = (
       group: '1',
       variable: 'episode',
       value_type: 'integer',
+    });
+  }
+  if (type === 'extract_between') {
+    Object.assign(config, {
+      input: '$item.title',
+      start_marker: '',
+      end_marker: '',
+      variable: 'extracted_value',
+      value_type: 'string',
+      overwrite: 'overwrite',
     });
   }
   if (type === 'keyword') {
@@ -710,15 +748,6 @@ export const createNodeDefinition = (
       category: '$item.category',
     });
   }
-  if (type === 'hdhive_query') {
-    Object.assign(config, {
-      tmdb_id: '$item.tmdb_id',
-      media_type: '$item.media_type',
-      resolution: '',
-      pan_type: '',
-    });
-  }
-  if (type === 'hdhive_unlock') config.slug = '$item.resource_slug';
   if (type === 'organize_strm') {
     Object.assign(config, {
       media_type: 'auto',
@@ -781,8 +810,6 @@ export const createNodeDefinition = (
       type === 'moviepilot_title_recognize' ||
       type === 'filmfusion_recognize' ||
       type === 'media_exists' ||
-      type === 'hdhive_query' ||
-      type === 'hdhive_unlock' ||
       type === 'moviepilot_recognize' ||
       type === 'emby_refresh_wait' ||
       type === 'notification'
@@ -824,8 +851,6 @@ export const nodeSourcePorts = (
       return ['success', 'partial', 'empty', 'failure'];
     case 'media_exists':
       return ['exists', 'missing', 'failure'];
-    case 'hdhive_query':
-      return ['found', 'not_found', 'failure'];
     case 'strm_verify':
       return ['valid', 'invalid', 'failure'];
     case 'parallel':

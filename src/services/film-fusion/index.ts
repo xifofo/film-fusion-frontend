@@ -34,8 +34,6 @@ export * from './embyStats';
 export * from './embyVersionCheck';
 // Emby 观看记录（多用户隔离统计）
 export * from './embyWatch';
-// HDHive OpenAPI 代理
-export * from './hdhive';
 // Match302 重定向相关API
 export * from './match302';
 // 媒体相关API

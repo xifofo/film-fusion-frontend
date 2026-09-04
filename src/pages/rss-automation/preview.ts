@@ -536,6 +536,7 @@ const previewNode = (
           output,
         };
       }
+      case 'extract_between':
       case 'set_variable':
       case 'template':
       case 'json_extract':
@@ -562,6 +563,9 @@ const previewNode = (
             : '',
           node.type === 'math'
             ? `运算：${String(config.operation || 'add')}`
+            : '',
+          node.type === 'extract_between'
+            ? `原始截取值：${previewValueText(result.output.raw_result)}`
             : '',
         ].filter(Boolean);
         return {
@@ -925,45 +929,6 @@ const previewNode = (
           },
         };
       }
-      case 'hdhive_query': {
-        const tmdbID = resolveConfiguredString(context, config.tmdb_id);
-        return {
-          active: true,
-          tone: tmdbID ? 'success' : 'warning',
-          label: tmdbID
-            ? `将在 HDHive 查询 TMDB ${tmdbID} 资源`
-            : 'TMDB ID 尚未解析',
-          detail: '样本预览不会查询真实 HDHive',
-          selectedPorts: [tmdbID ? 'found' : 'failure'],
-          output: {
-            resource_count: tmdbID ? 1 : 0,
-            selected_slug: tmdbID ? 'runtime-resource' : '',
-            selected_title: '运行时返回',
-            selected_size: '运行时返回',
-            selected_resolution: [],
-            is_unlocked: false,
-            resources: [],
-          },
-        };
-      }
-      case 'hdhive_unlock': {
-        const slug = resolveConfiguredString(context, config.slug);
-        return {
-          active: true,
-          tone: slug ? 'success' : 'warning',
-          label: slug ? `将解锁 HDHive 资源 ${slug}` : '资源 slug 尚未解析',
-          detail: '样本预览不会解锁真实 HDHive 资源',
-          selectedPorts: [slug ? 'success' : 'failure'],
-          output: {
-            download_url: slug
-              ? 'https://example.invalid/runtime-resource'
-              : '',
-            url: slug ? 'https://example.invalid/runtime-resource' : '',
-            access_code: '',
-            already_owned: false,
-          },
-        };
-      }
       case 'organize_strm': {
         const directoryID = Number(config.cloud_directory_id || 0);
         return {
@@ -1104,6 +1069,7 @@ const previewNode = (
     const reason = error?.message || '当前配置无法预览';
     const variableNode = [
       'set_variable',
+      'extract_between',
       'template',
       'json_extract',
       'math',

@@ -1754,22 +1754,6 @@ declare namespace API {
       timeout_seconds: number;
       cache_minutes: number;
     };
-    hdhive: {
-      enabled: boolean;
-      base_url: string;
-      client_id: string;
-      redirect_uri: string;
-      scope: string;
-      api_key: string;
-      access_token: string;
-      refresh_token: string;
-      access_token_expires_at: string;
-      refresh_token_expires_at: string;
-      auto_refresh: boolean;
-      refresh_before_minutes: number;
-      refresh_check_minutes: number;
-      timeout_seconds: number;
-    };
     file_watcher?: any;
   };
 
@@ -1868,102 +1852,6 @@ declare namespace API {
   type AppConfigResult = {
     config: AppConfig;
     secrets: Record<string, boolean>;
-  };
-
-  type HDHiveAPIResponse<T> = {
-    success: boolean;
-    code: string;
-    message: string;
-    description?: string;
-    data: T;
-    meta?: Record<string, any>;
-  };
-
-  type HDHiveQuota = {
-    daily_reset: number;
-    endpoint_limit?: number | null;
-    endpoint_remaining?: number | null;
-  };
-
-  type HDHiveUsageToday = {
-    total_calls: number;
-    success_calls: number;
-    failed_calls: number;
-    avg_latency: number;
-  };
-
-  type HDHiveAuthorizeURLResult = {
-    authorize_url: string;
-    state: string;
-  };
-
-  type HDHiveOAuthToken = {
-    access_token: string;
-    refresh_token: string;
-    token_type: string;
-    expires_in: number;
-    refresh_expires_in: number;
-    scope: string;
-    scopes: string[];
-  };
-
-  type HDHiveMe = {
-    id: number;
-    level: string;
-    username: string;
-    nickname: string;
-    avatar_url: string;
-    is_blocked: boolean;
-    checked_in_today: boolean;
-    points: number;
-    signin_days_total: number;
-    share_num: number;
-    is_forever_vip: boolean;
-    weekly_free_quota: number;
-    weekly_free_quota_remaining: number;
-    weekly_free_quota_unlimited: boolean;
-    bonus_quota: number;
-  };
-
-  type HDHiveResource = {
-    slug: string;
-    title?: string | null;
-    pan_type?: string | null;
-    media_url?: string;
-    media_slug?: string;
-    share_size?: string | null;
-    video_resolution?: string[];
-    source?: string[];
-    subtitle_language?: string[];
-    subtitle_type?: string[];
-    unlock_points?: number | null;
-    is_unlocked: boolean;
-    user?: any;
-  };
-
-  type HDHiveUnlockResult = {
-    url: string;
-    access_code: string;
-    full_url: string;
-    already_owned: boolean;
-  };
-
-  type HDHiveBatchUnlockItem = {
-    slug: string;
-    success: boolean;
-    message: string;
-    error_code?: string;
-    url?: string;
-    access_code?: string;
-    full_url?: string;
-    already_owned: boolean;
-  };
-
-  type HDHiveBatchUnlockResult = {
-    items: HDHiveBatchUnlockItem[];
-    total: number;
-    success_count: number;
-    failed_count: number;
   };
 
   /** 观看记录 - 采集规则设置 */

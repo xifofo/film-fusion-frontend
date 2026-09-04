@@ -10,7 +10,6 @@ export type SettingsTabKey =
   | 'mediaRecognition'
   | 'moviepilot'
   | 'tmdb'
-  | 'hdhive'
   | 'log'
   | 'jwt';
 
@@ -78,10 +77,6 @@ export const SETTINGS_TAB_SCOPES: Record<SettingsTabKey, SettingsTabScope> = {
   tmdb: {
     label: 'TMDB',
     fields: [['tmdb']],
-  },
-  hdhive: {
-    label: 'HDHive',
-    fields: [['hdhive']],
   },
   log: {
     label: '日志',

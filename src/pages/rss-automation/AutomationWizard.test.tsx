@@ -6,10 +6,20 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RSSAutomationDefinition } from '@/services/film-fusion';
 import AutomationWizard from './AutomationWizard';
+import { RSS_AUTOMATION_WIZARD_DRAFT_STORAGE_KEY } from './wizardDraft';
 
-const { sampleRSSAutomationSource } = vi.hoisted(() => ({
+const { sampleRSSAutomationSource, workflowPanelState } = vi.hoisted(() => ({
   sampleRSSAutomationSource: vi.fn(),
+  workflowPanelState: {
+    props: undefined as
+      | {
+          initialDefinition: RSSAutomationDefinition;
+          onWizardSaveDraft?: (definition: RSSAutomationDefinition) => void;
+        }
+      | undefined,
+  },
 }));
 
 vi.mock('@/services/film-fusion', async (importOriginal) => {
@@ -22,7 +32,28 @@ vi.mock('@/services/film-fusion', async (importOriginal) => {
 });
 
 vi.mock('./WorkflowPanel', () => ({
-  default: () => <div>workflow-panel</div>,
+  default: (props: {
+    initialDefinition: RSSAutomationDefinition;
+    onWizardSaveDraft?: (definition: RSSAutomationDefinition) => void;
+  }) => {
+    workflowPanelState.props = props;
+    return (
+      <div>
+        <div>workflow-panel</div>
+        <button
+          onClick={() =>
+            props.onWizardSaveDraft?.({
+              ...props.initialDefinition,
+              viewport: { x: 120, y: 48, zoom: 0.8 },
+            })
+          }
+          type="button"
+        >
+          保存画布草稿
+        </button>
+      </div>
+    );
+  },
 }));
 
 const renderWizard = () =>
@@ -38,6 +69,8 @@ const renderWizard = () =>
 
 describe('RSS automation wizard source step', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    workflowPanelState.props = undefined;
     window.scrollTo = vi.fn();
     sampleRSSAutomationSource.mockResolvedValue({
       code: 0,
@@ -58,6 +91,7 @@ describe('RSS automation wizard source step', () => {
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -108,5 +142,50 @@ describe('RSS automation wizard source step', () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(false);
+  });
+
+  it('saves the current canvas and restores it when creation is reopened', async () => {
+    const firstRender = renderWizard();
+
+    fireEvent.change(
+      screen.getByPlaceholderText('https://example.com/rss.xml'),
+      {
+        target: { value: 'https://example.com/feed.xml' },
+      },
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^解\s*析$/ }));
+    await screen.findByText('解析成功');
+    fireEvent.click(screen.getByRole('button', { name: /下一步：设计流程/ }));
+    await screen.findByText('workflow-panel');
+
+    fireEvent.click(screen.getByRole('button', { name: '保存画布草稿' }));
+
+    await waitFor(() => {
+      const stored = JSON.parse(
+        window.localStorage.getItem(RSS_AUTOMATION_WIZARD_DRAFT_STORAGE_KEY) ||
+          '{}',
+      );
+      expect(stored.step).toBe(1);
+      expect(stored.definition.viewport).toEqual({
+        x: 120,
+        y: 48,
+        zoom: 0.8,
+      });
+    });
+    firstRender.unmount();
+    workflowPanelState.props = undefined;
+
+    renderWizard();
+
+    expect(await screen.findByText('本机已有可恢复草稿')).toBeTruthy();
+    expect(await screen.findByText('workflow-panel')).toBeTruthy();
+    const restoredProps = workflowPanelState.props as
+      | { initialDefinition: RSSAutomationDefinition }
+      | undefined;
+    expect(restoredProps?.initialDefinition.viewport).toEqual({
+      x: 120,
+      y: 48,
+      zoom: 0.8,
+    });
   });
 });

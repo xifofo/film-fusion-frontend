@@ -22,7 +22,13 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
     },
     {
       title: '文本处理',
-      types: ['keyword', 'keyword_replace', 'regex', 'regex_replace'],
+      types: [
+        'extract_between',
+        'keyword',
+        'keyword_replace',
+        'regex',
+        'regex_replace',
+      ],
     },
     {
       title: '条件与分支',
@@ -61,10 +67,6 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
     {
       title: 'FilmFusion',
       types: ['filmfusion_recognize', 'media_exists'],
-    },
-    {
-      title: 'HDHive',
-      types: ['hdhive_query', 'hdhive_unlock'],
     },
     {
       title: 'STRM / Emby',

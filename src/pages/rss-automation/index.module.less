@@ -146,6 +146,10 @@
   margin-bottom: 26px;
 }
 
+.wizardDraftAlert {
+  margin-bottom: 18px;
+}
+
 .wizardStepCard {
   border-color: rgba(148, 163, 184, 0.22);
 
@@ -612,6 +616,46 @@
   margin: -2px 0 14px;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.nodeConfigFieldExtra {
+  display: grid;
+  gap: 6px;
+}
+
+.nodeConfigFieldPreview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+
+  span {
+    color: #94a3b8;
+    font-size: 12px;
+  }
+
+  code {
+    overflow: hidden;
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #334155;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #eef2f7;
+  }
+
+  em {
+    overflow: hidden;
+    color: #94a3b8;
+    font-size: 12px;
+    font-style: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .nodeConfigHelpButton:global(.ant-btn) {
@@ -1454,8 +1498,6 @@
 .node_moviepilot_title_recognize,
 .node_filmfusion_recognize,
 .node_media_exists,
-.node_hdhive_query,
-.node_hdhive_unlock,
 .node_moviepilot_recognize,
 .node_organize_strm,
 .node_strm_verify,

@@ -42,6 +42,10 @@ export const buildRSSItemReferences = (
       dataType: reference.dataType ?? existing.dataType,
       description: reference.description ?? existing.description,
       preview: reference.preview ?? existing.preview,
+      previewAvailable: reference.previewAvailable ?? existing.previewAvailable,
+      previewValue: reference.previewAvailable
+        ? reference.previewValue
+        : existing.previewValue,
     };
   };
 
@@ -70,6 +74,8 @@ export const buildRSSItemReferences = (
       name,
       value: `$item.${name}`,
       preview: referencePreview(value),
+      previewAvailable: true,
+      previewValue: value,
     });
   }
 

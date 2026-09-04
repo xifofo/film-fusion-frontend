@@ -38,6 +38,15 @@ export const automationVariableValueTypeOptions = [
   { label: 'JSON', value: 'json' },
 ];
 
+export const automationExtractBetweenValueTypeOptions = [
+  { label: '文本 string', value: 'string' },
+  { label: '整数 integer', value: 'integer' },
+  { label: '小数 number', value: 'number' },
+  { label: '布尔 boolean', value: 'boolean' },
+  { label: 'JSON', value: 'json' },
+  { label: '数组 array', value: 'array' },
+];
+
 export const automationMathOperationOptions = [
   { label: '相加 +', value: 'add' },
   { label: '相减 −', value: 'subtract' },
@@ -677,6 +686,51 @@ export const executeAutomationVariablePreviewNode = (
   context: Record<string, unknown>,
 ): VariableNodePreviewResult => {
   const config = node.config || {};
+  if (node.type === 'extract_between') {
+    const inputValue = resolveAutomationPreviewValue(context, config.input);
+    const input = templateValueText(inputValue);
+    const startMarker = String(config.start_marker ?? '');
+    const endMarker = String(config.end_marker ?? '');
+    if (!startMarker.trim() || !endMarker.trim()) {
+      throw new Error('前定位词和后定位词不能为空');
+    }
+    if (
+      Array.from(startMarker).length > 200 ||
+      Array.from(endMarker).length > 200
+    ) {
+      throw new Error('前定位词和后定位词不能超过 200 个字符');
+    }
+    const startIndex = input.indexOf(startMarker);
+    if (startIndex < 0) {
+      throw new Error(`没有找到前定位词 ${JSON.stringify(startMarker)}`);
+    }
+    const contentStart = startIndex + startMarker.length;
+    const endOffset = input.slice(contentStart).indexOf(endMarker);
+    if (endOffset < 0) {
+      throw new Error(
+        `前定位词之后没有找到后定位词 ${JSON.stringify(endMarker)}`,
+      );
+    }
+    const rawResult = input.slice(contentStart, contentStart + endOffset);
+    const valueType = String(config.value_type || 'string');
+    const value = convertAutomationPreviewValue(
+      rawResult,
+      valueType === 'array' ? 'json' : valueType,
+    );
+    if (valueType === 'array' && !Array.isArray(value)) {
+      throw new Error('截取结果不是 JSON 数组');
+    }
+    const result = writeAutomationPreviewVariable(
+      context,
+      config.variable,
+      value,
+      config.overwrite,
+    );
+    result.output.found = true;
+    result.output.raw_result = rawResult;
+    result.output.result = value;
+    return result;
+  }
   if (node.type === 'set_variable') {
     const sourceKind =
       typeof config.value !== 'string'

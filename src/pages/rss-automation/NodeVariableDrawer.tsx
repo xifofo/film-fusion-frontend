@@ -1,4 +1,4 @@
-import { Drawer } from 'antd';
+import { Drawer, Tooltip } from 'antd';
 import type { RSSAutomationNodeDefinition } from '@/services/film-fusion';
 import {
   NODE_LABELS,
@@ -17,15 +17,15 @@ type NodeVariableDrawerProps = {
 };
 
 const variableValueText = (value: unknown) => {
-  if (value === undefined) return '';
+  if (value === undefined) return 'undefined';
   if (value === null) return 'null';
-  let text: string;
+  if (value === '') return '""';
   try {
-    text = typeof value === 'string' ? value : JSON.stringify(value);
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    return text ?? String(value);
   } catch {
-    text = String(value);
+    return String(value);
   }
-  return text.length > 160 ? `${text.slice(0, 160)}…` : text;
 };
 
 const VariableSection = ({
@@ -66,10 +66,14 @@ const VariableSection = ({
                 {variable.source && <em>来自 {variable.source}</em>}
               </div>
               <p>{variable.description}</p>
-              {variable.valueKind === 'configured' && valueText && (
+              {variable.valueKind && (
                 <div className={styles.nodeVariableDrawerValue}>
-                  <span>配置值</span>
-                  <code title={valueText}>{valueText}</code>
+                  <span>
+                    {variable.valueKind === 'configured' ? '配置值' : '当前值'}
+                  </span>
+                  <Tooltip placement="topLeft" title={valueText}>
+                    <code>{valueText}</code>
+                  </Tooltip>
                 </div>
               )}
             </article>

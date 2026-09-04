@@ -17,6 +17,7 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'trigger',
   'delay',
   'regex',
+  'extract_between',
   'keyword',
   'keyword_replace',
   'regex_replace',
@@ -46,8 +47,6 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'moviepilot_title_recognize',
   'filmfusion_recognize',
   'media_exists',
-  'hdhive_query',
-  'hdhive_unlock',
   'moviepilot_recognize',
   'organize_strm',
   'strm_verify',
@@ -148,6 +147,14 @@ const variableValueTypes = new Set([
   'boolean',
   'datetime',
   'json',
+]);
+const extractBetweenValueTypes = new Set([
+  'string',
+  'integer',
+  'number',
+  'boolean',
+  'json',
+  'array',
 ]);
 const datetimeFormats = new Set([
   'rfc3339',
@@ -332,6 +339,19 @@ const validateTransferNodeConfig = (
   type: RSSAutomationNodeType,
   config?: Record<string, unknown>,
 ) => {
+  if (type === 'extract_between') {
+    validateVariableWriter(id, config);
+    requiredString(config?.input, `节点 ${id} 的输入文本`);
+    requiredString(config?.start_marker, `节点 ${id} 的前定位词`);
+    requiredString(config?.end_marker, `节点 ${id} 的后定位词`);
+    configEnum(
+      config,
+      'value_type',
+      'string',
+      extractBetweenValueTypes,
+      `节点 ${id} 的输出类型`,
+    );
+  }
   if (
     ['datetime_operation', 'list_operation', 'coalesce', 'foreach'].includes(
       type,
@@ -627,6 +647,7 @@ export const validateWorkflowTransferDefinition = (
     if (!source) continue;
     const port = [
       'datetime_operation',
+      'extract_between',
       'list_operation',
       'switch',
       'coalesce',
@@ -640,6 +661,7 @@ export const validateWorkflowTransferDefinition = (
     if (port === 'always') continue;
     const fixedPorts: Partial<Record<RSSAutomationNodeType, string[]>> = {
       datetime_operation: ['success', 'failure'],
+      extract_between: ['success', 'failure'],
       list_operation: ['success', 'empty', 'failure'],
       coalesce: ['success', 'failure'],
       deduplicate: ['new', 'duplicate', 'failure'],

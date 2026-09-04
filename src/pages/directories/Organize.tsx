@@ -9,7 +9,6 @@ import {
   EyeOutlined,
   FolderOpenOutlined,
   FolderOutlined,
-  MoreOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   SyncOutlined,
@@ -26,7 +25,6 @@ import {
   Button,
   Checkbox,
   Col,
-  Dropdown,
   Empty,
   Input,
   InputNumber,
@@ -57,7 +55,6 @@ import React, {
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import ConsolePage from '@/components/ConsolePage';
-import HDHiveResourcesButton from '@/components/HDHiveResourcesButton';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
   assignOrganizePreviewTaskTMDB,
@@ -2947,7 +2944,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         render: (_, row) => {
           const canView = row.status === 'completed' || row.status === 'failed';
           const isProcessing = row.status === 'processing';
-          const refs = row.tmdb_refs || [];
           return (
             <Space size={4} wrap>
               <Button
@@ -2980,41 +2976,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               >
                 指定 TMDB
               </Button>
-              {refs.length > 0 ? (
-                <Dropdown
-                  trigger={['click']}
-                  placement="bottomRight"
-                  destroyOnHidden={false}
-                  menu={{
-                    items: refs.map((ref, index) => {
-                      const title = ref.title
-                        ? `${ref.title}${ref.year ? ` (${ref.year})` : ''}`
-                        : `TMDB ${ref.tmdb_id}`;
-                      return {
-                        key: `${ref.media_type || 'media'}:${ref.tmdb_id}`,
-                        label: (
-                          <HDHiveResourcesButton
-                            tmdbId={ref.tmdb_id}
-                            mediaType={ref.media_type}
-                            title={title}
-                            buttonText={
-                              refs.length > 1 ? `HDHive ${index + 1}` : 'HDHive'
-                            }
-                          />
-                        ),
-                      };
-                    }),
-                  }}
-                >
-                  <Button
-                    size="small"
-                    type="link"
-                    title="更多"
-                    aria-label="更多操作"
-                    icon={<MoreOutlined />}
-                  />
-                </Dropdown>
-              ) : null}
               <Tooltip title="删除">
                 <Button
                   size="small"

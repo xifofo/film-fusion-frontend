@@ -97,6 +97,7 @@ import {
   parseRSSSourceMapping,
 } from './rssFieldReferences';
 import SamplePreviewPanel from './SamplePreviewPanel';
+import { humanizeRSSAutomationValidation } from './validationMessages';
 import WorkflowEdge from './WorkflowEdge';
 import {
   createWorkflowTransferPackage,
@@ -167,6 +168,7 @@ type WorkflowPanelProps = {
   previewFeed?: RSSAutomationParsedFeed;
   onWizardBack?: (definition: RSSAutomationDefinition) => void;
   onWizardNext?: (definition: RSSAutomationDefinition) => Promise<void> | void;
+  onWizardSaveDraft?: (definition: RSSAutomationDefinition) => void;
   showWorkflowList?: boolean;
 };
 
@@ -371,6 +373,7 @@ const WorkflowPanelInner = ({
   previewFeed,
   onWizardBack,
   onWizardNext,
+  onWizardSaveDraft,
   showWorkflowList = true,
 }: WorkflowPanelProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<RSSFlowNode>([]);
@@ -496,6 +499,13 @@ const WorkflowPanelInner = ({
     () => flowToDefinition(nodes, edges, viewport),
     [edges, nodes, viewport],
   );
+  const displayedValidation = useMemo(
+    () =>
+      validation
+        ? humanizeRSSAutomationValidation(validation, previewDefinition)
+        : undefined,
+    [previewDefinition, validation],
+  );
   const simulation = useMemo(() => {
     const item = effectivePreviewFeed?.items[previewItemIndex]?.fields;
     return item ? simulateRSSAutomation(previewDefinition, item) : undefined;
@@ -550,6 +560,7 @@ const WorkflowPanelInner = ({
       if (
         [
           'regex',
+          'extract_between',
           'keyword_replace',
           'regex_replace',
           'convert',
@@ -571,6 +582,18 @@ const WorkflowPanelInner = ({
             !Array.isArray(previewRecord.variables)
               ? (previewRecord.variables as Record<string, unknown>)
               : undefined;
+          const producedValueAvailable = Boolean(
+            producedVariables && Object.hasOwn(producedVariables, name),
+          );
+          const simulationValueAvailable = Object.hasOwn(
+            simulation?.variables || {},
+            name,
+          );
+          const previewValue = producedValueAvailable
+            ? producedVariables?.[name]
+            : simulationValueAvailable
+              ? simulation?.variables[name]
+              : undefined;
           addReference({
             kind: 'variable',
             name,
@@ -578,6 +601,10 @@ const WorkflowPanelInner = ({
             preview:
               referencePreview(producedVariables?.[name]) ||
               referencePreview(simulation?.variables[name]),
+            ...((producedValueAvailable || simulationValueAvailable) && {
+              previewAvailable: true,
+              previewValue,
+            }),
             description: `由“${definition.name || NODE_LABELS[definition.type]}”写入`,
           });
         }
@@ -586,6 +613,9 @@ const WorkflowPanelInner = ({
         (candidate) => candidate.type === definition.type,
       );
       for (const output of protocol?.outputs || []) {
+        const previewValueAvailable = Boolean(
+          previewRecord && Object.hasOwn(previewRecord, output.name),
+        );
         addReference({
           kind: 'node',
           name: `${definition.name || NODE_LABELS[definition.type]} · ${output.label}`,
@@ -593,6 +623,10 @@ const WorkflowPanelInner = ({
           preview:
             referencePreview(previewRecord?.[output.name]) ||
             referencePreview(output.example),
+          ...(previewValueAvailable && {
+            previewAvailable: true,
+            previewValue: previewRecord?.[output.name],
+          }),
           dataType: output.type,
           description: output.description,
         });
@@ -606,6 +640,7 @@ const WorkflowPanelInner = ({
           'keyword',
           'keyword_replace',
           'regex',
+          'extract_between',
           'regex_replace',
           'convert',
           'json_extract',
@@ -675,13 +710,20 @@ const WorkflowPanelInner = ({
         value: configuredReference,
       });
     } else if (configuredReference.startsWith('$vars.')) {
+      const variableName = configuredReference.slice('$vars.'.length);
+      const previewValueAvailable = Object.hasOwn(
+        simulation?.variables || {},
+        variableName,
+      );
       addReference({
         kind: 'variable',
-        name: configuredReference.slice('$vars.'.length),
+        name: variableName,
         value: configuredReference,
-        preview: referencePreview(
-          simulation?.variables[configuredReference.slice('$vars.'.length)],
-        ),
+        preview: referencePreview(simulation?.variables[variableName]),
+        ...(previewValueAvailable && {
+          previewAvailable: true,
+          previewValue: simulation?.variables[variableName],
+        }),
       });
     } else if (configuredReference.startsWith('$nodes.')) {
       addReference({
@@ -1306,12 +1348,12 @@ const WorkflowPanelInner = ({
           </Card>
         )}
 
-        {validation && !validation.valid && (
+        {displayedValidation && !displayedValidation.valid && (
           <Alert
             closable={{ onClose: () => setValidation(undefined) }}
             description={
               <ul className={styles.validationList}>
-                {validation.errors.map((error) => (
+                {displayedValidation.errors.map((error) => (
                   <li key={error}>{error}</li>
                 ))}
               </ul>
@@ -1514,6 +1556,17 @@ const WorkflowPanelInner = ({
                       </Button>
                     ) : (
                       <>
+                        <Tooltip title="不校验流程，保存到当前浏览器，下次新建时自动恢复">
+                          <Button
+                            aria-label="保存草稿"
+                            icon={<SaveOutlined />}
+                            onClick={() =>
+                              onWizardSaveDraft?.(currentDefinition())
+                            }
+                          >
+                            保存草稿
+                          </Button>
+                        </Tooltip>
                         <Tooltip title="上一步">
                           <Button
                             aria-label="上一步"

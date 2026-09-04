@@ -5,6 +5,7 @@ import {
   LinkOutlined,
   QuestionCircleOutlined,
   RocketOutlined,
+  SaveOutlined,
 } from '@ant-design/icons';
 import {
   Alert,
@@ -17,6 +18,7 @@ import {
   Input,
   InputNumber,
   message,
+  Popconfirm,
   Row,
   Select,
   Space,
@@ -26,6 +28,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd';
+import dayjs from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   RSSAutomationCreateResult,
@@ -46,6 +49,13 @@ import {
 import { ACTION_NODE_TYPES } from './flow';
 import styles from './index.module.less';
 import WorkflowPanel from './WorkflowPanel';
+import {
+  clearRSSAutomationWizardDraft,
+  loadRSSAutomationWizardDraft,
+  type RSSAutomationWizardPublishValues,
+  type RSSAutomationWizardSourceValues,
+  saveRSSAutomationWizardDraft,
+} from './wizardDraft';
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -59,20 +69,15 @@ const SAMPLE_FIELD_HELP: Record<string, string> = {
   title: '条目标题，可用于命名、筛选和通知。',
 };
 
-type FeedPreset = 'auto' | 'rss' | 'atom';
+type FeedPreset = RSSAutomationWizardSourceValues['preset'];
+type SourceStepValues = RSSAutomationWizardSourceValues;
+type PublishStepValues = RSSAutomationWizardPublishValues;
 
-type SourceStepValues = {
-  feed_url: string;
-  name?: string;
-  interval_minutes: number;
-  preset: FeedPreset;
+const DEFAULT_SOURCE_VALUES: Partial<SourceStepValues> = {
+  interval_minutes: 5,
+  preset: 'auto',
 };
-
-type PublishStepValues = {
-  name: string;
-  description?: string;
-  enabled: boolean;
-};
+const DEFAULT_PUBLISH_VALUES: Partial<PublishStepValues> = { enabled: true };
 
 type AutomationWizardProps = {
   targets: RSSAutomationTarget[];
@@ -102,18 +107,36 @@ const AutomationWizard = ({
   onCancel,
   onCreated,
 }: AutomationWizardProps) => {
+  const [restoredDraft] = useState(loadRSSAutomationWizardDraft);
   const [sourceForm] = Form.useForm<SourceStepValues>();
   const [publishForm] = Form.useForm<PublishStepValues>();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<0 | 1 | 2>(restoredDraft?.step || 0);
   const [sampling, setSampling] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [sample, setSample] = useState<RSSAutomationParsedFeed>();
-  const [source, setSource] = useState<RSSAutomationSourceInput>();
-  const [suggestedName, setSuggestedName] = useState('新的 RSS 自动化');
-  const [definition, setDefinition] = useState<RSSAutomationDefinition>(() =>
-    structuredClone(DEFAULT_RSS_AUTOMATION_DEFINITION),
+  const [sample, setSample] = useState<RSSAutomationParsedFeed | undefined>(
+    restoredDraft?.sample,
   );
-  const [selectedSample, setSelectedSample] = useState(0);
+  const [source, setSource] = useState<RSSAutomationSourceInput | undefined>(
+    restoredDraft?.source,
+  );
+  const [sourceValues, setSourceValues] = useState<Partial<SourceStepValues>>(
+    () => restoredDraft?.sourceValues || DEFAULT_SOURCE_VALUES,
+  );
+  const [publishValues, setPublishValues] = useState<
+    Partial<PublishStepValues>
+  >(() => restoredDraft?.publishValues || DEFAULT_PUBLISH_VALUES);
+  const [suggestedName, setSuggestedName] = useState(
+    restoredDraft?.suggestedName || '新的 RSS 自动化',
+  );
+  const [definition, setDefinition] = useState<RSSAutomationDefinition>(() =>
+    structuredClone(
+      restoredDraft?.definition || DEFAULT_RSS_AUTOMATION_DEFINITION,
+    ),
+  );
+  const [selectedSample, setSelectedSample] = useState(
+    restoredDraft?.selectedSample || 0,
+  );
+  const [draftSavedAt, setDraftSavedAt] = useState(restoredDraft?.savedAt);
   const [messageApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
@@ -130,6 +153,44 @@ const AutomationWizard = ({
         .length,
     [definition],
   );
+
+  const saveDraft = (nextDefinition = definition) => {
+    try {
+      setDefinition(nextDefinition);
+      const savedDraft = saveRSSAutomationWizardDraft({
+        step,
+        sourceValues,
+        publishValues,
+        source,
+        sample,
+        suggestedName,
+        definition: nextDefinition,
+        selectedSample,
+      });
+      setDraftSavedAt(savedDraft.savedAt);
+      messageApi.success('草稿已保存，下次新建时会自动恢复');
+    } catch (error: any) {
+      messageApi.error(error?.message || '草稿保存失败');
+    }
+  };
+
+  const discardDraft = () => {
+    clearRSSAutomationWizardDraft();
+    setDraftSavedAt(undefined);
+    setStep(0);
+    setSample(undefined);
+    setSource(undefined);
+    setSourceValues(DEFAULT_SOURCE_VALUES);
+    setPublishValues(DEFAULT_PUBLISH_VALUES);
+    setSuggestedName('新的 RSS 自动化');
+    setDefinition(structuredClone(DEFAULT_RSS_AUTOMATION_DEFINITION));
+    setSelectedSample(0);
+    sourceForm.resetFields();
+    sourceForm.setFieldsValue(DEFAULT_SOURCE_VALUES);
+    publishForm.resetFields();
+    publishForm.setFieldsValue(DEFAULT_PUBLISH_VALUES);
+    messageApi.success('已舍弃本机草稿，可以重新开始');
+  };
 
   const parseFeed = async () => {
     let values: SourceStepValues;
@@ -158,10 +219,17 @@ const AutomationWizard = ({
             values.name?.trim() || response.data.title || '新的 RSS 自动化';
           const resolvedSource = { ...input, name: detectedName };
           sourceForm.setFieldValue('name', detectedName);
+          setSourceValues({ ...values, name: detectedName });
           setSource(resolvedSource);
           setSample(response.data);
           setSelectedSample(0);
-          setSuggestedName(`${detectedName}自动化`);
+          const nextSuggestedName = `${detectedName}自动化`;
+          setSuggestedName(nextSuggestedName);
+          setPublishValues((current) =>
+            current.name?.trim()
+              ? current
+              : { ...current, name: nextSuggestedName },
+          );
           messageApi.success(
             `解析成功，找到 ${response.data.items.length} 条样本`,
           );
@@ -193,6 +261,7 @@ const AutomationWizard = ({
       messageApi.warning('RSS 链接有变化，请重新解析');
       return;
     }
+    setSourceValues(values);
     setStep(1);
   };
 
@@ -204,6 +273,7 @@ const AutomationWizard = ({
     } catch {
       return;
     }
+    setPublishValues(values);
     if (values.enabled && actionCount === 0) {
       messageApi.warning(
         '流程还没有下载或通知动作；请返回添加动作，或先关闭“立即启用”保存为草稿',
@@ -224,6 +294,8 @@ const AutomationWizard = ({
       if (response.code !== 0 || !response.data) {
         throw new Error(response.message || '创建自动化失败');
       }
+      clearRSSAutomationWizardDraft();
+      setDraftSavedAt(undefined);
       messageApi.success(
         values.enabled ? '自动化已创建并启用' : '自动化草稿已保存',
       );
@@ -250,6 +322,32 @@ const AutomationWizard = ({
         responsive={false}
       />
 
+      {draftSavedAt && (
+        <Alert
+          action={
+            <Popconfirm
+              cancelText="保留"
+              description="只会清除当前浏览器里的新建草稿，不会删除已经创建的自动化。"
+              okButtonProps={{ danger: true }}
+              okText="舍弃"
+              onConfirm={discardDraft}
+              title="舍弃这份草稿？"
+            >
+              <Button danger size="small" type="text">
+                舍弃草稿
+              </Button>
+            </Popconfirm>
+          }
+          className={styles.wizardDraftAlert}
+          description={`最近保存于 ${dayjs(draftSavedAt).format(
+            'YYYY-MM-DD HH:mm:ss',
+          )}，仅保存在当前浏览器。`}
+          showIcon
+          title="本机已有可恢复草稿"
+          type="info"
+        />
+      )}
+
       {step === 0 && (
         <Card className={styles.wizardStepCard}>
           <div className={styles.wizardStepIntro}>
@@ -274,9 +372,10 @@ const AutomationWizard = ({
           </div>
           <Form
             form={sourceForm}
-            initialValues={{ interval_minutes: 5, preset: 'auto' }}
+            initialValues={{ ...DEFAULT_SOURCE_VALUES, ...sourceValues }}
             layout="vertical"
-            onValuesChange={(changed) => {
+            onValuesChange={(changed, values) => {
+              setSourceValues(values);
               if ('feed_url' in changed) {
                 setSample(undefined);
                 setSource(undefined);
@@ -438,6 +537,11 @@ const AutomationWizard = ({
           )}
 
           <div className={styles.wizardFooter}>
+            <Tooltip title="不要求完成解析，保存到当前浏览器">
+              <Button icon={<SaveOutlined />} onClick={() => saveDraft()}>
+                保存草稿
+              </Button>
+            </Tooltip>
             <Button onClick={onCancel}>取消</Button>
             <Button
               disabled={!sample}
@@ -468,6 +572,7 @@ const AutomationWizard = ({
             setDefinition(nextDefinition);
             setStep(2);
           }}
+          onWizardSaveDraft={saveDraft}
           previewFeed={sample}
           sourceMapping={source?.mapping}
           sources={[]}
@@ -493,8 +598,13 @@ const AutomationWizard = ({
             <Col lg={14} xs={24}>
               <Form
                 form={publishForm}
-                initialValues={{ enabled: true, name: suggestedName }}
+                initialValues={{
+                  enabled: true,
+                  name: suggestedName,
+                  ...publishValues,
+                }}
                 layout="vertical"
+                onValuesChange={(_, values) => setPublishValues(values)}
               >
                 <Form.Item
                   label="自动化名称"
@@ -561,6 +671,15 @@ const AutomationWizard = ({
             </Col>
           </Row>
           <div className={styles.wizardFooter}>
+            <Tooltip title="保存到当前浏览器，下次新建时自动恢复">
+              <Button
+                icon={<SaveOutlined />}
+                onClick={() => saveDraft()}
+                size="large"
+              >
+                保存草稿
+              </Button>
+            </Tooltip>
             <Button
               icon={<ArrowLeftOutlined />}
               onClick={() => setStep(1)}
