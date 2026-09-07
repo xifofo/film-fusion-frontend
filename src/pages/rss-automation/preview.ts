@@ -770,6 +770,28 @@ const previewNode = (
           },
         };
       }
+      case 'stop_qbittorrent':
+        return {
+          active: true,
+          tone: 'success',
+          label: '下载完成后将停止 qBittorrent 做种',
+          detail: '保留 qBittorrent 任务和下载文件；样本预览不会连接真实下载器',
+          selectedPorts: ['success'],
+          output: {
+            stopped: true,
+            already_stopped: false,
+            already_missing: false,
+            files_retained: true,
+            hash: '运行时透传',
+            name: '运行时返回',
+            content_path: '运行时返回',
+            previous_state: 'uploading',
+            target_id: '运行时透传',
+            target_name: '运行时透传',
+            api_action: 'stop',
+            response_status: 200,
+          },
+        };
       case 'delete_qbittorrent': {
         const deleteFiles = Boolean(config.delete_files);
         return {

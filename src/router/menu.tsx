@@ -105,6 +105,11 @@ export const menuItems: AppMenuItem[] = [
         path: '/emby/version-check',
       },
       {
+        name: '账户管理',
+        icon: UserRoundCog,
+        path: '/emby/accounts',
+      },
+      {
         name: '账号绑定',
         icon: UserRoundCog,
         path: '/emby/bindings',

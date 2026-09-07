@@ -20,6 +20,7 @@ describe('RSS workflow node palette', () => {
     expect(groupTypes('qBittorrent')).toEqual([
       'qbittorrent',
       'wait_qbittorrent',
+      'stop_qbittorrent',
       'delete_qbittorrent',
     ]);
     expect(groupTypes('115 OpenAPI')).toEqual([

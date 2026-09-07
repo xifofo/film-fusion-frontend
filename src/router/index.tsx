@@ -34,6 +34,7 @@ const EmbyImageOptimization = lazy(
 const EmbyMissing = lazy(() => import('@/pages/emby-missing'));
 const EmbyVersionCheck = lazy(() => import('@/pages/emby-version-check'));
 const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
+const EmbyAccounts = lazy(() => import('@/pages/emby-accounts'));
 const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
@@ -210,6 +211,10 @@ const routes: RouteObject[] = [
       {
         path: 'emby/bindings',
         element: <EmbyBindings />,
+      },
+      {
+        path: 'emby/accounts',
+        element: <EmbyAccounts />,
       },
       {
         path: 'emby-watch',

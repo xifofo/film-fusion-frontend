@@ -39,6 +39,7 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'qbittorrent',
   'wait_qbittorrent',
   'moviepilot_transfer',
+  'stop_qbittorrent',
   'delete_qbittorrent',
   'offline115',
   'offline115_openapi',

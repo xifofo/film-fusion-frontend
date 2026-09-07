@@ -46,7 +46,12 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
   [
     {
       title: 'qBittorrent',
-      types: ['qbittorrent', 'wait_qbittorrent', 'delete_qbittorrent'],
+      types: [
+        'qbittorrent',
+        'wait_qbittorrent',
+        'stop_qbittorrent',
+        'delete_qbittorrent',
+      ],
     },
     {
       title: '115 OpenAPI',

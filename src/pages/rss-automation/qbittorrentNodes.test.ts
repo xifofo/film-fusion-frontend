@@ -20,10 +20,57 @@ describe('qBittorrent workflow nodes', () => {
     });
   });
 
-  it('uses explicit names for all three qBittorrent API actions', () => {
+  it('uses explicit names for all four qBittorrent API actions', () => {
     expect(NODE_LABELS.qbittorrent).toBe('添加 qBittorrent 任务');
     expect(NODE_LABELS.wait_qbittorrent).toBe('等待 qBittorrent 完成');
+    expect(NODE_LABELS.stop_qbittorrent).toBe('停止 qBittorrent 做种');
     expect(NODE_LABELS.delete_qbittorrent).toBe('删除 qBittorrent 任务');
+  });
+
+  it('creates and previews a stop-seeding node without deleting data', () => {
+    const stopNode = createNodeDefinition('stop_qbittorrent', {
+      x: 480,
+      y: 0,
+    });
+    const definition: RSSAutomationDefinition = {
+      schema_version: 1,
+      nodes: [
+        {
+          id: 'trigger',
+          type: 'trigger',
+          position: { x: 0, y: 0 },
+          config: {},
+        },
+        { ...stopNode, id: 'qb-stop' },
+      ],
+      edges: [
+        {
+          id: 'trigger-to-stop',
+          source: 'trigger',
+          source_port: 'next',
+          target: 'qb-stop',
+          target_port: 'input',
+        },
+      ],
+    };
+
+    expect(stopNode).toMatchObject({
+      name: '停止 qBittorrent 做种',
+      config: { timeout_seconds: 30 },
+      max_attempts: 3,
+    });
+    expect(
+      simulateRSSAutomation(definition, {}).nodes['qb-stop'],
+    ).toMatchObject({
+      active: true,
+      tone: 'success',
+      selectedPorts: ['success'],
+      output: {
+        stopped: true,
+        files_retained: true,
+        api_action: 'stop',
+      },
+    });
   });
 
   it('previews the structured add API output without calling qBittorrent', () => {

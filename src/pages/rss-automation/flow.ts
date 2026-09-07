@@ -80,6 +80,7 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   qbittorrent: '添加 qBittorrent 任务',
   wait_qbittorrent: '等待 qBittorrent 完成',
   moviepilot_transfer: 'MP2 整理入库',
+  stop_qbittorrent: '停止 qBittorrent 做种',
   delete_qbittorrent: '删除 qBittorrent 任务',
   offline115: '115 Cookie 离线',
   offline115_openapi: '115 OpenAPI 离线',
@@ -102,6 +103,7 @@ export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'qbittorrent',
   'wait_qbittorrent',
   'moviepilot_transfer',
+  'stop_qbittorrent',
   'delete_qbittorrent',
   'offline115',
   'offline115_openapi',
@@ -724,6 +726,9 @@ export const createNodeDefinition = (
       timeout_seconds: 600,
     });
   }
+  if (type === 'stop_qbittorrent') {
+    Object.assign(config, { timeout_seconds: 30 });
+  }
   if (type === 'delete_qbittorrent') {
     Object.assign(config, { delete_files: false, timeout_seconds: 30 });
   }
@@ -805,6 +810,7 @@ export const createNodeDefinition = (
       type === 'offline115' ||
       type === 'offline115_openapi' ||
       type === 'wait_qbittorrent' ||
+      type === 'stop_qbittorrent' ||
       type === 'wait115' ||
       type === 'rename115_openapi' ||
       type === 'moviepilot_title_recognize' ||

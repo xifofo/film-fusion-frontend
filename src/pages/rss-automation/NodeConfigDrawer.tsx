@@ -2900,6 +2900,16 @@ const NodeConfigModal = ({
             </Form.Item>
           </>
         );
+      case 'stop_qbittorrent':
+        return (
+          <Alert
+            className={styles.nodeConfigFull}
+            description="直接连接“等待 qBittorrent 完成”或“MP2 整理入库”的成功出口。节点只停止对应 Torrent 的做种，保留 qBittorrent 任务和下载文件；重复执行是安全的。"
+            title="停止做种但不删任务、不删文件"
+            showIcon
+            type="info"
+          />
+        );
       case 'delete_qbittorrent':
         return (
           <>
@@ -3810,6 +3820,7 @@ const NodeConfigModal = ({
                   'qbittorrent',
                   'wait_qbittorrent',
                   'moviepilot_transfer',
+                  'stop_qbittorrent',
                   'delete_qbittorrent',
                   'offline115',
                   'offline115_openapi',
