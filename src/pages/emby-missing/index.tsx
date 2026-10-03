@@ -1,4 +1,5 @@
 import {
+  DeleteOutlined,
   DownOutlined,
   EnvironmentOutlined,
   MoreOutlined,
@@ -41,6 +42,7 @@ import dayjs from 'dayjs';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   addEmbyMissingBlacklist,
+  deleteEmbyMissingSeries,
   embyWatchImageUrl,
   getEmbyMissing,
   getEmbyMissingBlacklist,
@@ -180,6 +182,8 @@ type MissingSeriesCardProps = {
   record: API.EmbyMissingSeriesGroup;
   scanning: boolean;
   rescanningSeriesId: string;
+  deletingSeriesId: string;
+  onDelete: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
   onAddBlacklist: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
   onRescan: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
   onViewPath: (record: API.EmbyMissingSeriesGroup) => Promise<void>;
@@ -189,6 +193,8 @@ const MissingSeriesCard: React.FC<MissingSeriesCardProps> = ({
   record,
   scanning,
   rescanningSeriesId,
+  deletingSeriesId,
+  onDelete,
   onAddBlacklist,
   onRescan,
   onViewPath,
@@ -307,6 +313,33 @@ const MissingSeriesCard: React.FC<MissingSeriesCardProps> = ({
                 </div>
                 <div className={styles.cardActionMenuDivider} />
                 <Popconfirm
+                  title={`删除《${record.series_name}》的缺集记录？`}
+                  description="仅删除扫描记录，不会删除媒体文件；后续扫描仍可能再次出现。"
+                  okText="删除记录"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  disabled={
+                    scanning || !!rescanningSeriesId || !!deletingSeriesId
+                  }
+                  onConfirm={async () => {
+                    await onDelete(record);
+                    setMoreOpen(false);
+                  }}
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    type="text"
+                    loading={deletingSeriesId === record.series_id}
+                    disabled={
+                      scanning || !!rescanningSeriesId || !!deletingSeriesId
+                    }
+                  >
+                    删除记录
+                  </Button>
+                </Popconfirm>
+                <Popconfirm
                   title="加入黑名单后将跳过该剧的缺集检查"
                   onConfirm={() => {
                     setMoreOpen(false);
@@ -352,6 +385,7 @@ const EmbyMissingPage: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [blacklist, setBlacklist] = useState<API.EmbyMissingBlacklist[]>([]);
   const [rescanningSeriesId, setRescanningSeriesId] = useState('');
+  const [deletingSeriesId, setDeletingSeriesId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [sortMode, setSortMode] = useState<MissingSortMode>('name');
@@ -445,6 +479,23 @@ const EmbyMissingPage: React.FC = () => {
       }
     } catch (error: any) {
       messageApi.error(error?.message || '加入黑名单失败');
+    }
+  };
+
+  const handleDeleteSeries = async (record: API.EmbyMissingSeriesGroup) => {
+    setDeletingSeriesId(record.series_id);
+    try {
+      const res = await deleteEmbyMissingSeries(record.series_id);
+      if (res.code === 0) {
+        messageApi.success('缺集记录已删除');
+        await load();
+      } else {
+        messageApi.error(res.message || '删除缺集记录失败');
+      }
+    } catch (error: any) {
+      messageApi.error(error?.message || '删除缺集记录失败');
+    } finally {
+      setDeletingSeriesId('');
     }
   };
 
@@ -726,6 +777,8 @@ const EmbyMissingPage: React.FC = () => {
                   record={record}
                   scanning={scanning}
                   rescanningSeriesId={rescanningSeriesId}
+                  deletingSeriesId={deletingSeriesId}
+                  onDelete={handleDeleteSeries}
                   onAddBlacklist={handleAddBlacklist}
                   onRescan={handleRescanSeries}
                   onViewPath={handleViewPath}

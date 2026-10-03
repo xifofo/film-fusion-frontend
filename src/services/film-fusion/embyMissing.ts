@@ -32,6 +32,17 @@ export async function rescanEmbyMissingSeries(
   );
 }
 
+/** 删除指定剧的缺集记录，下次扫描可重新发现 */
+export async function deleteEmbyMissingSeries(
+  seriesId: string,
+  options?: { [key: string]: any },
+) {
+  return apiClient.delete<API.Response<null>>(
+    `/api/emby-missing/series/${encodeURIComponent(seriesId)}`,
+    { ...(options || {}) },
+  );
+}
+
 /** 由剧集ID取 Emby 本地路径并反推云端源目录 */
 export async function resolveEmbyMissingCloudPath(
   data: { series_id: string },

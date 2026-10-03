@@ -1218,6 +1218,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     'dry' | 'apply'
   >();
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
+  const [organizeError, setOrganizeError] = useState<string>();
   const [activePreviewTask, setActivePreviewTask] =
     useState<API.OrganizePreviewTask>();
   const [assignTMDBTask, setAssignTMDBTask] =
@@ -1559,6 +1560,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   useEffect(() => {
     setResultData(undefined);
+    setOrganizeError(undefined);
     setActivePreviewTask(undefined);
     setRawResponse(undefined);
     setSelectedItemRowKeys([]);
@@ -1666,8 +1668,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             ? response.data
             : response;
         const total = payload?.total;
+        const failedGroups = (payload?.groups || []).filter(
+          (group) => !!group.error?.trim(),
+        );
         const suffix = typeof total === 'number' ? `，共 ${total} 项` : '';
-        const text = response?.message || '整理完成';
+        const text = payload?.dry_run
+          ? '整理预览已生成'
+          : response?.message || '整理完成';
         const sourceFolderDeletedCount =
           typeof payload?.source_folder_deleted_count === 'number'
             ? payload.source_folder_deleted_count
@@ -1688,9 +1695,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           !payload?.dry_run && sourceFolderDeletePendingCount > 0
             ? `，${sourceFolderDeletePendingCount} 个原文件夹将在字幕全部下载完成后自动删除`
             : '';
-        messageApi.success(
-          `${text}${suffix}${payload?.dry_run ? '（演练）' : ''}${sourceFolderDeletedSuffix}${sourceFolderDeletePendingSuffix}`,
-        );
+        if (failedGroups.length > 0) {
+          const failureText = `${payload?.dry_run ? '预整理' : '整理'}有 ${failedGroups.length} 个目录失败：${failedGroups[0].error}。详细原因见下方整理结果`;
+          if (failedGroups.length === payload?.groups?.length) {
+            messageApi.error(failureText);
+          } else {
+            messageApi.warning(failureText);
+          }
+        } else {
+          messageApi.success(
+            `${text}${suffix}${sourceFolderDeletedSuffix}${sourceFolderDeletePendingSuffix}`,
+          );
+        }
         const sourceFolderDeleteErrors =
           payload?.source_folder_delete_errors || [];
         if (!payload?.dry_run && sourceFolderDeleteErrors.length > 0) {
@@ -1699,14 +1715,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             sourceFolderDeleteErrors.length > 2
               ? `；另有 ${sourceFolderDeleteErrors.length - 2} 个错误`
               : '';
-          messageApi.warning(
-            `整理已完成，但原文件夹删除存在异常：${visibleErrors}${more}`,
-          );
+          messageApi.warning(`原文件夹处理存在异常：${visibleErrors}${more}`);
         }
         if (payload?.dry_run) {
+          const previewTask = applyingPreviewTaskRef.current;
+          applyingPreviewTaskRef.current = undefined;
+          requeuePreviewTaskAfterApplyRef.current = false;
           const selection = getInitialPreviewSelection(payload);
           setResultData(payload);
-          setActivePreviewTask(undefined);
+          setActivePreviewTask(previewTask);
           setRawResponse(response);
           setActiveVersionKey(selection.activeVersionKey);
           setSelectedItemRowKeys(selection.selectedRowKeys);
@@ -1714,17 +1731,24 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           const appliedPreviewTask = applyingPreviewTaskRef.current;
           const shouldRequeuePreviewTask =
             requeuePreviewTaskAfterApplyRef.current;
-          const failedApplyGroups = (payload?.groups || []).filter(
-            (group) => !!group.error,
-          );
           applyingPreviewTaskRef.current = undefined;
           requeuePreviewTaskAfterApplyRef.current = false;
-          if (appliedPreviewTask && failedApplyGroups.length > 0) {
-            messageApi.warning(
-              `有 ${failedApplyGroups.length} 个分组整理失败，已保留源目录和预整理任务，未删除其他版本`,
-            );
-            refreshPreviewTasks();
-          } else if (appliedPreviewTask && shouldRequeuePreviewTask) {
+          if (failedGroups.length > 0) {
+            setResultData(payload);
+            setRawResponse(response);
+            setActivePreviewTask(appliedPreviewTask);
+            setSelectedItemRowKeys([]);
+            setActiveVersionKey(ALL_VERSION_KEY);
+            if (appliedPreviewTask) refreshPreviewTasks();
+            window.setTimeout(() => {
+              previewResultRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
+            }, 0);
+            return;
+          }
+          if (appliedPreviewTask && shouldRequeuePreviewTask) {
             requeueOrganizePreviewTask(appliedPreviewTask.id)
               .then(() => {
                 messageApi.success(
@@ -1763,17 +1787,22 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       onError: (error: any) => {
         applyingPreviewTaskRef.current = undefined;
         requeuePreviewTaskAfterApplyRef.current = false;
-        messageApi.error(error?.message || '整理失败，请重试');
+        const errorMessage = error?.message || '整理失败，请重试';
+        setOrganizeError(errorMessage);
+        messageApi.error(errorMessage);
       },
     },
   );
 
   const runOrganizeWithMode = useCallback(
     (params: API.Organize115CookieParams) => {
+      setOrganizeError(undefined);
       setOrganizeRequestMode(params.dry_run ? 'dry' : 'apply');
-      return runOrganize(params).finally(() => {
-        setOrganizeRequestMode(undefined);
-      });
+      return runOrganize(params)
+        .catch(() => undefined)
+        .finally(() => {
+          setOrganizeRequestMode(undefined);
+        });
     },
     [runOrganize],
   );
@@ -1820,6 +1849,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           return;
         }
         setDryRun(true);
+        setOrganizeError(undefined);
         setActivePreviewTask(payload.task);
         if (!episodeMode) {
           setOrganizeMediaType(payload.task?.media_type || 'auto');
@@ -2284,7 +2314,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           messageApi.warning('预览结果缺少来源目录或文件 ID，无法按明细整理');
           return;
         }
-        const organizeParams = buildOrganizeParams(folderIds, false, fileIds);
+        const organizeParams = buildOrganizeParams(folderIds, dryRun, fileIds);
         if (!organizeParams) {
           return;
         }
@@ -2292,13 +2322,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           activePreviewTask?.folder_path ||
           activePreviewTask?.folder_name ||
           activePreviewTask?.folder_id;
-        let deleteSourceFolder = true;
+        let deleteSourceFolder = !dryRun;
         modalApi.confirm({
-          title: activePreviewTask
-            ? activeVersionGroup
-              ? `确认只整理“${activeVersionGroup.label}”版本？`
-              : `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
-            : `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
+          title: dryRun
+            ? `确认预览 ${selectedItemRowsForApply.length} 条处理明细？`
+            : activePreviewTask
+              ? activeVersionGroup
+                ? `确认只整理“${activeVersionGroup.label}”版本？`
+                : `确认整理此目录的 ${selectedItemRowsForApply.length} 条处理明细？`
+              : `确认整理 ${selectedItemRowsForApply.length} 条处理明细？`,
           content: (
             <Space orientation="vertical" size={8}>
               {activePreviewTaskLabel ? (
@@ -2310,8 +2342,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 </Typography.Text>
               ) : null}
               <Typography.Text>
-                将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。
-                单个目录失败不会阻断其它，错误会标注在对应分组上。
+                {dryRun
+                  ? '仅计算已选记录的重命名、目标目录和 STRM 内容。不会创建目录、重命名或移动文件、下载字幕、写入 STRM 或删除源文件夹。'
+                  : '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。单个目录失败不会阻断其它，错误会标注在对应分组上。'}
               </Typography.Text>
               {activeVersionGroup ? (
                 <Alert
@@ -2325,36 +2358,39 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                   description={`本次选择 ${selectedItemRowsForApply.length} 个文件，原目录另有 ${unselectedItemCount} 个未选文件。`}
                 />
               ) : null}
-              <Space orientation="vertical" size={4}>
-                <Checkbox
-                  defaultChecked
-                  onChange={(event) => {
-                    deleteSourceFolder = event.target.checked;
-                  }}
-                >
-                  {activeVersionGroup
-                    ? '只保留此版本，整理后删除其他版本'
-                    : '整理完成后删除原文件夹'}
-                </Checkbox>
-                <Typography.Text type="secondary">
-                  {activeVersionGroup
-                    ? `勾选后仅在所选版本整理成功且相关字幕全部下载完成后删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；下载失败时保留原文件夹。取消勾选则保留其他版本，并重新生成预整理任务。`
-                    : '仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。'}
-                </Typography.Text>
-              </Space>
+              {!dryRun ? (
+                <Space orientation="vertical" size={4}>
+                  <Checkbox
+                    defaultChecked
+                    onChange={(event) => {
+                      deleteSourceFolder = event.target.checked;
+                    }}
+                  >
+                    {activeVersionGroup
+                      ? '只保留此版本，整理后删除其他版本'
+                      : '整理完成后删除原文件夹'}
+                  </Checkbox>
+                  <Typography.Text type="secondary">
+                    {activeVersionGroup
+                      ? `勾选后仅在所选版本整理成功且相关字幕全部下载完成后删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；下载失败时保留原文件夹。取消勾选则保留其他版本，并重新生成预整理任务。`
+                      : '仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。'}
+                  </Typography.Text>
+                </Space>
+              ) : null}
             </Space>
           ),
-          okText: '执行整理',
-          okButtonProps: { danger: true },
+          okText: dryRun ? '生成预览' : '执行整理',
+          okButtonProps: { danger: !dryRun },
           cancelText: '取消',
           onOk: () => {
             applyingPreviewTaskRef.current = activePreviewTask;
             requeuePreviewTaskAfterApplyRef.current =
+              !dryRun &&
               !!activePreviewTask &&
               !!activeVersionGroup &&
               !deleteSourceFolder;
             runOrganizeWithMode(
-              deleteSourceFolder
+              !dryRun && deleteSourceFolder
                 ? { ...organizeParams, delete_source_folder: true }
                 : organizeParams,
             );
@@ -2368,42 +2404,45 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         return;
       }
       const folderIds = [...checkedKeys];
-      const organizeParams = buildOrganizeParams(folderIds, false);
+      const organizeParams = buildOrganizeParams(folderIds, dryRun);
       if (!organizeParams) {
         return;
       }
-      let deleteSourceFolder = true;
+      let deleteSourceFolder = !dryRun;
       modalApi.confirm({
-        title: `确认整理 ${folderIds.length} 个 115 目录？`,
+        title: `确认${dryRun ? '预览' : '整理'} ${folderIds.length} 个 115 目录？`,
         content: (
           <Space orientation="vertical" size={8}>
             <Typography.Text>
-              将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。
-              单个目录失败不会阻断其它，错误会标注在对应分组上。
+              {dryRun
+                ? '仅计算这些目录的重命名、目标目录和 STRM 内容。不会创建目录、重命名或移动文件、下载字幕、写入 STRM 或删除源文件夹。'
+                : '将对这些 115 目录依次执行真实整理（创建/重命名/移动/字幕下载）。单个目录失败不会阻断其它，错误会标注在对应分组上。'}
             </Typography.Text>
-            <Space orientation="vertical" size={4}>
-              <Checkbox
-                defaultChecked
-                onChange={(event) => {
-                  deleteSourceFolder = event.target.checked;
-                }}
-              >
-                整理完成后删除原文件夹
-              </Checkbox>
-              <Typography.Text type="secondary">
-                仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。
-              </Typography.Text>
-            </Space>
+            {!dryRun ? (
+              <Space orientation="vertical" size={4}>
+                <Checkbox
+                  defaultChecked
+                  onChange={(event) => {
+                    deleteSourceFolder = event.target.checked;
+                  }}
+                >
+                  整理完成后删除原文件夹
+                </Checkbox>
+                <Typography.Text type="secondary">
+                  仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。
+                </Typography.Text>
+              </Space>
+            ) : null}
           </Space>
         ),
-        okText: '执行整理',
-        okButtonProps: { danger: true },
+        okText: dryRun ? '生成预览' : '执行整理',
+        okButtonProps: { danger: !dryRun },
         cancelText: '取消',
         onOk: () => {
           applyingPreviewTaskRef.current = undefined;
           requeuePreviewTaskAfterApplyRef.current = false;
           runOrganizeWithMode(
-            deleteSourceFolder
+            !dryRun && deleteSourceFolder
               ? { ...organizeParams, delete_source_folder: true }
               : organizeParams,
           );
@@ -2415,6 +2454,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       activeVersionGroup,
       buildOrganizeParams,
       checkedKeys,
+      dryRun,
       episodeMode,
       messageApi,
       modalApi,
@@ -2633,6 +2673,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             <span>{row.strm_path}</span>
           </Tooltip>
         ),
+      },
+      {
+        title: 'STRM 内容',
+        dataIndex: 'strm_content',
+        width: 280,
+        ellipsis: true,
+        render: (_, row) =>
+          row.strm_content ? (
+            <Typography.Text copyable ellipsis={{ tooltip: row.strm_content }}>
+              {row.strm_content}
+            </Typography.Text>
+          ) : (
+            '-'
+          ),
       },
       {
         title: '字幕入队',
@@ -3056,14 +3110,19 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     </Space>
   ) : null;
   const hasPreviewResult = !!resultData?.dry_run;
-  const applyDisabled = hasPreviewResult
-    ? selectedItemRowsForApply.length === 0
-    : checkedKeys.length === 0;
+  const hasFailedApplyResult =
+    resultData?.dry_run === false &&
+    resultData.groups?.some((group) => !!group.error?.trim());
+  const applyDisabled =
+    hasFailedApplyResult ||
+    (hasPreviewResult
+      ? selectedItemRowsForApply.length === 0
+      : checkedKeys.length === 0);
   const applyButtonText = hasPreviewResult
     ? activeVersionGroup
-      ? `整理此版本 (${selectedItemRowsForApply.length}/${visibleItemsForTable.length})`
-      : `确认整理 (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
-    : `确认整理 (${checkedKeys.length})`;
+      ? `${dryRun ? '预览' : '整理'}此版本 (${selectedItemRowsForApply.length}/${visibleItemsForTable.length})`
+      : `确认${dryRun ? '预览' : '整理'} (${selectedItemRowsForApply.length}/${flatItemsForTable.length})`
+    : `确认${dryRun ? '预览' : '整理'} (${checkedKeys.length})`;
   const activePreviewTaskLabel = activePreviewTask
     ? activePreviewTask.folder_path ||
       activePreviewTask.folder_name ||
@@ -3386,6 +3445,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               extra={
                 resultData ? (
                   <>
+                    <Tag color={resultData.dry_run ? 'blue' : 'default'}>
+                      {resultData.dry_run ? '预览结果' : '执行结果'}
+                    </Tag>
                     <Tag color="blue">明细 {visibleItemsForTable.length}</Tag>
                     <Tag
                       color={
@@ -3403,6 +3465,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               }
               title="核对整理结果"
             >
+              {organizeError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  title="整理请求失败"
+                  description={organizeError}
+                  style={{ marginBottom: 12 }}
+                />
+              ) : null}
               {resultData ? (
                 <>
                   {(() => {
@@ -3842,9 +3913,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
         <div className={styles.actionDockControls}>
           <div className="flex items-center gap-1">
-            <Typography.Text type="secondary">演练模式</Typography.Text>
+            <Typography.Text type="secondary">预览模式</Typography.Text>
             <Switch
+              aria-label="预览模式"
               checked={dryRun}
+              disabled={organizeLoading}
               checkedChildren="是"
               unCheckedChildren="否"
               onChange={(checked) => setDryRun(checked)}
@@ -3868,10 +3941,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           </Button>
           <Button
             type="primary"
-            danger
+            danger={!dryRun}
             icon={<ThunderboltOutlined />}
             onClick={() => triggerOrganize('apply')}
-            loading={organizeLoading && organizeRequestMode === 'apply'}
+            loading={
+              organizeLoading &&
+              organizeRequestMode === (dryRun ? 'dry' : 'apply')
+            }
             disabled={applyDisabled}
           >
             {applyButtonText}

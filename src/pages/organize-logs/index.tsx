@@ -32,6 +32,7 @@ import {
 } from '@/services/film-fusion';
 
 const ACTION_OPTIONS: Record<string, { text: string; color?: string }> = {
+  media_organize: { text: '媒体整理', color: 'geekblue' },
   strm_create: { text: 'STRM 创建', color: 'blue' },
   strm_delete: { text: 'STRM 删除', color: 'magenta' },
   strm_rename: { text: 'STRM 重命名', color: 'purple' },

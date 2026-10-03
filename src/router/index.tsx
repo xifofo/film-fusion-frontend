@@ -42,6 +42,7 @@ const Automation = lazy(() => import('@/pages/automations'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
+const APITokens = lazy(() => import('@/pages/api-tokens'));
 const NotFound = lazy(() => import('@/pages/404'));
 
 const page = (element: React.ReactNode) => (
@@ -239,6 +240,10 @@ const routes: RouteObject[] = [
       {
         path: 'system-settings',
         element: <SystemSettings />,
+      },
+      {
+        path: 'api-tokens',
+        element: <APITokens />,
       },
     ],
   },

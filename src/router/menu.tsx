@@ -11,6 +11,7 @@ import {
   GitBranch,
   Images,
   Info,
+  KeyRound,
   Link2,
   ListRestart,
   Route,
@@ -152,6 +153,11 @@ export const menuItems: AppMenuItem[] = [
     name: '系统设置',
     icon: Settings,
     path: '/system-settings',
+  },
+  {
+    name: 'API Token',
+    icon: KeyRound,
+    path: '/api-tokens',
   },
 ];
 
