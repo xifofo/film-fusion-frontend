@@ -22,7 +22,6 @@ import {
   Row,
   Select,
   Space,
-  Steps,
   Switch,
   Tag,
   Tooltip,
@@ -46,8 +45,10 @@ import {
   DEFAULT_RSS_AUTOMATION_MAPPING,
   sampleRSSAutomationSource,
 } from '@/services/film-fusion';
+import AutomationSteps from '../automations/AutomationSteps';
 import { ACTION_NODE_TYPES } from './flow';
 import styles from './index.module.less';
+import RSSCacheNotice from './RSSCacheNotice';
 import WorkflowPanel from './WorkflowPanel';
 import {
   clearRSSAutomationWizardDraft,
@@ -230,9 +231,13 @@ const AutomationWizard = ({
               ? current
               : { ...current, name: nextSuggestedName },
           );
-          messageApi.success(
-            `解析成功，找到 ${response.data.items.length} 条样本`,
-          );
+          if (response.data.cache_stale) {
+            messageApi.warning('已解析上次成功的 RSS 缓存，请留意缓存时间');
+          } else {
+            messageApi.success(
+              `解析成功，找到 ${response.data.items.length} 条样本`,
+            );
+          }
           return;
         } catch (error) {
           lastError = error;
@@ -310,17 +315,7 @@ const AutomationWizard = ({
   return (
     <div className={styles.wizardShell}>
       {contextHolder}
-      <Steps
-        className={styles.wizardSteps}
-        current={step}
-        orientation="horizontal"
-        items={[
-          { title: 'RSS', content: '解析真实内容' },
-          { title: '流程', content: '边设计边预览' },
-          { title: '启用', content: '保存自动化' },
-        ]}
-        responsive={false}
-      />
+      <AutomationSteps current={step} trigger="RSS / ATOM" />
 
       {draftSavedAt && (
         <Alert
@@ -462,6 +457,7 @@ const AutomationWizard = ({
 
           {sample && (
             <div className={styles.wizardSampleResult}>
+              <RSSCacheNotice cache={sample} />
               <div className={styles.wizardSampleHeading}>
                 <Space>
                   <CheckCircleFilled className={styles.successIcon} />
@@ -590,7 +586,7 @@ const AutomationWizard = ({
             <div>
               <Title level={4}>确认后启用自动化</Title>
               <Text type="secondary">
-                RSS 源和流程会一次性创建，不会留下只创建了一半的配置。
+                检查来源与处理流程，选择是否立即开始监控新条目。
               </Text>
             </div>
           </div>
@@ -629,7 +625,7 @@ const AutomationWizard = ({
               </Form>
               <Alert
                 description="首次刷新只记录当前已有条目作为基线，不会把历史内容突然全部下载；之后出现的新条目才会进入流程。"
-                title="首次启用是安全的"
+                title="首次检查仅建立基线"
                 showIcon
                 type="success"
               />

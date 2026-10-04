@@ -24,14 +24,14 @@ const triggerOptions: Array<{
     value: 'rss',
     title: 'RSS / Atom',
     description: '发现订阅里的新下载条目',
-    detail: '适合 qBittorrent、115 离线下载以及后续识别整理。',
+    detail: '从订阅发现新资源，交给 qBittorrent 或 115 下载，再继续后续处理。',
     icon: <DownloadOutlined />,
   },
   {
     value: '115_directory',
     title: '115 目录',
     description: '发现目录里新增且已稳定的媒体',
-    detail: '按目录保存增量游标，适合入库后的识别、整理与通知。',
+    detail: '关注下载或上传后的新媒体，等待内容稳定，再完成识别、整理与通知。',
     icon: <FolderOpenOutlined />,
   },
 ];
@@ -64,7 +64,7 @@ const TriggerSelectorModal = ({
       width={760}
     >
       <Paragraph type="secondary">
-        每条自动化绑定一个触发器。触发器只负责发现事件，下载、识别、整理和通知由后续流程节点完成。
+        自动化从哪里开始？选择一种内容来源，接下来配置它的处理流程。
       </Paragraph>
       <Radio.Group
         aria-label="自动化触发器"
@@ -102,6 +102,11 @@ const TriggerSelectorModal = ({
                     >
                       {option.detail}
                     </Paragraph>
+                    <div className={styles.triggerExample}>
+                      {option.value === 'rss'
+                        ? '订阅更新 → 下载 → 后续处理'
+                        : '目录新增 → 媒体识别 → 整理入库'}
+                    </div>
                   </div>
                 </div>
               </Card>

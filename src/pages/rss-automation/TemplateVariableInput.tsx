@@ -113,6 +113,13 @@ const TemplateVariableInput = ({
     () =>
       [
         {
+          kind: 'parameter' as const,
+          label: '流程参数',
+          options: filteredOptions.filter(
+            (option) => option.kind === 'parameter',
+          ),
+        },
+        {
           kind: 'item' as const,
           label: 'RSS 原始字段',
           options: filteredOptions.filter((option) => option.kind === 'item'),
@@ -314,8 +321,8 @@ const TemplateVariableInput = ({
                     key={option.value}
                     onMouseDown={(event) => {
                       event.preventDefault();
-                      insertOption(option);
                     }}
+                    onClick={() => insertOption(option)}
                     role="option"
                     type="button"
                   >
@@ -360,7 +367,7 @@ const TemplateVariableInput = ({
         if (!nextOpen) setOpen(false);
       }}
       open={open}
-      overlayClassName={styles.templateVariablePopover}
+      classNames={{ root: styles.templateVariablePopover }}
       placement={multiline ? 'topLeft' : 'bottomLeft'}
       trigger="click"
     >

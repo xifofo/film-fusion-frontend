@@ -6,7 +6,9 @@ import {
   AUTOMATION_DELAY_MAX_SECONDS,
   formatAutomationDelay,
 } from '../automations/delay';
+import { resolveDefinitionParameters } from '../automations/management';
 import { executeAutomationAdvancedPreviewNode } from './advancedNodes';
+import { previewTorrentToMagnet } from './torrentToMagnet';
 import { executeAutomationVariablePreviewNode } from './variableNodes';
 
 export type RSSAutomationNodePreview = {
@@ -645,6 +647,26 @@ const previewNode = (
             : undefined,
         };
       }
+      case 'torrent_to_magnet': {
+        const input = resolveConfiguredString(context, config.url);
+        const output = previewTorrentToMagnet(
+          input,
+          config.include_trackers !== false,
+        );
+        const passthrough = output.metadata_available === false;
+        return {
+          active: true,
+          tone: 'success',
+          label: passthrough
+            ? '已有磁链，可直接传给下载节点'
+            : '将读取种子并转换磁力（示例数据）',
+          detail: passthrough
+            ? '仅解析磁链参数，未获取种子元数据'
+            : '以下为模拟输出；预览不下载种子，也不请求 115',
+          selectedPorts: ['success'],
+          output,
+        };
+      }
       case 'offline115': {
         const url = resolveConfiguredString(context, config.url);
         return {
@@ -657,14 +679,171 @@ const previewNode = (
         };
       }
       case 'offline115_openapi': {
-        const url = resolveConfiguredString(context, config.url);
+        const urls = resolveConfiguredString(context, config.url)
+          .split('\n')
+          .map((url) => url.trim())
+          .filter(Boolean);
+        if (urls.length === 0 || urls.length > 115)
+          throw new Error('每批需要 1 到 115 个下载链接');
+        if (urls.some((url) => !/^(https?:|ftp:|magnet:|ed2k:)/i.test(url)))
+          throw new Error('115 OpenAPI 不支持该下载协议');
+        const results = urls.map((url, index) => ({
+          state: true,
+          code: 0,
+          message: '',
+          url,
+          info_hash: `preview-hash-${index + 1}`,
+        }));
+        const response = { state: true, code: 0, message: '', data: results };
         return {
           active: true,
-          tone: url ? 'success' : 'warning',
-          label: '将通过 OpenAPI 提交到 115 离线',
-          detail: String(url || '下载 URL 尚未解析'),
-          selectedPorts: [url ? 'success' : 'failure'],
-          output: url,
+          tone: 'success',
+          label: `将提交 ${urls.length} 个 115 链接任务`,
+          detail: '以下为模拟响应；不会请求 115，也不代表已提交或已完成下载',
+          selectedPorts: ['success'],
+          output: {
+            ...response,
+            response,
+            preview: true,
+            cloud_storage_id: config.cloud_storage_id,
+            access_method: 'openapi',
+            directory_id: config.directory_id || '0',
+            submitted: true,
+            hashes: results.map((item) => item.info_hash),
+            ...(results.length === 1
+              ? { info_hash: results[0].info_hash }
+              : {}),
+            results,
+            failed_results: [],
+            success_count: results.length,
+            failure_count: 0,
+            partial: false,
+          },
+        };
+      }
+      case 'torrent115_openapi':
+      case 'offline115_bt_openapi':
+      case 'list115_tasks_openapi':
+      case 'quota115_openapi':
+      case 'delete115_task_openapi':
+      case 'clear115_tasks_openapi': {
+        const required = (field: string) => {
+          const value = resolveConfiguredString(context, config[field]);
+          if (!value) throw new Error(`115 参数 ${field} 尚未解析`);
+          return value;
+        };
+        let data: unknown = [];
+        let fields: Record<string, unknown> = {};
+        let label = '';
+        if (node.type === 'torrent115_openapi') {
+          fields = {
+            torrent_sha1: required('torrent_sha1'),
+            pick_code: required('pick_code'),
+            wanted: '0',
+          };
+          data = {
+            info_hash: 'preview-bt-hash',
+            torrent_name: '示例种子',
+            file_size: 1024,
+            file_count: 1,
+            torrent_filelist: [{ size: 1024, path: '示例.mkv', wanted: 1 }],
+          };
+          Object.assign(fields, data);
+          label = '将解析 115 账号内的 BT 种子';
+        } else if (node.type === 'offline115_bt_openapi') {
+          const hash = required('info_hash');
+          const wanted = required('wanted');
+          if (!/^\d+(,\d+)*$/.test(wanted))
+            throw new Error('下载文件索引应为 0,1,2 这样的格式');
+          required('torrent_sha1');
+          required('pick_code');
+          fields = {
+            info_hash: hash,
+            hashes: [hash],
+            submitted: true,
+            save_path: required('save_path'),
+            directory_id: config.directory_id || '0',
+          };
+          label = '将提交选择文件后的 115 BT 任务';
+        } else if (node.type === 'list115_tasks_openapi') {
+          const hash = config.info_hash ? required('info_hash') : '';
+          const task = {
+            info_hash: hash,
+            status: 2,
+            percentDone: 100,
+            file_id: 'preview-file-id',
+            name: '示例.mkv',
+            wp_path_id: '0',
+            size: 1024,
+          };
+          data = {
+            page: hash ? 1 : config.page || 1,
+            page_count: hash ? 1 : 0,
+            count: hash ? 1 : 0,
+            tasks: hash ? [task] : [],
+          };
+          fields = {
+            ...(data as Record<string, unknown>),
+            pages_checked: 1,
+            ...(hash
+              ? {
+                  task,
+                  info_hash: hash,
+                  hashes: [hash],
+                  matched: true,
+                  completed: true,
+                  status: 2,
+                  percent: 100,
+                  file_id: task.file_id,
+                  file_name: task.name,
+                  directory_id: '0',
+                }
+              : {}),
+          };
+          label = hash
+            ? '将按 Hash 跨页查找 115 任务'
+            : '将按页获取 115 任务列表';
+        } else if (node.type === 'quota115_openapi') {
+          data = { count: 100, surplus: 80, used: 20, package: [] };
+          fields = data as Record<string, unknown>;
+          label = '将读取 115 云下载配额';
+        } else if (node.type === 'delete115_task_openapi') {
+          fields = {
+            deleted: true,
+            info_hash: required('info_hash'),
+            delete_files: config.delete_files === true,
+          };
+          label = config.delete_files
+            ? '将删除指定 115 任务及源文件'
+            : '将删除指定 115 任务并保留文件';
+        } else {
+          const flag = Number(config.flag);
+          if (!Number.isInteger(flag) || flag < 0 || flag > 5)
+            throw new Error('请选择有效的清理范围');
+          fields = { cleared: true, flag };
+          label =
+            flag >= 4
+              ? '将清空所选范围的 115 任务及源文件'
+              : '将清空所选范围的 115 任务并保留文件';
+        }
+        const response = { state: true, code: 0, message: '', data };
+        return {
+          active: true,
+          tone: 'success',
+          label,
+          detail: '仅使用模拟响应演示变量流转；不会读取或修改真实 115 数据',
+          selectedPorts: ['success'],
+          output: {
+            ...response,
+            response,
+            ...fields,
+            preview: true,
+            cloud_storage_id: config.cloud_storage_id,
+            access_method: 'openapi',
+            ...(node.type === 'list115_tasks_openapi'
+              ? { responses: [response] }
+              : {}),
+          },
         };
       }
       case 'wait115':
@@ -675,6 +854,7 @@ const previewNode = (
           detail: '样本预览不会查询真实 115 任务',
           selectedPorts: ['success'],
           output: {
+            preview: true,
             completed: true,
             percent: 100,
             file_id: '运行时返回',
@@ -1117,6 +1297,27 @@ export const simulateRSSAutomation = (
   definition: RSSAutomationDefinition,
   item: Record<string, unknown>,
 ): RSSAutomationFlowPreview => {
+  try {
+    definition = resolveDefinitionParameters(definition);
+  } catch (error: any) {
+    return {
+      nodes: Object.fromEntries(
+        definition.nodes.map((node) => [
+          node.id,
+          {
+            active: false,
+            tone: 'warning',
+            label: '参数无效',
+            detail: error.message,
+            selectedPorts: [],
+          },
+        ]),
+      ),
+      activeEdgeIds: [],
+      activeNodeIds: [],
+      variables: {},
+    };
+  }
   const previews: Record<string, RSSAutomationNodePreview> = {};
   const activeEdgeIds = new Set<string>();
   const selectedPorts = new Map<string, string[]>();

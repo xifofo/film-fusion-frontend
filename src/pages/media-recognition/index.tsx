@@ -37,6 +37,7 @@ import {
   saveMediaRecognitionWords,
   validateMediaRecognitionCategoryConfig,
 } from '@/services/film-fusion';
+import MedianameWorkbench from './MedianameWorkbench';
 import RenameConfigSection from './RenameConfigSection';
 import {
   inspectRecognitionWords,
@@ -61,6 +62,10 @@ const ruleStyles: Record<MediaRecognitionRuleType, string> = {
 };
 
 const tmdbStatuses: Record<string, { label: string; className: string }> = {
+  request_error: { label: '请求错误', className: 'text-amber-700' },
+  not_identified: { label: '未识别', className: 'text-amber-700' },
+  review: { label: '需要复核', className: 'text-amber-700' },
+  compatible: { label: '可采用', className: 'text-amber-700' },
   skipped: {
     label: '未查询 TMDB',
     className:
@@ -113,11 +118,11 @@ const shadowStatuses: Record<string, { label: string; className: string }> = {
     className: 'bg-red-50 text-red-700 dark:bg-red-400/12 dark:text-red-200',
   },
   local_error: {
-    label: '本地影子失败',
+    label: 'medianame 识别失败',
     className: 'bg-red-50 text-red-700 dark:bg-red-400/12 dark:text-red-200',
   },
   local_unavailable: {
-    label: '本地影子未启用',
+    label: 'medianame 未启用',
     className:
       'bg-neutral-100 text-neutral-600 dark:bg-white/8 dark:text-white/65',
   },
@@ -378,10 +383,10 @@ const MediaRecognitionPage = () => {
               </span>
               <div>
                 <h2 className="m-0 text-sm font-semibold text-neutral-900 dark:text-white">
-                  MP2 / FilmFusion 影子对比
+                  medianame / MP2 识别详情对比
                 </h2>
                 <p className="mt-0.5 mb-0 text-xs text-neutral-400 dark:text-white/35">
-                  MP2 主结果 → FilmFusion 本地影子 → 字段差异
+                  medianame 识别 → MP2 对照 → 字段差异
                 </p>
               </div>
             </div>
@@ -485,7 +490,7 @@ const MediaRecognitionPage = () => {
                     填入示例
                   </Button>
                   <span className="text-xs text-neutral-400 dark:text-white/35">
-                    两边使用同一份页面草稿；结果始终以 MP2 为基准
+                    优先展示 medianame 识别，MP2 结果用于对照
                   </span>
                 </div>
               </div>
@@ -499,6 +504,10 @@ const MediaRecognitionPage = () => {
           )}
         </section>
 
+        <MedianameWorkbench />
+        <h2 className="text-lg font-semibold">
+          MP2 分类与重命名配置（原配置保留）
+        </h2>
         <RenameConfigSection />
 
         <section className="overflow-hidden rounded-2xl bg-white/82 shadow-[0_18px_55px_rgba(0,0,0,0.045)] backdrop-blur-xl dark:bg-white/[0.055]">
@@ -911,7 +920,7 @@ const ShadowEngineCard = ({
             : 'bg-violet-50 text-violet-700 dark:bg-violet-400/12 dark:text-violet-200',
         )}
       >
-        {primary ? '主结果' : '影子结果'}
+        {primary ? '优先展示' : '对照结果'}
       </span>
     </div>
 
@@ -952,7 +961,7 @@ const ShadowEngineCard = ({
   </section>
 );
 
-const ShadowComparisonResult = ({
+export const ShadowComparisonResult = ({
   result,
 }: {
   result: MediaRecognitionShadowTestResult;
@@ -966,7 +975,7 @@ const ShadowComparisonResult = ({
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 text-xs font-medium text-white dark:bg-white dark:text-neutral-950">
           <GitCompareArrows aria-hidden="true" className="size-3.5" />
-          MP2 优先影子对比
+          medianame 优先展示
         </span>
         <span className={cn(pillClass, status.className)}>{status.label}</span>
         {comparison.status === 'different' && (
@@ -977,23 +986,23 @@ const ShadowComparisonResult = ({
       </div>
 
       <p className="mt-0 mb-5 text-xs leading-5 text-neutral-500 dark:text-white/45">
-        MP2 先执行并作为对照基准；FilmFusion
-        随后使用相同输入与页面草稿运行，影子结果不会替换 MP2。
+        同一输入的 medianame 识别结果优先展示，MP2 放在右侧供对照。
+        实际整理使用哪个引擎，在整理页确认时选择。
       </p>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ShadowEngineCard
-          error={comparison.moviepilot_error}
+          error={comparison.local_error}
           primary
-          snapshot={comparison.moviepilot}
-          subtitle="MoviePilot / MP2 · 权威基准"
-          title="MP2 识别"
+          snapshot={comparison.local}
+          subtitle="medianame · 解析与 TMDB 识别"
+          title="medianame 识别"
         />
         <ShadowEngineCard
-          error={comparison.local_error}
-          snapshot={comparison.local}
-          subtitle="FilmFusion · 不影响主结果"
-          title="本地识别"
+          error={comparison.moviepilot_error}
+          snapshot={comparison.moviepilot}
+          subtitle="MoviePilot / MP2 · 对照"
+          title="MP2 识别"
         />
       </div>
 
@@ -1012,8 +1021,8 @@ const ShadowComparisonResult = ({
               <thead>
                 <tr className="text-neutral-400 dark:text-white/35">
                   <th className="w-36 px-4 py-2.5 font-medium">字段</th>
+                  <th className="px-4 py-2.5 font-medium">medianame</th>
                   <th className="px-4 py-2.5 font-medium">MP2</th>
-                  <th className="px-4 py-2.5 font-medium">FilmFusion 本地</th>
                 </tr>
               </thead>
               <tbody>
@@ -1023,10 +1032,10 @@ const ShadowComparisonResult = ({
                       {difference.label}
                     </td>
                     <td className="px-4 py-3 break-all text-neutral-600 dark:text-white/55">
-                      {optionalText(difference.moviepilot)}
+                      {optionalText(difference.local)}
                     </td>
                     <td className="px-4 py-3 break-all text-neutral-600 dark:text-white/55">
-                      {optionalText(difference.local)}
+                      {optionalText(difference.moviepilot)}
                     </td>
                   </tr>
                 ))}
@@ -1044,7 +1053,7 @@ const ShadowComparisonResult = ({
 
       <div className="mt-4 space-y-2">
         {result.local && (
-          <ResultDisclosure title="FilmFusion 本地识别执行详情">
+          <ResultDisclosure title="medianame 识别执行详情">
             <RecognitionResult result={result.local} />
           </ResultDisclosure>
         )}

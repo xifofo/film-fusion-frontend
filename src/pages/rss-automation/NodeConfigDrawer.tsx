@@ -47,6 +47,11 @@ import {
   automationListOperationOptions,
   automationSwitchOperatorOptions,
 } from './advancedNodes';
+import CloudDownload115Fields from './CloudDownload115Fields';
+import {
+  OPENAPI_115_CLOUD_NODES,
+  OPENAPI_115_WRITE_NODES,
+} from './cloudDownload115';
 import DirectoryIdInput from './DirectoryIdInput';
 import { NODE_LABELS } from './flow';
 import styles from './index.module.less';
@@ -80,7 +85,7 @@ type NodeConfigModalProps = {
 };
 
 export type NodeFieldReference = {
-  kind: 'item' | 'variable' | 'node' | 'each';
+  kind: 'item' | 'variable' | 'node' | 'each' | 'parameter';
   name: string;
   value: string;
   preview?: string;
@@ -639,7 +644,9 @@ const NodeConfigModal = ({
     };
     form.setFieldsValue({
       name: node.name || NODE_LABELS[node.type],
-      max_attempts: node.max_attempts || 1,
+      max_attempts: OPENAPI_115_WRITE_NODES.includes(node.type)
+        ? 1
+        : node.max_attempts || 1,
       ...config,
       delay_value: delay.value,
       delay_unit: delay.unit,
@@ -776,6 +783,9 @@ const NodeConfigModal = ({
       'policy',
       'target_id',
       'cloud_storage_id',
+      'file_id',
+      'new_name',
+      'delete_files',
       'url',
       'save_path',
       'category',
@@ -792,6 +802,12 @@ const NodeConfigModal = ({
       'ratio_limit',
       'seeding_time_limit',
       'directory_id',
+      'torrent_sha1',
+      'pick_code',
+      'info_hash',
+      'wanted',
+      'page',
+      'flag',
       'poll_interval_seconds',
       'max_wait_minutes',
       'image_url',
@@ -818,6 +834,7 @@ const NodeConfigModal = ({
       'content_type',
       'allow_private_network',
       'follow_redirects',
+      'include_trackers',
       'timeout_seconds',
     ];
     for (const key of configKeys) {
@@ -856,7 +873,7 @@ const NodeConfigModal = ({
           : {}),
       };
     }
-    if (node.type === 'http_request') {
+    if (node.type === 'http_request' || node.type === 'torrent_to_magnet') {
       config.headers = parseHTTPHeaders(values.headers_json);
     }
     if (
@@ -980,7 +997,11 @@ const NodeConfigModal = ({
       config.transform = { type: transformType, config: transformConfig };
     }
     const ui = { ...(node.ui || {}) };
-    if (node.type === 'offline115' || node.type === 'offline115_openapi') {
+    if (
+      node.type === 'offline115' ||
+      node.type === 'offline115_openapi' ||
+      node.type === 'offline115_bt_openapi'
+    ) {
       if (values.directory_path) {
         ui.directory_path = values.directory_path;
       } else {
@@ -999,6 +1020,15 @@ const NodeConfigModal = ({
 
   const renderConfig = () => {
     if (!node) return null;
+    if (OPENAPI_115_CLOUD_NODES.includes(node.type)) {
+      return (
+        <CloudDownload115Fields
+          type={node.type}
+          cloudStorages={cloudStorages}
+          references={fieldReferences}
+        />
+      );
+    }
     switch (node.type) {
       case 'delay':
         return (
@@ -2938,7 +2968,7 @@ const NodeConfigModal = ({
           <>
             <Text className={styles.nodeConfigHint} type="secondary">
               {isOpenAPI
-                ? '使用 115 开放平台 AccessToken 提交离线任务。'
+                ? '支持磁力链、HTTP(S)、FTP 和电驴链接，每行一个，每批最多 115 个。响应保留每条链接的结果；部分成功走失败出口，避免重复提交。'
                 : '使用 115 网页 Cookie 提交离线任务。'}
             </Text>
             <Form.Item
@@ -2989,7 +3019,7 @@ const NodeConfigModal = ({
           <>
             <Alert
               className={styles.nodeConfigFull}
-              description="直接连接在 115 Cookie/OpenAPI 离线节点的“成功”出口。任务提交后会持久化查询进度，服务重启也会继续等待。"
+              description="连接在 115 链接任务、BT 任务或按 Hash 查询任务节点的“成功”出口。持续按 info_hash 查询，直到下载成功并返回文件 ID；服务重启后继续等待。"
               title="只有 115 云下载真正完成后，才会走成功出口。"
               showIcon
               type="info"
@@ -3016,7 +3046,7 @@ const NodeConfigModal = ({
           <>
             <Alert
               className={styles.nodeConfigFull}
-              description="通常连接在“等待 115 下载完成”的成功出口，并把该节点的 file_id 插入下方。样本预览只展示将要使用的 ID 和名称，不会调用真实 115 接口。"
+              description="连接“等待 115 下载完成”的成功出口，插入它的 file_id，并选择同一个 115 账号。info_hash 是下载任务标识，不能直接作为文件 ID；多文件种子可能返回文件夹 ID，此时重命名的是文件夹。"
               title="通过 115 OpenAPI 重命名文件或文件夹"
               showIcon
               type="info"
@@ -3530,6 +3560,74 @@ const NodeConfigModal = ({
             </Form.Item>
           </>
         );
+      case 'torrent_to_magnet':
+        return (
+          <>
+            <Text className={styles.nodeConfigFull} type="secondary">
+              读取 RSS 种子并在本地转换，无需 115 账号或上传种子。把输出 magnet
+              接到“115 添加链接任务”的下载链接。 支持 v1
+              和混合种子；已有磁链直接通过。私有种子会返回提示，转换成功不代表下载成功。
+            </Text>
+            <TemplateConfigField
+              field="url"
+              insertMode="template"
+              label="种子地址或磁力链接"
+              placeholder="$item.download_url"
+              protocol={inputProtocol('url')}
+              references={fieldReferences}
+              required
+            />
+            <Form.Item
+              label="磁链携带 Tracker"
+              name="include_trackers"
+              valuePropName="checked"
+              extra="Tracker 可能包含站点 passkey；开启后会随磁链传给后续下载节点。"
+            >
+              <Switch />
+            </Form.Item>
+            <Form.Item
+              className={styles.nodeConfigFull}
+              label="种子请求头 JSON（可选）"
+              name="headers_json"
+              extra="需要登录的种子地址可配置 Cookie、Referer 等；请求头值支持变量。配置会保存在流程定义中。"
+              rules={[
+                {
+                  validator: (_, value) => {
+                    try {
+                      parseHTTPHeaders(value);
+                      return Promise.resolve();
+                    } catch (error: unknown) {
+                      return Promise.reject(error);
+                    }
+                  },
+                },
+              ]}
+            >
+              <TemplateVariableInput
+                ariaLabel="种子请求头 JSON"
+                insertMode="template"
+                multiline
+                placeholder='{"Referer":"https://example.com"}'
+                references={fieldReferences}
+              />
+            </Form.Item>
+            <Form.Item
+              label="跟随同源跳转"
+              name="follow_redirects"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Form.Item>
+            <Form.Item
+              label="允许访问内网"
+              name="allow_private_network"
+              valuePropName="checked"
+              extra="种子地址来自 NAS 或内网 RSS 服务时开启。单个种子最大 8 MiB。"
+            >
+              <Switch />
+            </Form.Item>
+          </>
+        );
       case 'http_request':
         return (
           <>
@@ -3726,6 +3824,18 @@ const NodeConfigModal = ({
           layout="vertical"
           preserve={false}
         >
+          {Object.keys(node.parameter_bindings || {}).length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              title="这些字段使用流程参数"
+              description={`${Object.entries(node.parameter_bindings || {})
+                .map(([field, name]) => `${field} → ${name}`)
+                .join(
+                  '；',
+                )}。修改字段会同步修改对应参数；其他绑定节点也会使用新值。`}
+            />
+          )}
           {preview && (
             <Alert
               className={styles.nodeConfigPreview}
@@ -3798,6 +3908,7 @@ const NodeConfigModal = ({
                     disabled={[
                       'moviepilot_transfer',
                       'delete_qbittorrent',
+                      ...OPENAPI_115_WRITE_NODES,
                       'organize_strm',
                       'strm_regenerate',
                       'http_request',
@@ -3806,6 +3917,7 @@ const NodeConfigModal = ({
                       [
                         'moviepilot_transfer',
                         'delete_qbittorrent',
+                        ...OPENAPI_115_WRITE_NODES,
                         'organize_strm',
                         'strm_regenerate',
                         'http_request',
@@ -3824,6 +3936,7 @@ const NodeConfigModal = ({
                   'delete_qbittorrent',
                   'offline115',
                   'offline115_openapi',
+                  ...OPENAPI_115_CLOUD_NODES,
                   'wait115',
                   'rename115_openapi',
                   'moviepilot_title_recognize',
@@ -3835,6 +3948,7 @@ const NodeConfigModal = ({
                   'strm_regenerate',
                   'emby_refresh_wait',
                   'http_request',
+                  'torrent_to_magnet',
                   'notification',
                 ].includes(node.type) && (
                   <Form.Item
@@ -3877,10 +3991,15 @@ const ActionFields = ({
       label="下载 URL"
       name="url"
       rules={[{ required: true }]}
-      extra="选择 enclosure@url 等解析出的下载字段，通常为 download_url。"
+      extra={
+        directoryAccessMethod === 'openapi'
+          ? '选择 RSS 下载字段或输入链接；多链接请换行分隔，每批最多 115 个。'
+          : '选择 enclosure@url 等解析出的下载字段，通常为 download_url。'
+      }
     >
       <TemplateVariableInput
         ariaLabel="下载 URL"
+        multiline={directoryAccessMethod === 'openapi'}
         placeholder="点击“插入变量”选择 RSS 下载字段或上游变量"
         references={fieldReferences}
       />

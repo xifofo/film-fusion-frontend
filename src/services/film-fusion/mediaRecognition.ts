@@ -109,7 +109,7 @@ export type MediaRecognitionCandidate = MediaRecognitionMediaInfo & {
 };
 
 export type MediaRecognitionTestResult = {
-  engine: 'local';
+  engine: 'local' | 'medianame';
   mode: 'file' | 'title';
   word_result: {
     original: string;
@@ -121,6 +121,10 @@ export type MediaRecognitionTestResult = {
   media_info: MediaRecognitionMediaInfo;
   candidates: MediaRecognitionCandidate[];
   tmdb_status:
+    | 'compatible'
+    | 'review'
+    | 'not_identified'
+    | 'request_error'
     | 'skipped'
     | 'not_configured'
     | 'matched'
@@ -133,7 +137,7 @@ export type MediaRecognitionTestResult = {
 };
 
 export type MediaRecognitionShadowSnapshot = {
-  engine: 'moviepilot' | 'local';
+  engine: 'moviepilot' | 'local' | 'medianame';
   media_type?: string;
   title?: string;
   original_title?: string;

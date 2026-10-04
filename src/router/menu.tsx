@@ -15,6 +15,7 @@ import {
   Link2,
   ListRestart,
   Route,
+  Rss,
   ScanSearch,
   Settings,
   SquareTerminal,
@@ -143,6 +144,11 @@ export const menuItems: AppMenuItem[] = [
     name: '自动化中心',
     icon: Route,
     path: '/automations',
+  },
+  {
+    name: 'RSS 中转',
+    icon: Rss,
+    path: '/rss-relay',
   },
   {
     name: '系统信息',

@@ -35,6 +35,12 @@ describe('findMenuTrail', () => {
     ]);
   });
 
+  it('exposes RSS relay independently from automations', () => {
+    expect(findMenuTrail('/rss-relay').map((item) => item.name)).toEqual([
+      'RSS 中转',
+    ]);
+  });
+
   it('exposes downloader account settings', () => {
     expect(findMenuTrail('/downloaders').map((item) => item.name)).toEqual([
       '下载器设置',

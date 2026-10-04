@@ -8,14 +8,21 @@ import {
   automationDelayParts,
   toAutomationDelaySeconds,
 } from './delay';
+import { resolveDefinitionParameters } from './management';
 
-export type RecognitionMode = 'none' | 'local' | 'moviepilot' | 'shadow';
+export type RecognitionMode =
+  | 'none'
+  | 'local'
+  | 'moviepilot'
+  | 'shadow'
+  | 'medianame';
 
 export type AutomationActionValues = {
   delay_value: number;
   delay_unit: AutomationDelayUnit;
   recognition: RecognitionMode;
   organize_enabled: boolean;
+  organize_dry_run: boolean;
   cloud_directory_id?: number;
   media_type: 'auto' | 'movie' | 'tv';
   category?: string;
@@ -39,6 +46,7 @@ export const defaultAutomationActions = (): AutomationActionValues => ({
   delay_unit: 'minutes',
   recognition: 'shadow',
   organize_enabled: false,
+  organize_dry_run: false,
   media_type: 'auto',
   notification_enabled: true,
   notification_title: '115 目录发现新媒体',
@@ -83,6 +91,7 @@ export const buildAutomationDefinition = (
       max_attempts: 3,
     });
   } else if (
+    values.recognition === 'medianame' ||
     values.recognition === 'moviepilot' ||
     values.recognition === 'shadow'
   ) {
@@ -92,7 +101,9 @@ export const buildAutomationDefinition = (
       name:
         values.recognition === 'shadow'
           ? '影子识别（MP2 优先）'
-          : '仅 MP2 识别',
+          : values.recognition === 'medianame'
+            ? 'medianame 识别'
+            : '仅 MP2 识别',
       position: { x: 40 + nodes.length * 260, y: 120 },
       config: { recognition_source: values.recognition },
       max_attempts: 3,
@@ -107,6 +118,9 @@ export const buildAutomationDefinition = (
       position: { x: 40 + nodes.length * 260, y: 120 },
       config: {
         cloud_directory_id: values.cloud_directory_id,
+        dry_run: values.organize_dry_run,
+        recognition_source:
+          values.recognition === 'none' ? '' : values.recognition,
         media_type: values.media_type || 'auto',
         category: values.category?.trim() || '',
       },
@@ -155,7 +169,9 @@ export const readAutomationActions = (
   const fallback = defaultAutomationActions();
   if (!workflow?.definition_json) return fallback;
   try {
-    const definition = JSON.parse(workflow.definition_json) as {
+    const definition = resolveDefinitionParameters(
+      JSON.parse(workflow.definition_json),
+    ) as {
       nodes?: Array<{ type?: string; config?: unknown }>;
     };
     if (!Array.isArray(definition.nodes)) return fallback;
@@ -178,9 +194,11 @@ export const readAutomationActions = (
     const notificationConfig = asRecord(notification?.config);
     const moviePilotConfig = asRecord(moviePilot?.config);
     const moviePilotRecognition =
-      moviePilotConfig.recognition_source === 'shadow'
-        ? 'shadow'
-        : 'moviepilot';
+      moviePilotConfig.recognition_source === 'medianame'
+        ? 'medianame'
+        : moviePilotConfig.recognition_source === 'shadow'
+          ? 'shadow'
+          : 'moviepilot';
     return {
       delay_value: delay.value,
       delay_unit: delay.unit,
@@ -190,6 +208,7 @@ export const readAutomationActions = (
           ? moviePilotRecognition
           : 'none',
       organize_enabled: Boolean(organize),
+      organize_dry_run: organizeConfig.dry_run === true,
       cloud_directory_id: asNumber(organizeConfig.cloud_directory_id),
       media_type:
         organizeConfig.media_type === 'movie' ||
@@ -213,4 +232,96 @@ export const readAutomationActions = (
   } catch {
     return fallback;
   }
+};
+
+export const editAutomationDefinition = (
+  values: AutomationActionValues,
+  workflow?: AutomationWorkflow,
+): AutomationDefinition => {
+  if (!workflow) return buildAutomationDefinition(values);
+  const original = JSON.parse(workflow.definition_json) as AutomationDefinition;
+  const initial = readAutomationActions(workflow);
+  if (
+    (Object.keys(initial) as (keyof AutomationActionValues)[]).every(
+      (key) => (values[key] ?? initial[key]) === initial[key],
+    )
+  )
+    return structuredClone(original);
+  const previousManaged = buildAutomationDefinition(initial);
+  const next = buildAutomationDefinition(values);
+  const parameters = { ...original.parameters };
+  const topology = (definition: AutomationDefinition) =>
+    JSON.stringify({
+      nodes: definition.nodes.map(({ id, type }) => ({ id, type })),
+      edges: definition.edges.map(
+        ({ source, source_port, target, target_port }) => ({
+          source,
+          source_port,
+          target,
+          target_port,
+        }),
+      ),
+    });
+  const custom = topology(original) !== topology(previousManaged);
+  if (custom && topology(next) !== topology(previousManaged)) {
+    throw new Error(
+      '此流程包含自定义节点或连线，不能在简化编辑器中增删步骤；可以通过流程参数调整配置。',
+    );
+  }
+  const mergeNode = (
+    node: AutomationNodeDefinition,
+    previous?: AutomationNodeDefinition,
+  ) => {
+    if (!previous) return node;
+    const baseline = previousManaged.nodes.find(
+      (item) => item.id === node.id && item.type === node.type,
+    );
+    const config = { ...previous.config };
+    for (const [field, after] of Object.entries(node.config || {})) {
+      if (baseline && baseline.config?.[field] === after) continue;
+      const raw = previous.config?.[field];
+      const parameter =
+        previous.parameter_bindings?.[field] ||
+        (typeof raw === 'string' && /^\$params\.[A-Za-z_]\w*$/.test(raw)
+          ? raw.slice(8)
+          : undefined);
+      if (parameter) parameters[parameter] = after as string | number | boolean;
+      else config[field] = after;
+    }
+    return { ...node, ...previous, config };
+  };
+  const nodes = custom
+    ? original.nodes.map((previous) => {
+        const node =
+          next.nodes.find(
+            (item) => item.id === previous.id && item.type === previous.type,
+          ) ||
+          (original.nodes.filter((item) => item.type === previous.type)
+            .length === 1
+            ? next.nodes.find((item) => item.type === previous.type)
+            : undefined);
+        return node ? mergeNode(node, previous) : previous;
+      })
+    : next.nodes.map((node) =>
+        mergeNode(
+          node,
+          original.nodes.find(
+            (item) => item.id === node.id && item.type === node.type,
+          ),
+        ),
+      );
+  const sameNodes =
+    original.nodes.length === nodes.length &&
+    original.nodes.every((node) =>
+      nodes.some((item) => item.id === node.id && item.type === node.type),
+    );
+  return {
+    ...original,
+    ...next,
+    nodes,
+    edges: custom || sameNodes ? original.edges : next.edges,
+    parameters,
+    metadata: original.metadata,
+    viewport: original.viewport || next.viewport,
+  };
 };

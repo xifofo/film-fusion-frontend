@@ -26,6 +26,34 @@ describe('115 directory automation workflow', () => {
     ).toBe(true);
   });
 
+  it('keeps medianame selected for recognition and organizing after round-trip', () => {
+    const definition = buildAutomationDefinition({
+      ...defaultAutomationActions(),
+      recognition: 'medianame',
+      organize_enabled: true,
+      organize_dry_run: true,
+      cloud_directory_id: 9,
+    });
+    for (const node of definition.nodes.filter((node) =>
+      ['moviepilot_recognize', 'organize_strm'].includes(node.type),
+    ))
+      expect(node.config?.recognition_source).toBe('medianame');
+    expect(
+      readAutomationActions({
+        definition_json: JSON.stringify(definition),
+      } as AutomationWorkflow).recognition,
+    ).toBe('medianame');
+    expect(
+      definition.nodes.find((node) => node.type === 'organize_strm')?.config
+        ?.dry_run,
+    ).toBe(true);
+    expect(
+      readAutomationActions({
+        definition_json: JSON.stringify(definition),
+      } as AutomationWorkflow).organize_dry_run,
+    ).toBe(true);
+  });
+
   it('allows a monitor that only records events', () => {
     const definition = buildAutomationDefinition({
       ...defaultAutomationActions(),

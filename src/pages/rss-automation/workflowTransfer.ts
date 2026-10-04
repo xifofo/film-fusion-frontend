@@ -4,6 +4,8 @@ import type {
   RSSAutomationNodeDefinition,
   RSSAutomationNodeType,
 } from '@/services/film-fusion';
+import { resolveDefinitionParameters } from '../automations/management';
+import { OPENAPI_115_CLOUD_NODES } from './cloudDownload115';
 import {
   automationJSONPointerError,
   automationVariableNameError,
@@ -43,6 +45,8 @@ const nodeTypes: RSSAutomationNodeType[] = [
   'delete_qbittorrent',
   'offline115',
   'offline115_openapi',
+  'torrent_to_magnet',
+  ...OPENAPI_115_CLOUD_NODES,
   'wait115',
   'rename115_openapi',
   'moviepilot_title_recognize',
@@ -628,7 +632,21 @@ export const validateWorkflowTransferDefinition = (
   if (!Array.isArray(value.edges)) throw new Error('流程缺少连线列表');
   if (value.edges.length > 500) throw new Error('流程连线不能超过 500 条');
 
-  const nodes = value.nodes.map(parseNode);
+  let nodes: RSSAutomationNodeDefinition[];
+  if (
+    value.parameters !== undefined ||
+    value.nodes.some((node) => isRecord(node) && node.parameter_bindings)
+  ) {
+    const original = value as unknown as RSSAutomationDefinition;
+    const resolved = resolveDefinitionParameters(original);
+    nodes = resolved.nodes.map(parseNode).map((node, index) => ({
+      ...node,
+      config: structuredClone(original.nodes[index].config || {}),
+      parameter_bindings: original.nodes[index].parameter_bindings
+        ? { ...original.nodes[index].parameter_bindings }
+        : undefined,
+    }));
+  } else nodes = value.nodes.map(parseNode);
   const nodeIDs = new Set(nodes.map((node) => node.id));
   if (nodeIDs.size !== nodes.length) throw new Error('流程中存在重复节点 ID');
   if (nodes.filter((node) => node.type === 'trigger').length !== 1) {
@@ -706,11 +724,28 @@ export const validateWorkflowTransferDefinition = (
     nodes,
     edges,
     ...(viewport ? { viewport } : {}),
+    ...(value.parameters !== undefined
+      ? {
+          parameters: structuredClone(
+            value.parameters,
+          ) as RSSAutomationDefinition['parameters'],
+        }
+      : {}),
+    ...(isRecord(value.metadata)
+      ? { metadata: structuredClone(value.metadata) }
+      : {}),
   };
 };
 
 const makePortable = (definition: RSSAutomationDefinition) => {
-  const portable = validateWorkflowTransferDefinition(definition);
+  // The legacy workflow-only format exports effective values. The template
+  // library format preserves reusable parameters and clears their values.
+  const effective = resolveDefinitionParameters(definition);
+  delete effective.parameters;
+  effective.nodes = effective.nodes.map(
+    ({ parameter_bindings: _bindings, ...node }) => node,
+  );
+  const portable = validateWorkflowTransferDefinition(effective);
   const removed: WorkflowRemovedBindings = {
     qbittorrent_targets: 0,
     offline115_accounts: 0,
@@ -729,12 +764,14 @@ const makePortable = (definition: RSSAutomationDefinition) => {
     if (
       node.type === 'offline115' ||
       node.type === 'offline115_openapi' ||
-      node.type === 'rename115_openapi'
+      node.type === 'rename115_openapi' ||
+      OPENAPI_115_CLOUD_NODES.includes(node.type)
     ) {
       if ('cloud_storage_id' in config) {
         if (
           node.type === 'offline115_openapi' ||
-          node.type === 'rename115_openapi'
+          node.type === 'rename115_openapi' ||
+          OPENAPI_115_CLOUD_NODES.includes(node.type)
         ) {
           removed.offline115_openapi_accounts += 1;
         } else {
@@ -743,7 +780,11 @@ const makePortable = (definition: RSSAutomationDefinition) => {
         delete config.cloud_storage_id;
       }
     }
-    if (node.type === 'offline115' || node.type === 'offline115_openapi') {
+    if (
+      node.type === 'offline115' ||
+      node.type === 'offline115_openapi' ||
+      node.type === 'offline115_bt_openapi'
+    ) {
       if ('directory_id' in config) {
         removed.offline115_directories += 1;
         delete config.directory_id;
@@ -782,11 +823,15 @@ export const getWorkflowImportRequirements = (
   ).length,
   offline115OpenAPIAccounts: definition.nodes.filter(
     (node) =>
-      node.type === 'offline115_openapi' || node.type === 'rename115_openapi',
+      node.type === 'offline115_openapi' ||
+      node.type === 'rename115_openapi' ||
+      OPENAPI_115_CLOUD_NODES.includes(node.type),
   ).length,
   directorySelections: definition.nodes.filter(
     (node) =>
-      (node.type === 'offline115' || node.type === 'offline115_openapi') &&
+      (node.type === 'offline115' ||
+        node.type === 'offline115_openapi' ||
+        node.type === 'offline115_bt_openapi') &&
       (node.config?.directory_id !== undefined || node.ui?.directory_path),
   ).length,
   organizeDirectories: definition.nodes.filter(

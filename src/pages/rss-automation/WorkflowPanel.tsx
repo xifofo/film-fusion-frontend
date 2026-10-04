@@ -68,6 +68,7 @@ import {
   updateRSSAutomationWorkflow,
   validateRSSAutomationWorkflow,
 } from '@/services/film-fusion';
+import AutomationParametersModal from '../automations/AutomationParametersModal';
 import EntryHistoryPanel from './EntryHistoryPanel';
 import FlowNode from './FlowNode';
 import {
@@ -387,6 +388,10 @@ const WorkflowPanelInner = ({
   }>();
   const [validation, setValidation] = useState<RSSAutomationValidationResult>();
   const [saving, setSaving] = useState(false);
+  const [parametersOpen, setParametersOpen] = useState(false);
+  const [definitionExtras, setDefinitionExtras] = useState<
+    Pick<RSSAutomationDefinition, 'parameters' | 'metadata'>
+  >({});
   const [layingOut, setLayingOut] = useState(false);
   const [previewItemIndex, setPreviewItemIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -425,6 +430,10 @@ const WorkflowPanelInner = ({
 
   const loadDefinition = useCallback(
     (definition: RSSAutomationDefinition) => {
+      setDefinitionExtras({
+        parameters: definition.parameters,
+        metadata: definition.metadata,
+      });
       const flow = definitionToFlow(definition);
       setNodes(flow.nodes);
       setEdges(flow.edges);
@@ -494,10 +503,24 @@ const WorkflowPanelInner = ({
     () => nodes.find((node) => node.id === selectedNodeId)?.data.definition,
     [nodes, selectedNodeId],
   );
+  const editorNode = useMemo(() => {
+    if (!selectedNode) return undefined;
+    const config = { ...selectedNode.config };
+    for (const [field, name] of Object.entries(
+      selectedNode.parameter_bindings || {},
+    )) {
+      if (Object.hasOwn(definitionExtras.parameters || {}, name))
+        config[field] = definitionExtras.parameters?.[name];
+    }
+    return { ...selectedNode, config };
+  }, [selectedNode, definitionExtras.parameters]);
 
   const previewDefinition = useMemo(
-    () => flowToDefinition(nodes, edges, viewport),
-    [edges, nodes, viewport],
+    () => ({
+      ...flowToDefinition(nodes, edges, viewport),
+      ...definitionExtras,
+    }),
+    [edges, nodes, viewport, definitionExtras],
   );
   const displayedValidation = useMemo(
     () =>
@@ -524,6 +547,20 @@ const WorkflowPanelInner = ({
       seen.add(reference.value);
       references.push(reference);
     };
+
+    for (const [name, value] of Object.entries(
+      definitionExtras.parameters || {},
+    )) {
+      addReference({
+        kind: 'parameter',
+        name,
+        value: `$params.${name}`,
+        preview: String(value),
+        previewAvailable: true,
+        previewValue: value,
+        description: '集中配置的流程参数',
+      });
+    }
 
     const sampleFields =
       effectivePreviewFeed?.items[previewItemIndex]?.fields ||
@@ -679,15 +716,29 @@ const WorkflowPanelInner = ({
         }
       }
       if (
-        ['qbittorrent', 'offline115', 'offline115_openapi'].includes(
-          selectedNode.type,
-        )
+        [
+          'qbittorrent',
+          'offline115',
+          'offline115_openapi',
+          'torrent_to_magnet',
+        ].includes(selectedNode.type)
       ) {
         return String(selectedNode.config?.url || '').trim();
       }
       if (selectedNode.type === 'moviepilot_title_recognize') {
         return String(selectedNode.config?.input || '').trim();
       }
+      if (
+        [
+          'offline115_bt_openapi',
+          'list115_tasks_openapi',
+          'delete115_task_openapi',
+        ].includes(selectedNode.type)
+      ) {
+        return String(selectedNode.config?.info_hash || '').trim();
+      }
+      if (selectedNode.type === 'torrent115_openapi')
+        return String(selectedNode.config?.torrent_sha1 || '').trim();
       if (selectedNode.type === 'rename115_openapi') {
         return String(selectedNode.config?.file_id || '').trim();
       }
@@ -746,6 +797,7 @@ const WorkflowPanelInner = ({
     selectedNodeId,
     simulation?.variables,
     nodeProtocols,
+    definitionExtras.parameters,
   ]);
   const routingPlan = useMemo(
     () => buildFlowRoutingPlan(nodes, edges),
@@ -922,6 +974,23 @@ const WorkflowPanelInner = ({
   };
 
   const updateNode = (definition: RSSAutomationNodeDefinition) => {
+    if (definition.parameter_bindings) {
+      setDefinitionExtras((current) => {
+        const parameters = { ...current.parameters };
+        for (const [field, name] of Object.entries(
+          definition.parameter_bindings || {},
+        )) {
+          const value = definition.config?.[field];
+          if (
+            typeof value === 'string' ||
+            typeof value === 'number' ||
+            typeof value === 'boolean'
+          )
+            parameters[name] = value;
+        }
+        return { ...current, parameters };
+      });
+    }
     setNodes((current) =>
       current.map((node) =>
         node.id === definition.id
@@ -1250,6 +1319,17 @@ const WorkflowPanelInner = ({
       }`}
     >
       {contextHolder}
+      {parametersOpen && (
+        <AutomationParametersModal
+          definition={currentDefinition()}
+          onCancel={() => setParametersOpen(false)}
+          onSave={async (definition) => {
+            loadDefinition(definition);
+            setParametersOpen(false);
+            messageApi.success('参数已应用到画布，请保存流程');
+          }}
+        />
+      )}
       <input
         accept=".json,application/json"
         hidden
@@ -1544,6 +1624,9 @@ const WorkflowPanelInner = ({
                       />
                     </Tooltip>
                     <span className={styles.flowCanvasDivider} />
+                    <Button onClick={() => setParametersOpen(true)}>
+                      流程参数
+                    </Button>
                     {mode === 'manage' ? (
                       <Button
                         aria-label="保存流程"
@@ -1765,7 +1848,7 @@ const WorkflowPanelInner = ({
         cloudDirectories={cloudDirectories}
         cloudStorages={cloudStorages}
         fieldReferences={fieldReferences}
-        node={selectedNode}
+        node={editorNode}
         nodeProtocol={nodeProtocols.find(
           (protocol) => protocol.type === selectedNode?.type,
         )}

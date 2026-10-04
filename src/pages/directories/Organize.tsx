@@ -57,6 +57,10 @@ import { useNavigate, useParams } from 'react-router';
 import ConsolePage from '@/components/ConsolePage';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import {
+  medianameStatusLabels,
+  PipelineDiagnostics,
+} from '@/pages/media-recognition/MedianameWorkbench';
+import {
   assignOrganizePreviewTaskTMDB,
   clearOrganizePreviewTasks,
   createOrganizePreviewTasks,
@@ -71,6 +75,16 @@ import {
   requeueOrganizePreviewTask,
   subscribeOrganizePreviewTaskEvents,
 } from '@/services/film-fusion';
+import {
+  canApplyUpgrade,
+  upgradeActionLabels,
+} from '@/services/film-fusion/upgrade';
+import OrganizeEngineConfirmation, {
+  organizeEngineLabel,
+} from './components/OrganizeEngineConfirmation';
+import OrganizeUpgradeControls from './components/OrganizeUpgradeControls';
+import UpgradeComparison from './components/UpgradeComparison';
+import { parseUpgradePolicy } from './components/UpgradePolicyEditor';
 
 const ROOT_KEY = '0';
 const PAGE_LIMIT = 1150;
@@ -87,7 +101,8 @@ const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
 const DEFAULT_PREVIEW_TASK_LIMIT = 100;
 const MAX_PREVIEW_TASK_LIMIT = 1000;
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
-type RecognitionSource = 'moviepilot' | 'local' | 'shadow';
+
+type RecognitionSource = 'moviepilot' | 'local' | 'shadow' | 'medianame';
 type PreviewQueueOptions = {
   mediaType: OrganizeMediaType;
   recognitionSource: RecognitionSource;
@@ -120,7 +135,8 @@ const recognitionSourceOptions: Array<{
   value: RecognitionSource;
 }> = [
   { label: '仅 MP2', value: 'moviepilot' },
-  { label: '仅 FilmFusion', value: 'local' },
+  { label: '旧本地（兼容）', value: 'local' },
+  { label: 'medianame', value: 'medianame' },
   { label: '影子模式', value: 'shadow' },
 ];
 const recognitionSourcePresentation: Record<
@@ -128,7 +144,8 @@ const recognitionSourcePresentation: Record<
   { label: string; color: string }
 > = {
   moviepilot: { label: '仅 MP2', color: 'blue' },
-  local: { label: '仅 FilmFusion', color: 'geekblue' },
+  local: { label: '旧本地（兼容）', color: 'geekblue' },
+  medianame: { label: 'medianame', color: 'cyan' },
   shadow: { label: '影子模式', color: 'purple' },
 };
 type FilenameRegexConfig = {
@@ -222,7 +239,11 @@ type OrganizeDirDebug = NonNullable<
   API.Organize115CookieResult['dir_debug']
 >[number];
 
-type OrganizeItemRow = OrganizeItem & { __folder_id?: string };
+type OrganizeItemRow = OrganizeItem & {
+  __folder_id?: string;
+  __plan_item?: OrganizeItem;
+};
+type RecognitionDisplaySource = 'medianame' | 'moviepilot';
 type OrganizeDirDebugRow = OrganizeDirDebug & { __folder_id?: string };
 type OrganizeShadowFieldRow = {
   key: string;
@@ -372,7 +393,9 @@ function renderOrganizeShadowStatus(
       ? 'MP2 失败'
       : comparison.status === 'local_unavailable'
         ? '本地不可用'
-        : '本地失败';
+        : comparison.medianame
+          ? 'medianame 失败'
+          : '本地失败';
   return (
     <Tag color="error" icon={<CloseCircleOutlined />}>
       {label}
@@ -397,7 +420,7 @@ const organizeShadowFieldColumns: TableColumnsType<OrganizeShadowFieldRow> = [
     ),
   },
   {
-    title: 'FilmFusion（影子）',
+    title: 'medianame（影子）',
     dataIndex: 'local',
     key: 'local',
     width: 320,
@@ -422,8 +445,22 @@ const organizeShadowFieldColumns: TableColumnsType<OrganizeShadowFieldRow> = [
   },
 ];
 
-function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
+function renderOrganizeItemExpandedRow(displayRow: OrganizeItemRow) {
+  const row = displayRow.__plan_item || displayRow;
+  if (!row.upgrade) return renderOrganizeItemDiagnostics(displayRow);
+  return (
+    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <UpgradeComparison decision={row.upgrade} />
+      {renderOrganizeItemDiagnostics(displayRow)}
+    </Space>
+  );
+}
+
+function renderOrganizeItemDiagnostics(displayRow: OrganizeItemRow) {
+  const row = displayRow.__plan_item || displayRow;
   const comparison = row.shadow_comparison;
+  if (row.medianame || comparison?.medianame)
+    return <PipelineDiagnostics item={row} />;
   if (!comparison) {
     return (
       <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
@@ -447,7 +484,7 @@ function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
         }
         title={
           comparison.matched
-            ? 'MP2 与 FilmFusion 的整理结果一致'
+            ? 'MP2 与 medianame 的整理结果一致'
             : errors.length
               ? '影子对比未完整完成'
               : `发现 ${comparison.differences?.length || 0} 项差异`
@@ -455,7 +492,7 @@ function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
         description={
           errors.length
             ? errors.join('；')
-            : 'MP2 始终作为主结果，FilmFusion 仅跟跑并记录差异。'
+            : 'MP2 始终作为主结果，medianame 仅生成独立计划并记录差异。'
         }
       />
       <Table<OrganizeShadowFieldRow>
@@ -479,6 +516,29 @@ function renderOrganizeItemExpandedRow(row: OrganizeItemRow) {
 
 function getOrganizeItemRowKey(row: OrganizeItemRow): string {
   return `${row.__folder_id || ''}::${row.file_id}`;
+}
+
+// Display a complete branch without changing the saved plan or selection source.
+export function buildOrganizeDisplayRow(
+  row: OrganizeItemRow,
+  source: RecognitionDisplaySource,
+): OrganizeItemRow {
+  if (source === 'moviepilot') return row;
+  const medianame = row.shadow_comparison?.medianame;
+  return {
+    ...medianame,
+    engine: 'medianame',
+    file_id: row.file_id,
+    file_name: row.file_name,
+    file_size: row.file_size,
+    pickcode: row.pickcode,
+    error: medianame
+      ? medianame.error
+      : '此条目没有 medianame 识别结果，请重新预览',
+    shadow_comparison: row.shadow_comparison,
+    __folder_id: row.__folder_id,
+    __plan_item: row,
+  };
 }
 
 function flattenOrganizeItems(
@@ -510,6 +570,11 @@ function flattenOrganizeMediaItems(
 
 function getInitialPreviewSelection(result: API.Organize115CookieResult) {
   const rows = flattenOrganizeMediaItems(result);
+  if (result.upgrade_policy?.enabled)
+    return {
+      activeVersionKey: ALL_VERSION_KEY,
+      selectedRowKeys: getDefaultSelectedItemKeys(rows),
+    };
   const versionGroups = result.version_groups || [];
   if (versionGroups.length < 2) {
     return {
@@ -618,7 +683,9 @@ const renderFileSize = (value?: number) => {
 };
 
 function getDefaultSelectedItemKeys(rows: OrganizeItemRow[]) {
-  return rows.map(getOrganizeItemRowKey);
+  return rows
+    .filter((row) => canApplyUpgrade(row.__plan_item || row))
+    .map(getOrganizeItemRowKey);
 }
 
 function unwrapResponseData<T>(response: T | API.Response<T>): T {
@@ -1218,6 +1285,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     'dry' | 'apply'
   >();
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
+  const [recognitionDisplay, setRecognitionDisplay] = useState<{
+    result: API.Organize115CookieResult;
+    source: RecognitionDisplaySource;
+  }>();
   const [organizeError, setOrganizeError] = useState<string>();
   const [activePreviewTask, setActivePreviewTask] =
     useState<API.OrganizePreviewTask>();
@@ -1242,7 +1313,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         if (
           cancelled ||
           recognitionSourceOverriddenRef.current ||
-          (source !== 'moviepilot' && source !== 'local' && source !== 'shadow')
+          (source !== 'moviepilot' &&
+            source !== 'local' &&
+            source !== 'shadow' &&
+            source !== 'medianame')
         ) {
           return;
         }
@@ -1297,19 +1371,47 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     },
   );
 
+  useEffect(() => {
+    if (
+      directoryDetail?.recognition_source &&
+      !recognitionSourceOverriddenRef.current
+    ) {
+      setOrganizeRecognitionSource(directoryDetail.recognition_source);
+      setPreviewRecognitionSourceDraft(directoryDetail.recognition_source);
+      recognitionSourceOverriddenRef.current = true;
+    }
+  }, [directoryDetail?.recognition_source]);
   const cloudStorageId = directoryDetail?.cloud_storage_id;
+  const upgradeEnabled = useMemo(() => {
+    if (resultData?.upgrade_policy?.enabled) return true;
+    try {
+      return !!parseUpgradePolicy(directoryDetail?.upgrade_policy)?.enabled;
+    } catch {
+      return false;
+    }
+  }, [directoryDetail?.upgrade_policy, resultData?.upgrade_policy?.enabled]);
 
+  const categoryRecognitionSource = previewOptionsOpen
+    ? previewRecognitionSourceDraft
+    : organizeRecognitionSource;
   const { loading: categoryConfigLoading, refresh: refreshCategoryConfig } =
-    useApiRequest(getOrganizeCategoryConfig, {
-      onSuccess: (result) => {
-        setCategoryConfig(
-          unwrapResponseData<API.OrganizeCategoryConfigResult>(result),
-        );
+    useApiRequest(
+      () =>
+        getOrganizeCategoryConfig({
+          params: { recognition_source: categoryRecognitionSource },
+        }),
+      {
+        refreshDeps: [categoryRecognitionSource],
+        onSuccess: (result) => {
+          setCategoryConfig(
+            unwrapResponseData<API.OrganizeCategoryConfigResult>(result),
+          );
+        },
+        onError: (error: any) => {
+          messageApi.warning(error?.message || '获取分类配置失败');
+        },
       },
-      onError: (error: any) => {
-        messageApi.warning(error?.message || '获取分类配置失败');
-      },
-    });
+    );
 
   const openPreviewOptions = useCallback(() => {
     if (checkedKeys.length === 0) {
@@ -1851,12 +1953,19 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         setDryRun(true);
         setOrganizeError(undefined);
         setActivePreviewTask(payload.task);
+        setFilenameRegexConfig({
+          enabled: !!payload.task.filename_regex_enabled,
+          pattern: payload.task.filename_regex_pattern || '',
+          replacement: payload.task.filename_regex_replacement || '',
+        });
         if (!episodeMode) {
           setOrganizeMediaType(payload.task?.media_type || 'auto');
         }
         recognitionSourceOverriddenRef.current = true;
         setOrganizeRecognitionSource(
-          payload.task?.recognition_source || 'shadow',
+          (previewResult.pipeline?.source as RecognitionSource) ||
+            payload.task?.recognition_source ||
+            'shadow',
         );
         setOrganizeCategory(payload.task?.category || undefined);
         setBestVersionEnabled(!!payload.task?.best_version_enabled);
@@ -2077,6 +2186,26 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     return flatItemsForTable.filter((row) => fileIDs.has(row.file_id));
   }, [activeVersionGroup, flatItemsForTable]);
 
+  const canSwitchRecognitionDisplay =
+    resultData?.dry_run && resultData.recognition_source === 'shadow';
+  const recognitionDisplaySource =
+    recognitionDisplay?.result === resultData
+      ? recognitionDisplay?.source || 'medianame'
+      : 'medianame';
+  const displayedItemsForTable = useMemo(
+    () =>
+      canSwitchRecognitionDisplay
+        ? visibleItemsForTable.map((row) =>
+            buildOrganizeDisplayRow(row, recognitionDisplaySource),
+          )
+        : visibleItemsForTable,
+    [
+      canSwitchRecognitionDisplay,
+      recognitionDisplaySource,
+      visibleItemsForTable,
+    ],
+  );
+
   const handleVersionTabChange = useCallback(
     (key: string) => {
       setActiveVersionKey(key);
@@ -2100,8 +2229,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   const selectedItemRowsForApply = useMemo(() => {
     const selectedSet = new Set(selectedItemRowKeys.map((key) => String(key)));
-    return flatItemsForTable.filter((row) =>
-      selectedSet.has(getOrganizeItemRowKey(row)),
+    return flatItemsForTable.filter(
+      (row) =>
+        selectedSet.has(getOrganizeItemRowKey(row)) &&
+        canApplyUpgrade(row.__plan_item || row),
     );
   }, [flatItemsForTable, selectedItemRowKeys]);
 
@@ -2314,16 +2445,24 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           messageApi.warning('预览结果缺少来源目录或文件 ID，无法按明细整理');
           return;
         }
+        if (!resultData.plan_id || !resultData.pipeline) {
+          messageApi.warning('历史预览缺少引擎与配置快照，请重新预览');
+          return;
+        }
         const organizeParams = buildOrganizeParams(folderIds, dryRun, fileIds);
         if (!organizeParams) {
           return;
         }
+        organizeParams.plan_id = resultData.plan_id;
+        organizeParams.recognition_source = resultData.recognition_source;
         const activePreviewTaskLabel =
           activePreviewTask?.folder_path ||
           activePreviewTask?.folder_name ||
           activePreviewTask?.folder_id;
-        let deleteSourceFolder = !dryRun;
-        modalApi.confirm({
+        let deleteSourceFolder = !dryRun && !upgradeEnabled;
+        let confirmedParams: API.Organize115CookieParams | undefined;
+        const confirmation = modalApi.confirm({
+          width: 720,
           title: dryRun
             ? `确认预览 ${selectedItemRowsForApply.length} 条处理明细？`
             : activePreviewTask
@@ -2344,8 +2483,27 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               <Typography.Text>
                 {dryRun
                   ? '仅计算已选记录的重命名、目标目录和 STRM 内容。不会创建目录、重命名或移动文件、下载字幕、写入 STRM 或删除源文件夹。'
-                  : '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。单个目录失败不会阻断其它，错误会标注在对应分组上。'}
+                  : upgradeEnabled
+                    ? '只执行已选的新增或替换项，同步 STRM 和关联字幕。旧版保留在恢复目录；中途失败时暂停本次任务，可在洗版记录中继续或恢复。'
+                    : '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。单个目录失败不会阻断其它，错误会标注在对应分组上。'}
               </Typography.Text>
+              <OrganizeEngineConfirmation
+                params={organizeParams}
+                preview={resultData}
+                onChange={(choice) => {
+                  confirmedParams = choice.params;
+                  confirmation.update({
+                    okText: dryRun
+                      ? '生成预览'
+                      : `使用 ${organizeEngineLabel(choice.source)} 执行整理`,
+                    okButtonProps: {
+                      danger: !dryRun,
+                      disabled: !choice.params || choice.loading,
+                      loading: choice.loading,
+                    },
+                  });
+                }}
+              />
               {activeVersionGroup ? (
                 <Alert
                   type="info"
@@ -2361,38 +2519,45 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               {!dryRun ? (
                 <Space orientation="vertical" size={4}>
                   <Checkbox
-                    defaultChecked
+                    defaultChecked={!upgradeEnabled}
+                    disabled={upgradeEnabled}
                     onChange={(event) => {
                       deleteSourceFolder = event.target.checked;
                     }}
                   >
-                    {activeVersionGroup
-                      ? '只保留此版本，整理后删除其他版本'
-                      : '整理完成后删除原文件夹'}
+                    {upgradeEnabled
+                      ? '洗版保留源目录，用于失败恢复'
+                      : activeVersionGroup
+                        ? '只保留此版本，整理后删除其他版本'
+                        : '整理完成后删除原文件夹'}
                   </Checkbox>
                   <Typography.Text type="secondary">
-                    {activeVersionGroup
-                      ? `勾选后仅在所选版本整理成功且相关字幕全部下载完成后删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；下载失败时保留原文件夹。取消勾选则保留其他版本，并重新生成预整理任务。`
-                      : '仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。'}
+                    {upgradeEnabled
+                      ? '本次保留源目录及未选文件。旧视频保留在云盘 FilmFusion-Recovery 目录，旧 STRM 和字幕内容保存在恢复记录中。'
+                      : activeVersionGroup
+                        ? `勾选后仅在所选版本整理成功且相关字幕全部下载完成后删除原文件夹，其中 ${unselectedItemCount} 个未选文件也会一并移入 115 回收站；下载失败时保留原文件夹。取消勾选则保留其他版本，并重新生成预整理任务。`
+                        : '仅在整理成功且本次字幕全部下载完成后执行；下载失败时会保留原文件夹。'}
                   </Typography.Text>
                 </Space>
               ) : null}
             </Space>
           ),
           okText: dryRun ? '生成预览' : '执行整理',
-          okButtonProps: { danger: !dryRun },
+          okButtonProps: { danger: !dryRun, disabled: true },
           cancelText: '取消',
           onOk: () => {
+            if (!confirmedParams)
+              return Promise.reject(new Error('请先生成有效预览'));
             applyingPreviewTaskRef.current = activePreviewTask;
             requeuePreviewTaskAfterApplyRef.current =
               !dryRun &&
               !!activePreviewTask &&
               !!activeVersionGroup &&
               !deleteSourceFolder;
-            runOrganizeWithMode(
+            return runOrganizeWithMode(
               !dryRun && deleteSourceFolder
-                ? { ...organizeParams, delete_source_folder: true }
-                : organizeParams,
+                ? { ...confirmedParams, delete_source_folder: true }
+                : confirmedParams,
             );
           },
         });
@@ -2404,11 +2569,15 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         return;
       }
       const folderIds = [...checkedKeys];
+      if (!dryRun) {
+        messageApi.warning('请先生成预览，再确认执行计划');
+        return;
+      }
       const organizeParams = buildOrganizeParams(folderIds, dryRun);
       if (!organizeParams) {
         return;
       }
-      let deleteSourceFolder = !dryRun;
+      let deleteSourceFolder = !dryRun && !upgradeEnabled;
       modalApi.confirm({
         title: `确认${dryRun ? '预览' : '整理'} ${folderIds.length} 个 115 目录？`,
         content: (
@@ -2421,7 +2590,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
             {!dryRun ? (
               <Space orientation="vertical" size={4}>
                 <Checkbox
-                  defaultChecked
+                  defaultChecked={!upgradeEnabled}
+                  disabled={upgradeEnabled}
                   onChange={(event) => {
                     deleteSourceFolder = event.target.checked;
                   }}
@@ -2458,15 +2628,35 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       episodeMode,
       messageApi,
       modalApi,
-      resultData?.dry_run,
+      resultData,
       runOrganizeWithMode,
       selectedItemRowsForApply,
       unselectedItemCount,
+      upgradeEnabled,
     ],
   );
 
   const itemColumns = useMemo<ProColumns<OrganizeItemRow>[]>(
     () => [
+      {
+        title: '识别状态 / 失败原因',
+        dataIndex: 'error',
+        width: 220,
+        render: (_, row) => {
+          const status = row.medianame?.result?.status;
+          return (
+            <div>
+              {status && <span>{medianameStatusLabels[status] || status}</span>}
+              {row.error && (
+                <Typography.Text type="danger" className="block">
+                  {row.error}
+                </Typography.Text>
+              )}
+              {!status && !row.error && '-'}
+            </div>
+          );
+        },
+      },
       {
         title: '集数校验',
         dataIndex: 'episode_matched',
@@ -2508,6 +2698,38 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                 {row.tmdb_id} <ExportOutlined />
               </Typography.Link>
             </Tooltip>
+          );
+        },
+      },
+      {
+        title: '洗版处理',
+        dataIndex: 'upgrade',
+        width: 240,
+        hideInTable: !resultData?.upgrade_policy?.enabled,
+        render: (_, row) => {
+          const decision = (row.__plan_item || row).upgrade;
+          return decision ? (
+            <Space orientation="vertical" size={2}>
+              <Tag
+                color={
+                  decision.action === 'replace'
+                    ? 'processing'
+                    : decision.action === 'review'
+                      ? 'warning'
+                      : 'default'
+                }
+              >
+                {upgradeActionLabels[decision.action]}
+              </Tag>
+              <span>{decision.reason}</span>
+              <Typography.Text type="secondary">
+                {decision.existing.map((old) => old.rank.label).join('、') ||
+                  '库内无可比版本'}{' '}
+                → {decision.rank.label}
+              </Typography.Text>
+            </Space>
+          ) : (
+            '-'
           );
         },
       },
@@ -3131,7 +3353,20 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   return (
     <ConsolePage
-      actions={headerExtra}
+      actions={
+        <Space wrap>
+          {directoryDetail && (
+            <OrganizeUpgradeControls
+              directory={directoryDetail}
+              onSaved={() => {
+                refreshDirectory();
+                setResultData(undefined);
+              }}
+            />
+          )}
+          {headerExtra}
+        </Space>
+      }
       className={styles.page}
       eyebrow="Media organize"
       title={`${episodeMode ? '剧集预整理' : '整理目录'}：${
@@ -3476,6 +3711,36 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               ) : null}
               {resultData ? (
                 <>
+                  {resultData?.pipeline && (
+                    <Typography.Paragraph type="secondary">
+                      计划 {resultData.plan_id?.slice(0, 12)} · 引擎{' '}
+                      {resultData.pipeline.source} · medianame{' '}
+                      {resultData.pipeline.package_version} · 配置{' '}
+                      {resultData.pipeline.config_version.slice(0, 12)}
+                      {resultData.dry_run
+                        ? '；确认整理时选择实际引擎并核对最终计划。'
+                        : '；执行结果来自此计划。'}
+                    </Typography.Paragraph>
+                  )}
+                  {canSwitchRecognitionDisplay && (
+                    <div className="mb-4 space-y-2">
+                      <Segmented<RecognitionDisplaySource>
+                        aria-label="识别结果展示"
+                        value={recognitionDisplaySource}
+                        options={[
+                          { label: 'medianame 识别', value: 'medianame' },
+                          { label: 'MP2 识别', value: 'moviepilot' },
+                        ]}
+                        onChange={(source) =>
+                          setRecognitionDisplay({ result: resultData, source })
+                        }
+                      />
+                      <p className="m-0 text-sm text-neutral-500">
+                        当前展示 {organizeEngineLabel(recognitionDisplaySource)}
+                        的识别与目标路径；实际整理引擎在确认框中选择。
+                      </p>
+                    </div>
+                  )}
                   {(() => {
                     const errored = (resultData.groups || []).filter(
                       (g) => !!g?.error,
@@ -3534,6 +3799,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                                 >
                                   <Typography.Text strong>
                                     版本轨道
+                                    {canSwitchRecognitionDisplay
+                                      ? '（MP2 分组）'
+                                      : ''}
                                   </Typography.Text>
                                   <Typography.Text type="secondary">
                                     切换版本会同步选择该版本的全部文件
@@ -3589,6 +3857,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                               rowKey={getOrganizeItemRowKey}
                               rowSelection={{
                                 selectedRowKeys: selectedItemRowKeys,
+                                getCheckboxProps: (row) => ({
+                                  disabled: !canApplyUpgrade(
+                                    row.__plan_item || row,
+                                  ),
+                                }),
                                 onChange: (keys) =>
                                   setSelectedItemRowKeys(keys),
                                 preserveSelectedRowKeys: false,
@@ -3600,7 +3873,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                                 showSizeChanger: true,
                               }}
                               scroll={{ x: 'max-content', y: 420 }}
-                              dataSource={visibleItemsForTable}
+                              dataSource={displayedItemsForTable}
                               columns={itemColumns}
                               expandable={{
                                 columnTitle:
@@ -3616,7 +3889,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                       },
                       {
                         key: 'dir-debug',
-                        label: `目录调试 (${flatDirDebugForTable.length})`,
+                        label: `目录调试${canSwitchRecognitionDisplay ? ' · MP2' : ''} (${flatDirDebugForTable.length})`,
                         children: (
                           <ProTable<OrganizeDirDebugRow>
                             className={styles.tableSurface}
@@ -3768,10 +4041,12 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               style={{ display: 'block', marginTop: 6, fontSize: 12 }}
             >
               {previewRecognitionSourceDraft === 'shadow'
-                ? '先运行 MP2 主识别，再用相同输入运行 FilmFusion 本地影子；本地结果只参与差异记录。'
+                ? '同一输入分别运行 medianame 和 MP2，优先展示 medianame；实际整理引擎在确认时选择。'
                 : previewRecognitionSourceDraft === 'moviepilot'
                   ? '只运行 MP2 识别与 MoviePilot 转名，不执行 FilmFusion 本地识别。'
-                  : '只使用 FilmFusion 本地规则与 TMDB 识别，并在本地转名。'}
+                  : previewRecognitionSourceDraft === 'medianame'
+                    ? '使用 medianame 独立完成解析、识别、分类与命名。'
+                    : '使用旧本地引擎（兼容模式）。'}
             </Typography.Text>
           </div>
           <Row gutter={12}>

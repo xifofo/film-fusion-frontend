@@ -8,6 +8,7 @@ import type {
   RSSAutomationVariableProtocol,
   RSSAutomationVariableType,
 } from '@/services/film-fusion';
+import { OPENAPI_115_CLOUD_NODES } from './cloudDownload115';
 import type { RSSAutomationNodePreview } from './preview';
 
 export type RSSFlowVariableInfo = {
@@ -83,7 +84,14 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   stop_qbittorrent: '停止 qBittorrent 做种',
   delete_qbittorrent: '删除 qBittorrent 任务',
   offline115: '115 Cookie 离线',
-  offline115_openapi: '115 OpenAPI 离线',
+  offline115_openapi: '115 添加链接任务',
+  torrent_to_magnet: '种子转磁力',
+  torrent115_openapi: '115 解析 BT 种子',
+  offline115_bt_openapi: '115 添加 BT 任务',
+  list115_tasks_openapi: '115 云下载任务列表',
+  quota115_openapi: '115 云下载配额',
+  delete115_task_openapi: '115 删除云下载任务',
+  clear115_tasks_openapi: '115 清空云下载任务',
   wait115: '等待 115 下载完成',
   rename115_openapi: '115 API 重命名',
   moviepilot_title_recognize: 'MP 标题识别',
@@ -107,6 +115,13 @@ export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'delete_qbittorrent',
   'offline115',
   'offline115_openapi',
+  'torrent_to_magnet',
+  'torrent115_openapi',
+  'offline115_bt_openapi',
+  'list115_tasks_openapi',
+  'quota115_openapi',
+  'delete115_task_openapi',
+  'clear115_tasks_openapi',
   'wait115',
   'rename115_openapi',
   'moviepilot_title_recognize',
@@ -697,6 +712,32 @@ export const createNodeDefinition = (
       timeout_seconds: 30,
     });
   }
+  if (OPENAPI_115_CLOUD_NODES.includes(type) || type === 'offline115_openapi')
+    config.timeout_seconds = 30;
+  if (type === 'list115_tasks_openapi')
+    Object.assign(config, { page: 1, info_hash: '' });
+  if (type === 'torrent_to_magnet')
+    Object.assign(config, {
+      url: '$item.download_url',
+      headers: {},
+      include_trackers: true,
+      allow_private_network: false,
+      follow_redirects: true,
+      timeout_seconds: 30,
+    });
+  if (type === 'torrent115_openapi')
+    Object.assign(config, { torrent_sha1: '', pick_code: '' });
+  if (type === 'offline115_bt_openapi')
+    Object.assign(config, {
+      torrent_sha1: '',
+      pick_code: '',
+      info_hash: '',
+      wanted: '',
+      save_path: '',
+    });
+  if (type === 'delete115_task_openapi')
+    Object.assign(config, { info_hash: '', delete_files: false });
+  if (type === 'clear115_tasks_openapi') config.flag = 0;
   if (type === 'wait115') {
     Object.assign(config, {
       poll_interval_seconds: 30,
@@ -808,7 +849,10 @@ export const createNodeDefinition = (
     max_attempts:
       type === 'qbittorrent' ||
       type === 'offline115' ||
-      type === 'offline115_openapi' ||
+      type === 'torrent_to_magnet' ||
+      type === 'torrent115_openapi' ||
+      type === 'list115_tasks_openapi' ||
+      type === 'quota115_openapi' ||
       type === 'wait_qbittorrent' ||
       type === 'stop_qbittorrent' ||
       type === 'wait115' ||

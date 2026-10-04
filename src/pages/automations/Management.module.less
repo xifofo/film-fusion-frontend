@@ -1,0 +1,13 @@
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.wide { width: 100%; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.hint { color: var(--ant-color-text-secondary); font-size: 12px; margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.binding { padding: 12px; border: 1px solid var(--ant-color-border-secondary); border-radius: 8px; display: grid; gap: 8px; }
+.parameter { display: grid; grid-template-columns: minmax(100px, 1fr) 100px minmax(120px, 1.5fr) 32px; gap: 8px; align-items: center; }
+.code { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; max-height: 200px; overflow: auto; font-size: 12px; }
+.library { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.template { padding: 20px; border: 1px solid var(--ant-color-border-secondary); border-radius: 12px; background: var(--ant-color-bg-container); display: flex; flex-direction: column; gap: 12px; h3, p { margin: 0; } }
+.batch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; background: var(--ant-color-fill-quaternary); border-radius: 8px; margin-bottom: 12px; }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } .parameter { grid-template-columns: minmax(100px, 1fr) 90px; } }

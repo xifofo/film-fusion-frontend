@@ -1,39 +1,20 @@
 import '@xyflow/react/dist/style.css';
 
 import {
+  AppstoreOutlined,
   ArrowLeftOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  FolderOpenOutlined,
+  HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
-  ScanOutlined,
 } from '@ant-design/icons';
-import type { TableProps } from 'antd';
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Empty,
-  message,
-  Popconfirm,
-  Row,
-  Space,
-  Statistic,
-  Switch,
-  Table,
-  Tabs,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Alert, Button, Empty, message, Space, Tabs } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ConsolePage from '@/components/ConsolePage';
 import RSSAutomationWizard from '@/pages/rss-automation/AutomationWizard';
 import RSSSourcePanel from '@/pages/rss-automation/SourcePanel';
 import RSSWorkflowPanel from '@/pages/rss-automation/WorkflowPanel';
 import type {
+  AutomationBatchInput,
   AutomationCreateInput,
   AutomationDashboard,
   AutomationSource,
@@ -41,21 +22,37 @@ import type {
   RSSAutomationSource,
 } from '@/services/film-fusion';
 import {
+  batchAutomations,
   createAutomation,
   deleteAutomation,
   getAutomationDashboard,
   getCloudDirectoryList,
   getCloudStorageList,
+  saveAutomationSettings,
   scanAutomation,
   setAutomationEnabled,
   updateAutomation,
 } from '@/services/film-fusion';
+import AutomationCopyModal from './AutomationCopyModal';
 import AutomationEditorModal from './AutomationEditorModal';
 import AutomationHistory from './AutomationHistory';
+import AutomationOverview, {
+  type HistorySelection,
+} from './AutomationOverview';
+import AutomationParametersModal from './AutomationParametersModal';
+import AutomationSettingsModal from './AutomationSettingsModal';
+import AutomationTemplates, {
+  SaveAutomationTemplateModal,
+} from './AutomationTemplates';
+import AutomationVersionsModal from './AutomationVersionsModal';
+import {
+  buildAutomationCopy,
+  copyName,
+  readAutomationConfiguration,
+} from './copyAutomation';
+import styles from './index.module.less';
+import { defaultAutomationSettings } from './management';
 import TriggerSelectorModal from './TriggerSelectorModal';
-import { readAutomationActions } from './workflow';
-
-const { Link, Text } = Typography;
 
 type PageView = 'overview' | 'rss-create' | 'rss-edit';
 
@@ -72,22 +69,6 @@ const emptyDashboard = (): AutomationDashboard => ({
   node_protocols: [],
 });
 
-const formatTime = (value?: string) =>
-  value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '--';
-
-const workflowNodeTypes = (definitionJSON?: string) => {
-  try {
-    const definition = JSON.parse(definitionJSON || '') as {
-      nodes?: Array<{ type?: string }>;
-    };
-    return new Set(
-      (definition.nodes || []).map((node) => node.type).filter(Boolean),
-    );
-  } catch {
-    return new Set<string>();
-  }
-};
-
 const AutomationPage = () => {
   const [dashboard, setDashboard] =
     useState<AutomationDashboard>(emptyDashboard);
@@ -96,12 +77,30 @@ const AutomationPage = () => {
     API.CloudDirectory[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>();
+  const [overviewTab, setOverviewTab] = useState('automations');
+  const [historySelection, setHistorySelection] = useState<HistorySelection>(
+    {},
+  );
+  const [historyVisit, setHistoryVisit] = useState(0);
   const [view, setView] = useState<PageView>('overview');
   const [triggerSelectorOpen, setTriggerSelectorOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingSourceID, setEditingSourceID] = useState<number>();
   const [scanningID, setScanningID] = useState<number>();
   const [togglingID, setTogglingID] = useState<number>();
+  const [copyingID, setCopyingID] = useState<number>();
+  const [copyInput, setCopyInput] = useState<AutomationCreateInput>();
+  const [copyTitle, setCopyTitle] = useState('复制自动化');
+  const [management, setManagement] = useState<{
+    sourceID: number;
+    action: 'parameters' | 'template' | 'versions' | 'settings';
+    input: AutomationCreateInput;
+  }>();
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -112,20 +111,28 @@ const AutomationPage = () => {
         const [dashboardResponse, storageResponse, directoryResponse] =
           await Promise.all([
             getAutomationDashboard(),
-            getCloudStorageList({ current: 1, pageSize: 500 }),
-            getCloudDirectoryList({ current: 1, pageSize: 500 }),
+            silent
+              ? undefined
+              : getCloudStorageList({ current: 1, pageSize: 500 }),
+            silent
+              ? undefined
+              : getCloudDirectoryList({ current: 1, pageSize: 500 }),
           ]);
         if (dashboardResponse.code !== 0 || !dashboardResponse.data) {
           throw new Error(dashboardResponse.message || '获取自动化信息失败');
         }
         setDashboard(dashboardResponse.data);
-        if (storageResponse.code === 0 && storageResponse.data) {
+        setLoadError('');
+        setHasLoaded(true);
+        setLastRefreshed(new Date());
+        if (storageResponse?.code === 0 && storageResponse.data) {
           setCloudStorages(storageResponse.data.list || []);
         }
-        if (directoryResponse.code === 0 && directoryResponse.data) {
+        if (directoryResponse?.code === 0 && directoryResponse.data) {
           setCloudDirectories(directoryResponse.data.list || []);
         }
       } catch (error: any) {
+        setLoadError(error?.data || error?.message || '获取自动化信息失败');
         if (!silent) {
           messageApi.error(
             error?.data || error?.message || '获取自动化信息失败',
@@ -143,15 +150,27 @@ const AutomationPage = () => {
   }, [load]);
 
   useEffect(() => {
-    if (view !== 'overview' || editorOpen || triggerSelectorOpen) return;
+    if (
+      view !== 'overview' ||
+      editorOpen ||
+      triggerSelectorOpen ||
+      copyInput ||
+      management ||
+      copyingID !== undefined
+    )
+      return;
     const timer = window.setInterval(() => void load(true), 15_000);
     return () => window.clearInterval(timer);
-  }, [editorOpen, load, triggerSelectorOpen, view]);
+  }, [
+    copyingID,
+    copyInput,
+    management,
+    editorOpen,
+    load,
+    triggerSelectorOpen,
+    view,
+  ]);
 
-  const storageByID = useMemo(
-    () => new Map(cloudStorages.map((storage) => [storage.id, storage])),
-    [cloudStorages],
-  );
   const workflowBySourceID = useMemo(
     () =>
       new Map(
@@ -170,10 +189,11 @@ const AutomationPage = () => {
       ? (editingSource as RSSAutomationSource)
       : undefined;
 
-  const rssCount = dashboard.sources.filter(
-    (source) => source.trigger_type === 'rss',
-  ).length;
-  const directoryCount = dashboard.sources.length - rssCount;
+  const openHistory = (selection: HistorySelection = {}) => {
+    setHistorySelection(selection);
+    setHistoryVisit((value) => value + 1);
+    setOverviewTab('history');
+  };
 
   const returnToOverview = () => {
     setView('overview');
@@ -223,6 +243,85 @@ const AutomationPage = () => {
     }
   };
 
+  const openCopy = (source: AutomationSource) => {
+    try {
+      const input = buildAutomationCopy(
+        source,
+        workflowBySourceID.get(source.id),
+        [...dashboard.sources, ...dashboard.workflows].map((item) => item.name),
+      );
+      setCopyTitle('复制自动化');
+      setCopyInput(input);
+    } catch (error: any) {
+      messageApi.error(error?.message || '流程无法复制');
+    }
+  };
+
+  const copyAutomation = async (input: AutomationCreateInput) => {
+    if (copyingID !== undefined) return;
+    setCopyingID(0);
+    try {
+      const response = await createAutomation(input);
+      if (response.code !== 0 || !response.data) {
+        throw new Error(response.message || '复制自动化失败');
+      }
+      const created = response.data;
+      await load(true);
+      // Keep the returned copy editable even if the dashboard refresh fails.
+      setDashboard((current) => ({
+        ...current,
+        sources: [
+          ...current.sources.filter((item) => item.id !== created.source.id),
+          created.source,
+        ],
+        workflows: [
+          ...current.workflows.filter(
+            (item) => item.id !== created.workflow.id,
+          ),
+          created.workflow,
+        ],
+      }));
+      openEdit(created.source);
+      setCopyInput(undefined);
+      messageApi.success('副本已创建并保持停用，修改后可启用');
+    } finally {
+      setCopyingID(undefined);
+    }
+  };
+
+  const openManagement = (
+    source: AutomationSource,
+    action: NonNullable<typeof management>['action'],
+  ) => {
+    try {
+      const workflow = workflowBySourceID.get(source.id);
+      if (!workflow) throw new Error('流程数据缺失');
+      setManagement({
+        sourceID: source.id,
+        action,
+        input: readAutomationConfiguration(source, workflow),
+      });
+    } catch (error: any) {
+      messageApi.error(error?.message || '无法读取流程');
+    }
+  };
+
+  const applyBatch = async (input: AutomationBatchInput) => {
+    setBatchBusy(true);
+    try {
+      const response = await batchAutomations(input);
+      if (response.code !== 0)
+        throw new Error(response.message || '批量操作失败');
+      await load(true);
+      messageApi.success('批量操作完成');
+    } catch (error: any) {
+      messageApi.error(error?.data || error?.message || '批量操作失败');
+      throw error;
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   const toggleAutomation = async (
     source: AutomationSource,
     enabled: boolean,
@@ -251,7 +350,11 @@ const AutomationPage = () => {
       }
       const result = response.data;
       if (source.trigger_type === 'rss') {
-        if (result.baseline) {
+        if (result.cache_stale) {
+          messageApi.warning(
+            `已读取上次缓存：${result.cache_warning || '原站暂未更新'}；新增 ${result.new_entries || 0} 条`,
+          );
+        } else if (result.baseline) {
           messageApi.success(
             `RSS 基线建立完成：读取 ${result.fetched || 0} 条，未触发历史下载`,
           );
@@ -259,7 +362,7 @@ const AutomationPage = () => {
           messageApi.success('RSS 内容没有变化');
         } else {
           messageApi.success(
-            `RSS 刷新完成：新增 ${result.new_entries || 0} 条，创建 ${result.created_runs} 次运行`,
+            `RSS ${result.cache_hit ? '缓存检查' : '刷新'}完成：新增 ${result.new_entries || 0} 条，创建 ${result.created_runs} 次运行`,
           );
         }
       } else if (result.baseline) {
@@ -294,172 +397,14 @@ const AutomationPage = () => {
     }
   };
 
-  const columns: TableProps<AutomationSource>['columns'] = [
-    {
-      title: '自动化',
-      width: 220,
-      render: (_, source) => (
-        <Space orientation="vertical" size={2}>
-          <Text strong>{source.name}</Text>
-          <Tag color={source.trigger_type === 'rss' ? 'orange' : 'blue'}>
-            {source.trigger_type === 'rss' ? 'RSS / Atom' : '115 目录'}
-          </Tag>
-          {source.description && (
-            <Text ellipsis={{ tooltip: source.description }} type="secondary">
-              {source.description}
-            </Text>
-          )}
-        </Space>
-      ),
-    },
-    {
-      title: '触发器配置',
-      render: (_, source) =>
-        source.trigger_type === 'rss' ? (
-          <Space orientation="vertical" size={2}>
-            <Tooltip title={source.feed_url}>
-              <Link
-                ellipsis
-                href={source.feed_url}
-                rel="noreferrer"
-                style={{ maxWidth: 340 }}
-                target="_blank"
-              >
-                {source.feed_url}
-              </Link>
-            </Tooltip>
-            <Text type="secondary">
-              每 {source.interval_minutes || 5} 分钟增量刷新
-            </Text>
-          </Space>
-        ) : (
-          <Space orientation="vertical" size={2}>
-            <Space>
-              <Tag color="blue">
-                {storageByID.get(source.cloud_storage_id || 0)?.storage_name ||
-                  `账号 #${source.cloud_storage_id}`}
-              </Tag>
-              {source.recursive && <Tag>包含子目录</Tag>}
-            </Space>
-            <Tooltip title={source.directory_path}>
-              <Text ellipsis style={{ maxWidth: 300 }}>
-                <FolderOpenOutlined /> {source.directory_path}
-              </Text>
-            </Tooltip>
-            <Text type="secondary">
-              每 {source.interval_seconds} 秒检查 · 静默期{' '}
-              {source.quiet_seconds} 秒
-            </Text>
-          </Space>
-        ),
-    },
-    {
-      title: '后续操作',
-      width: 290,
-      render: (_, source) => {
-        const workflow = workflowBySourceID.get(source.id);
-        const actions = readAutomationActions(workflow);
-        const nodeTypes = workflowNodeTypes(workflow?.definition_json);
-        return (
-          <Space wrap>
-            {nodeTypes.has('qbittorrent') && (
-              <Tag color="green">qBittorrent 下载</Tag>
-            )}
-            {(nodeTypes.has('offline115') ||
-              nodeTypes.has('offline115_openapi')) && (
-              <Tag color="blue">115 离线下载</Tag>
-            )}
-            {actions.recognition === 'local' && (
-              <Tag color="purple">本地识别</Tag>
-            )}
-            {actions.recognition === 'moviepilot' && (
-              <Tag color="blue">仅 MP2</Tag>
-            )}
-            {actions.recognition === 'shadow' && (
-              <Tag color="purple">影子模式</Tag>
-            )}
-            {actions.organize_enabled && <Tag color="cyan">整理 + STRM</Tag>}
-            {actions.notification_enabled && <Tag color="gold">发送通知</Tag>}
-            {nodeTypes.size <= 2 && <Tag>仅记录事件</Tag>}
-          </Space>
-        );
-      },
-    },
-    {
-      title: '触发状态',
-      width: 220,
-      render: (_, source) => {
-        const status = !source.enabled
-          ? { color: 'default', label: '已停用' }
-          : source.last_error
-            ? { color: 'error', label: '检查失败' }
-            : source.initialized
-              ? { color: 'success', label: '增量监听中' }
-              : { color: 'processing', label: '等待首次基线' };
-        return (
-          <Space orientation="vertical" size={2}>
-            <Tag color={status.color}>{status.label}</Tag>
-            <Text type="secondary">
-              最近成功：{formatTime(source.last_success_at)}
-            </Text>
-            {source.last_error && (
-              <Text ellipsis={{ tooltip: source.last_error }} type="danger">
-                {source.last_error}
-              </Text>
-            )}
-          </Space>
-        );
-      },
-    },
-    {
-      title: '启用',
-      width: 80,
-      render: (_, source) => (
-        <Switch
-          checked={source.enabled}
-          loading={togglingID === source.id}
-          onChange={(enabled) => toggleAutomation(source, enabled)}
-          size="small"
-        />
-      ),
-    },
-    {
-      title: '操作',
-      fixed: 'right',
-      width: 250,
-      render: (_, source) => (
-        <Space>
-          <Button
-            icon={<ScanOutlined />}
-            loading={scanningID === source.id}
-            onClick={() => runScan(source)}
-            size="small"
-          >
-            立即检查
-          </Button>
-          <Button
-            icon={<EditOutlined />}
-            onClick={() => openEdit(source)}
-            size="small"
-          >
-            编辑
-          </Button>
-          <Popconfirm
-            description="触发器状态、流程、事件和运行历史都会一起删除。"
-            onConfirm={() => removeAutomation(source)}
-            title="彻底删除这条自动化？"
-          >
-            <Button danger icon={<DeleteOutlined />} size="small" />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   const pageActions =
     view === 'overview' ? (
       <Space>
-        <Button icon={<ReloadOutlined />} onClick={() => load()}>
+        <Button
+          icon={<ReloadOutlined />}
+          loading={loading}
+          onClick={() => load()}
+        >
           刷新
         </Button>
         <Button icon={<PlusOutlined />} onClick={openCreate} type="primary">
@@ -473,7 +418,23 @@ const AutomationPage = () => {
     );
 
   return (
-    <ConsolePage actions={pageActions} eyebrow="Automation" title="自动化中心">
+    <ConsolePage
+      actions={pageActions}
+      eyebrow={view === 'overview' ? 'Automation' : 'Automation / Editor'}
+      title={
+        view === 'rss-create'
+          ? '新建 RSS 自动化'
+          : view === 'rss-edit'
+            ? editingSource?.name || '编辑自动化'
+            : '自动化中心'
+      }
+    >
+      {view === 'overview' && (
+        <p className={styles.pageDescription}>
+          连接内容来源与处理流程，让媒体管理自动运转。
+        </p>
+      )}
+
       {contextHolder}
 
       {view === 'rss-create' && (
@@ -527,6 +488,7 @@ const AutomationPage = () => {
               label: '事件与运行',
               children: (
                 <AutomationHistory
+                  initialSourceID={editingRSSSource.id}
                   refreshToken={historyRefreshToken}
                   sources={[editingRSSSource]}
                   workflows={[editingWorkflow]}
@@ -544,83 +506,109 @@ const AutomationPage = () => {
       )}
 
       {view === 'overview' && (
-        <Space orientation="vertical" size={20} style={{ width: '100%' }}>
-          <Alert
-            description="RSS 负责发现新的下载条目，115 目录负责发现新增且已稳定的媒体；二者共用同一套流程执行、事件记录和运行历史。"
-            showIcon
-            title="一个自动化选择一个触发器"
-            type="info"
-          />
-          <Row gutter={[16, 16]}>
-            <Col xs={12} lg={6}>
-              <Card>
-                <Statistic title="自动化" value={dashboard.sources.length} />
-              </Card>
-            </Col>
-            <Col xs={12} lg={6}>
-              <Card>
-                <Statistic title="RSS 触发器" value={rssCount} />
-              </Card>
-            </Col>
-            <Col xs={12} lg={6}>
-              <Card>
-                <Statistic title="115 触发器" value={directoryCount} />
-              </Card>
-            </Col>
-            <Col xs={12} lg={6}>
-              <Card>
-                <Statistic
-                  styles={
-                    dashboard.failed_runs
-                      ? { content: { color: '#cf1322' } }
-                      : {}
-                  }
-                  title="失败运行"
-                  value={dashboard.failed_runs}
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          <Tabs
-            items={[
-              {
-                key: 'automations',
-                label: '自动化',
-                children: (
-                  <Table<AutomationSource>
-                    columns={columns}
-                    dataSource={dashboard.sources}
-                    loading={loading}
-                    locale={{
-                      emptyText: (
-                        <Empty description="还没有自动化">
-                          <Button onClick={openCreate} type="primary">
-                            创建第一条自动化
-                          </Button>
-                        </Empty>
-                      ),
-                    }}
-                    pagination={false}
-                    rowKey="id"
-                    scroll={{ x: 1450 }}
-                  />
-                ),
-              },
-              {
-                key: 'history',
-                label: '事件与运行',
-                children: (
-                  <AutomationHistory
-                    refreshToken={historyRefreshToken}
-                    sources={dashboard.sources}
-                    workflows={dashboard.workflows}
-                  />
-                ),
-              },
-            ]}
-          />
-        </Space>
+        <div className={styles.centerShell}>
+          {loadError && (
+            <Alert
+              action={
+                <Button onClick={() => load()} size="small">
+                  重试
+                </Button>
+              }
+              description={loadError}
+              showIcon
+              title={
+                hasLoaded
+                  ? '刷新失败，当前显示上次获取的数据'
+                  : '暂时无法加载自动化'
+              }
+              type="error"
+            />
+          )}
+          {(hasLoaded || loading) && (
+            <Tabs
+              activeKey={overviewTab}
+              className={styles.centerTabs}
+              onChange={setOverviewTab}
+              tabBarExtraContent={
+                <span className={styles.refreshStatus}>
+                  {lastRefreshed
+                    ? `更新于 ${lastRefreshed.toLocaleTimeString('zh-CN', { hour12: false })} · 每 15 秒刷新`
+                    : '正在获取运行状态'}
+                </span>
+              }
+              items={[
+                {
+                  key: 'automations',
+                  label: (
+                    <span>
+                      <AppstoreOutlined /> 自动化
+                    </span>
+                  ),
+                  children: (
+                    <AutomationOverview
+                      cloudStorages={cloudStorages}
+                      copyingID={copyingID}
+                      batchBusy={batchBusy}
+                      dashboard={dashboard}
+                      loading={loading}
+                      onCopy={openCopy}
+                      onManage={openManagement}
+                      onBatch={applyBatch}
+                      onCreate={openCreate}
+                      onEdit={openEdit}
+                      onHistory={openHistory}
+                      onRemove={removeAutomation}
+                      onScan={runScan}
+                      onToggle={toggleAutomation}
+                      scanningID={scanningID}
+                      togglingID={togglingID}
+                    />
+                  ),
+                },
+                {
+                  key: 'templates',
+                  label: '流程模板',
+                  children: (
+                    <AutomationTemplates
+                      refreshKey={templateRefreshKey}
+                      onUse={(input, name) => {
+                        const next = structuredClone(input);
+                        next.source.name = copyName(
+                          name,
+                          dashboard.sources.map((item) => item.name),
+                        );
+                        next.workflow.name = next.source.name;
+                        setCopyTitle('从模板创建自动化');
+                        setCopyInput(next);
+                      }}
+                    />
+                  ),
+                },
+                {
+                  key: 'history',
+                  label: (
+                    <span>
+                      <HistoryOutlined /> 事件与运行
+                    </span>
+                  ),
+                  children: (
+                    <AutomationHistory
+                      active={overviewTab === 'history'}
+                      initialRunID={historySelection.runID}
+                      initialSourceID={historySelection.sourceID}
+                      initialStatus={historySelection.status}
+                      initialTab="runs"
+                      key={historyVisit}
+                      refreshToken={historyRefreshToken}
+                      sources={dashboard.sources}
+                      workflows={dashboard.workflows}
+                    />
+                  ),
+                },
+              ]}
+            />
+          )}
+        </div>
       )}
 
       <TriggerSelectorModal
@@ -628,6 +616,88 @@ const AutomationPage = () => {
         onSelect={selectTrigger}
         open={triggerSelectorOpen}
       />
+
+      {copyInput && (
+        <AutomationCopyModal
+          input={copyInput}
+          title={copyTitle}
+          cloudStorages={cloudStorages}
+          cloudDirectories={cloudDirectories}
+          targets={dashboard.targets}
+          onCancel={() => setCopyInput(undefined)}
+          onSubmit={copyAutomation}
+        />
+      )}
+      {management?.action === 'parameters' && (
+        <AutomationParametersModal
+          definition={management.input.workflow.definition}
+          onCancel={() => setManagement(undefined)}
+          onSave={async (definition) => {
+            const response = await updateAutomation(management.sourceID, {
+              ...management.input,
+              expected_version: workflowBySourceID.get(management.sourceID)
+                ?.version,
+              workflow: { ...management.input.workflow, definition },
+            });
+            if (response.code !== 0 || !response.data)
+              throw new Error(response.message || '保存参数失败');
+            setManagement(undefined);
+            await load(true);
+            messageApi.success('流程参数已保存');
+          }}
+        />
+      )}
+      {management?.action === 'template' && (
+        <SaveAutomationTemplateModal
+          input={management.input}
+          onCancel={() => setManagement(undefined)}
+          onSaved={() => {
+            setManagement(undefined);
+            setTemplateRefreshKey((value) => value + 1);
+            messageApi.success('模板已保存');
+          }}
+        />
+      )}
+      {management?.action === 'settings' && (
+        <AutomationSettingsModal
+          settings={
+            dashboard.settings?.find(
+              (item) => item.source_id === management.sourceID,
+            ) || defaultAutomationSettings(management.sourceID)
+          }
+          groups={[
+            ...new Set(
+              dashboard.settings
+                ?.map((item) => item.group_name)
+                .filter(Boolean),
+            ),
+          ]}
+          onCancel={() => setManagement(undefined)}
+          onSave={async (settings) => {
+            const response = await saveAutomationSettings(
+              management.sourceID,
+              settings,
+            );
+            if (response.code !== 0 || !response.data)
+              throw new Error(response.message || '保存设置失败');
+            setManagement(undefined);
+            await load(true);
+            messageApi.success('分组与提醒设置已保存');
+          }}
+        />
+      )}
+      {management?.action === 'versions' && (
+        <AutomationVersionsModal
+          sourceID={management.sourceID}
+          current={management.input}
+          onCancel={() => setManagement(undefined)}
+          onRestored={async () => {
+            setManagement(undefined);
+            await load(true);
+            messageApi.success('已恢复为新版本并停用，请检查后启用');
+          }}
+        />
+      )}
 
       <AutomationEditorModal
         cloudDirectories={cloudDirectories}

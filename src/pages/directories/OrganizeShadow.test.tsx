@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildOrganizeShadowFieldRows } from './Organize';
+import {
+  buildOrganizeDisplayRow,
+  buildOrganizeShadowFieldRows,
+} from './Organize';
 
 function matchedComparison(): API.Organize115ShadowComparison {
   return {
@@ -41,6 +44,45 @@ function matchedComparison(): API.Organize115ShadowComparison {
 }
 
 describe('organize shadow comparison rows', () => {
+  it('keeps failed or missing medianame results separate from the saved MP2 plan', () => {
+    const original = {
+      file_id: '101',
+      file_name: 'Show.mkv',
+      __folder_id: '100',
+      tmdb_id: '123',
+      target_path: '/MP2/Show.mkv',
+      rename_to: 'Show.mkv',
+      strm_path: '/MP2/Show.strm',
+      shadow_comparison: {
+        status: 'local_error',
+        matched: false,
+        differences: [],
+        medianame: {
+          file_id: '101',
+          file_name: 'Show.mkv',
+          error: 'medianame: review',
+        },
+      },
+    };
+    const displayed = buildOrganizeDisplayRow(original, 'medianame');
+    expect(displayed).toMatchObject({
+      file_id: '101',
+      __folder_id: '100',
+      error: 'medianame: review',
+    });
+    expect(displayed.tmdb_id).toBeUndefined();
+    expect(displayed.target_path).toBeUndefined();
+    expect(displayed.rename_to).toBeUndefined();
+    expect(displayed.strm_path).toBeUndefined();
+    expect(buildOrganizeDisplayRow(original, 'moviepilot')).toBe(original);
+    expect(original.target_path).toBe('/MP2/Show.mkv');
+    const missing = buildOrganizeDisplayRow(
+      { ...original, shadow_comparison: undefined },
+      'medianame',
+    );
+    expect(missing.error).toContain('没有 medianame 识别结果');
+    expect(missing.target_path).toBeUndefined();
+  });
   it('shows recognition, naming and target path as matched', () => {
     const rows = buildOrganizeShadowFieldRows(matchedComparison());
     expect(rows.find((row) => row.key === 'recognition:tmdb_id')).toMatchObject(

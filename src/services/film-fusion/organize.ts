@@ -18,7 +18,7 @@ export async function organize115Cookie(
   return apiClient.post<API.Response<API.Organize115CookieResult>>(
     '/api/organize/115-cookie',
     data,
-    { ...(options || {}) },
+    { timeout: data.dry_run ? 30_000 : 0, ...(options || {}) },
   );
 }
 

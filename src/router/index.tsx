@@ -39,6 +39,7 @@ const EmbyWatch = lazy(() => import('@/pages/emby-watch'));
 const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const Automation = lazy(() => import('@/pages/automations'));
+const RSSRelay = lazy(() => import('@/pages/rss-relay'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
@@ -228,6 +229,10 @@ const routes: RouteObject[] = [
       {
         path: 'automations',
         element: <Automation />,
+      },
+      {
+        path: 'rss-relay',
+        element: <RSSRelay />,
       },
       {
         path: 'server-logs',

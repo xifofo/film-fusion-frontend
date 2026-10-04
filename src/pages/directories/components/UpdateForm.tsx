@@ -7,11 +7,12 @@ import {
   ProFormText,
   ProFormTextArea,
 } from '@ant-design/pro-components';
-import { Button, message, Tabs } from 'antd';
+import { Button, Form, message, Tabs } from 'antd';
 import React, { useMemo, useState } from 'react';
 import { useApiRequest } from '@/hooks/useApiRequest';
 import { updateCloudDirectory } from '@/services/film-fusion';
 import DirectoryStrmPreview from './DirectoryStrmPreview';
+import UpgradePolicyEditor, { parseUpgradePolicy } from './UpgradePolicyEditor';
 
 export type UpdateFormProps = {
   record: API.CloudDirectory;
@@ -25,6 +26,7 @@ const FIELD_TAB_MAP: Record<
   string,
   { key: string; tab: string; label: string }
 > = {
+  upgrade_policy: { key: 'upgrade', tab: '洗版策略', label: '洗版策略' },
   cloud_storage_id: { key: 'basic', tab: '基本信息', label: '云存储' },
   directory_name: { key: 'basic', tab: '基本信息', label: '目录名称' },
   directory_id: { key: 'basic', tab: '基本信息', label: '云盘目录 ID' },
@@ -71,7 +73,7 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
         if (!Array.isArray(parsed)) {
           return Promise.reject(new Error('请输入 JSON 数组格式'));
         }
-      } catch (error) {
+      } catch {
         return Promise.reject(new Error('请输入有效的 JSON 格式'));
       }
       return Promise.resolve();
@@ -171,6 +173,18 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
                     placeholder="例如：/mnt/media"
                     tooltip="保存文件地址"
                   />
+                  <ProFormSelect
+                    name="recognition_source"
+                    label="目录整理引擎"
+                    tooltip="只影响此目录的新任务，可在整理页单次覆盖。"
+                    options={[
+                      { label: '跟随系统默认', value: '' },
+                      { label: 'MP2', value: 'moviepilot' },
+                      { label: '影子对比（执行 MP2）', value: 'shadow' },
+                      { label: 'medianame', value: 'medianame' },
+                      { label: '旧本地（兼容）', value: 'local' },
+                    ]}
+                  />
                   <ProFormSwitch
                     name="classify_by_category"
                     label="按分类目录"
@@ -205,6 +219,26 @@ const UpdateForm: React.FC<UpdateFormProps> = ({
                     }}
                   />
                 </>
+              ),
+            },
+            {
+              key: 'upgrade',
+              label: '洗版策略',
+              children: (
+                <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                  <Form.Item
+                    name="upgrade_policy"
+                    rules={[
+                      {
+                        validator: async (_, value) => {
+                          parseUpgradePolicy(value);
+                        },
+                      },
+                    ]}
+                  >
+                    <UpgradePolicyEditor />
+                  </Form.Item>
+                </div>
               ),
             },
             {

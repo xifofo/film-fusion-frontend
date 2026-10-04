@@ -1,4 +1,7 @@
 import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  ExclamationCircleOutlined,
   EyeOutlined,
   PlayCircleOutlined,
   RedoOutlined,
@@ -9,6 +12,7 @@ import type { TableProps } from 'antd';
 import {
   Alert,
   Button,
+  Collapse,
   Descriptions,
   Drawer,
   Empty,
@@ -21,7 +25,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AutomationEntryHistoryItem,
   AutomationRun,
@@ -39,23 +43,22 @@ import {
   retryAutomationRun,
   runAutomationEntry,
 } from '@/services/film-fusion';
+import styles from './History.module.less';
+import {
+  automationNodeLabel,
+  formatAutomationTime as formatTime,
+  runStatusMeta,
+} from './presentation';
 
 const { Text } = Typography;
 
-const runStatusMeta: Record<
-  AutomationRunStatus,
-  { color: string; label: string }
-> = {
-  pending: { color: 'default', label: '等待执行' },
-  running: { color: 'processing', label: '执行中' },
-  succeeded: { color: 'success', label: '成功' },
-  partial: { color: 'warning', label: '部分成功' },
-  failed: { color: 'error', label: '失败' },
-  cancelled: { color: 'default', label: '已取消' },
+const formatJSON = (value: string) => {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 };
-
-const formatTime = (value?: string) =>
-  value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '--';
 
 const formatBytes = (value: number) => {
   if (!value) return '--';
@@ -71,14 +74,38 @@ type AutomationHistoryProps = {
   sources: AutomationSource[];
   workflows: AutomationWorkflow[];
   refreshToken: number;
+  initialSourceID?: number;
+  initialRunID?: number;
+  initialStatus?: AutomationRunStatus;
+  initialTab?: 'events' | 'runs';
+  active?: boolean;
 };
 
 const AutomationHistory = ({
   sources,
   workflows,
   refreshToken,
+  initialSourceID,
+  initialRunID,
+  initialStatus,
+  initialTab = 'events',
+  active = true,
 }: AutomationHistoryProps) => {
-  const [sourceID, setSourceID] = useState<number>();
+  const [sourceID, setSourceID] = useState<number | undefined>(initialSourceID);
+  const [status, setStatus] = useState<AutomationRunStatus | undefined>(
+    initialStatus,
+  );
+  const [tab, setTab] = useState(initialTab);
+  const [entryPage, setEntryPage] = useState(1);
+  const [runPage, setRunPage] = useState(1);
+  const [loadError, setLoadError] = useState('');
+  const [detailID, setDetailID] = useState<number | undefined>(initialRunID);
+  const [detailError, setDetailError] = useState('');
+  const [detailRefresh, setDetailRefresh] = useState(0);
+  const [busyRunID, setBusyRunID] = useState<number>();
+  const loadSequence = useRef(0);
+  const loadInFlight = useRef(false);
+  const detailSequence = useRef(0);
   const [entries, setEntries] = useState<AutomationEntryHistoryItem[]>([]);
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [entryTotal, setEntryTotal] = useState(0);
@@ -95,67 +122,128 @@ const AutomationHistory = ({
     [sourceID, workflows],
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [entryResponse, runResponse] = await Promise.all([
-        listAutomationEntries({ sourceId: sourceID, limit: 50 }),
-        listAutomationRuns({ workflowId: workflowID, limit: 50 }),
-      ]);
-      if (entryResponse.code !== 0 || !entryResponse.data) {
-        throw new Error(entryResponse.message || '获取条目记录失败');
+  const load = useCallback(
+    async (silent = false) => {
+      if (silent && loadInFlight.current) return;
+      const requestID = ++loadSequence.current;
+      loadInFlight.current = true;
+      if (!silent) setLoading(true);
+      try {
+        const [entryResponse, runResponse] = await Promise.all([
+          listAutomationEntries({
+            sourceId: sourceID,
+            limit: 20,
+            offset: (entryPage - 1) * 20,
+          }),
+          sourceID && !workflowID
+            ? Promise.resolve({
+                code: 0,
+                message: '',
+                data: { items: [], total: 0 },
+              })
+            : listAutomationRuns({
+                workflowId: workflowID,
+                status,
+                limit: 20,
+                offset: (runPage - 1) * 20,
+              }),
+        ]);
+        if (entryResponse.code !== 0 || !entryResponse.data) {
+          throw new Error(entryResponse.message || '获取条目记录失败');
+        }
+        if (runResponse.code !== 0 || !runResponse.data) {
+          throw new Error(runResponse.message || '获取运行记录失败');
+        }
+        if (requestID !== loadSequence.current) return;
+        setLoadError('');
+        setEntries(entryResponse.data.items || []);
+        setEntryTotal(entryResponse.data.total || 0);
+        setRuns(runResponse.data.items || []);
+        setRunTotal(runResponse.data.total || 0);
+      } catch (error: any) {
+        if (requestID === loadSequence.current)
+          setLoadError(error?.data || error?.message || '获取自动化历史失败');
+      } finally {
+        if (requestID === loadSequence.current) {
+          setLoading(false);
+          loadInFlight.current = false;
+        }
       }
-      if (runResponse.code !== 0 || !runResponse.data) {
-        throw new Error(runResponse.message || '获取运行记录失败');
-      }
-      setEntries(entryResponse.data.items || []);
-      setEntryTotal(entryResponse.data.total || 0);
-      setRuns(runResponse.data.items || []);
-      setRunTotal(runResponse.data.total || 0);
-    } catch (error: any) {
-      messageApi.error(error?.data || error?.message || '获取自动化历史失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [messageApi, sourceID, workflowID]);
+    },
+    [sourceID, workflowID, status, entryPage, runPage],
+  );
 
   useEffect(() => {
+    if (!active) return;
+    setEntries([]);
+    setRuns([]);
+    setEntryTotal(0);
+    setRunTotal(0);
     void load();
-  }, [load, refreshToken]);
+    const timer = window.setInterval(() => void load(true), 15_000);
+    return () => {
+      window.clearInterval(timer);
+      loadSequence.current += 1;
+    };
+  }, [active, load, refreshToken]);
 
-  const openRun = async (runID: number) => {
-    setDetailLoading(true);
-    try {
-      const response = await getAutomationRun(runID);
-      if (response.code !== 0 || !response.data) {
-        throw new Error(response.message || '获取运行详情失败');
+  useEffect(() => {
+    if (!detailID || !active) return;
+    let disposed = false;
+    let inFlight = false;
+    const fetchDetail = async (silent = false) => {
+      if (inFlight) return;
+      inFlight = true;
+      const requestID = ++detailSequence.current;
+      if (!silent) {
+        setDetail(undefined);
+        setDetailLoading(true);
       }
-      setDetail(response.data);
+      try {
+        const response = await getAutomationRun(detailID);
+        if (response.code !== 0 || !response.data)
+          throw new Error(response.message || '获取运行详情失败');
+        if (disposed || requestID !== detailSequence.current) return;
+        setDetail(response.data);
+        setDetailError('');
+      } catch (error: any) {
+        if (!disposed && requestID === detailSequence.current)
+          setDetailError(error?.data || error?.message || '获取运行详情失败');
+      } finally {
+        inFlight = false;
+        if (!disposed && requestID === detailSequence.current)
+          setDetailLoading(false);
+      }
+    };
+    setDetailError('');
+    void fetchDetail();
+    const timer = window.setInterval(() => void fetchDetail(true), 15_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [active, detailID, detailRefresh]);
+
+  const openRun = (runID: number) => setDetailID(runID);
+
+  const changeRun = async (runID: number, action: 'retry' | 'cancel') => {
+    setBusyRunID(runID);
+    try {
+      const response = await (action === 'retry'
+        ? retryAutomationRun(runID)
+        : cancelAutomationRun(runID));
+      if (response.code !== 0)
+        throw new Error(response.message || '更新运行失败');
+      messageApi.success(
+        action === 'retry' ? '流程已进入重试队列' : '流程已取消',
+      );
+      await load(true);
+      if (detailID === runID) setDetailRefresh((value) => value + 1);
     } catch (error: any) {
-      messageApi.error(error?.data || error?.message || '获取运行详情失败');
+      messageApi.error(error?.data || error?.message || '更新运行失败');
     } finally {
-      setDetailLoading(false);
+      setBusyRunID(undefined);
     }
-  };
-
-  const retryRun = async (runID: number) => {
-    const response = await retryAutomationRun(runID);
-    if (response.code !== 0) {
-      messageApi.error(response.message || '重试失败');
-      return;
-    }
-    messageApi.success('流程已进入重试队列');
-    await load();
-  };
-
-  const cancelRun = async (runID: number) => {
-    const response = await cancelAutomationRun(runID);
-    if (response.code !== 0) {
-      messageApi.error(response.message || '取消失败');
-      return;
-    }
-    messageApi.success('流程已取消');
-    await load();
   };
 
   const repeatRun = async (run: AutomationRun) => {
@@ -307,7 +395,16 @@ const AutomationHistory = ({
       width: 180,
       render: (_, run) => formatTime(run.started_at || run.created_at),
     },
-    { title: '流程', dataIndex: 'workflow_name' },
+    {
+      title: '流程',
+      dataIndex: 'workflow_name',
+      render: (name: string, run) => (
+        <Space orientation="vertical" size={0}>
+          <Text strong>{name}</Text>
+          <Text type="secondary">运行 #{run.id}</Text>
+        </Space>
+      ),
+    },
     {
       title: '版本',
       dataIndex: 'workflow_version',
@@ -356,7 +453,7 @@ const AutomationHistory = ({
         <Space>
           <Button
             icon={<EyeOutlined />}
-            loading={detailLoading}
+            loading={detailLoading && detailID === run.id}
             onClick={() => openRun(run.id)}
             size="small"
           >
@@ -365,7 +462,8 @@ const AutomationHistory = ({
           {(run.status === 'failed' || run.status === 'partial') && (
             <Button
               icon={<ReloadOutlined />}
-              onClick={() => retryRun(run.id)}
+              loading={busyRunID === run.id}
+              onClick={() => changeRun(run.id, 'retry')}
               size="small"
             >
               重试
@@ -400,7 +498,7 @@ const AutomationHistory = ({
           )}
           {(run.status === 'pending' || run.status === 'running') && (
             <Popconfirm
-              onConfirm={() => cancelRun(run.id)}
+              onConfirm={() => changeRun(run.id, 'cancel')}
               title="取消这次运行？"
             >
               <Button danger icon={<StopOutlined />} size="small">
@@ -416,26 +514,68 @@ const AutomationHistory = ({
   return (
     <>
       {contextHolder}
-      <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-        <Alert
-          description="首次扫描发现的存量条目不会自动运行，但会保留在列表中，可逐条手动执行；已经结束的运行也可以重新运行。"
-          showIcon
-          title="存量基线不会自动运行"
-          type="info"
-        />
-        <Select
-          allowClear
-          aria-label="筛选自动化"
-          onChange={setSourceID}
-          options={sources.map((source) => ({
-            label: source.name,
-            value: source.id,
-          }))}
-          placeholder="全部自动化"
-          style={{ width: 240 }}
-          value={sourceID}
-        />
+      <div className={styles.history}>
+        <div className={styles.heading}>
+          <div>
+            <h2>执行记录</h2>
+            <p>从发现条目到执行结束，查看每一次自动化的处理结果。</p>
+          </div>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={() => load()}
+          >
+            刷新记录
+          </Button>
+        </div>
+        {loadError && (
+          <Alert
+            showIcon
+            title="记录刷新失败"
+            description={loadError}
+            type="error"
+          />
+        )}
+        <div className={styles.filters}>
+          <Select
+            allowClear
+            aria-label="筛选自动化"
+            onChange={(value) => {
+              setSourceID(value);
+              setRunPage(1);
+              setEntryPage(1);
+            }}
+            options={sources.map((source) => ({
+              label: source.name,
+              value: source.id,
+            }))}
+            placeholder="全部自动化"
+            showSearch={{ optionFilterProp: 'label' }}
+            style={{ width: 240, maxWidth: '100%' }}
+            value={sourceID}
+          />
+          {tab === 'runs' && (
+            <Select
+              allowClear
+              aria-label="筛选运行状态"
+              onChange={(value) => {
+                setStatus(value);
+                setRunPage(1);
+              }}
+              options={Object.entries(runStatusMeta).map(([value, meta]) => ({
+                value,
+                label: meta.label,
+              }))}
+              placeholder="全部运行状态"
+              style={{ width: 160 }}
+              value={status}
+            />
+          )}
+          <span className={styles.refreshNote}>每 15 秒更新</span>
+        </div>
         <Tabs
+          activeKey={tab}
+          onChange={(value) => setTab(value as 'events' | 'runs')}
           items={[
             {
               key: 'events',
@@ -446,7 +586,14 @@ const AutomationHistory = ({
                   dataSource={entries}
                   loading={loading}
                   locale={{ emptyText: <Empty description="暂无条目记录" /> }}
-                  pagination={false}
+                  pagination={{
+                    current: entryPage,
+                    pageSize: 20,
+                    total: entryTotal,
+                    onChange: setEntryPage,
+                    showSizeChanger: false,
+                    hideOnSinglePage: true,
+                  }}
                   rowKey={(item) => item.entry.id}
                   scroll={{ x: 1000 }}
                 />
@@ -461,7 +608,14 @@ const AutomationHistory = ({
                   dataSource={runs}
                   loading={loading}
                   locale={{ emptyText: <Empty description="暂无运行记录" /> }}
-                  pagination={false}
+                  pagination={{
+                    current: runPage,
+                    pageSize: 20,
+                    total: runTotal,
+                    onChange: setRunPage,
+                    showSizeChanger: false,
+                    hideOnSinglePage: true,
+                  }}
                   rowKey="id"
                   scroll={{ x: 1100 }}
                 />
@@ -469,15 +623,46 @@ const AutomationHistory = ({
             },
           ]}
         />
-      </Space>
+        {tab === 'events' && (
+          <p className={styles.baselineNote}>
+            首次检查发现的存量条目只作基线记录。需要处理某一条时，可手动执行。
+          </p>
+        )}
+      </div>
 
       <Drawer
         destroyOnHidden
-        onClose={() => setDetail(undefined)}
-        open={Boolean(detail)}
+        extra={
+          detail &&
+          (detail.run.status === 'failed' ||
+            detail.run.status === 'partial') ? (
+            <Button
+              icon={<ReloadOutlined />}
+              loading={busyRunID === detail.run.id}
+              onClick={() => changeRun(detail.run.id, 'retry')}
+              type="primary"
+            >
+              重试运行
+            </Button>
+          ) : undefined
+        }
+        onClose={() => {
+          setDetailID(undefined);
+          setDetail(undefined);
+        }}
+        loading={detailLoading}
+        open={Boolean(detailID)}
         size="large"
-        title={detail ? `运行 #${detail.run.id}` : '运行详情'}
+        title={`运行 #${detailID || ''}`}
       >
+        {detailError && (
+          <Alert
+            showIcon
+            title="无法更新运行详情"
+            description={detailError}
+            type="error"
+          />
+        )}
         {detail && (
           <Space orientation="vertical" size={20} style={{ width: '100%' }}>
             <Descriptions
@@ -552,27 +737,116 @@ const AutomationHistory = ({
                   : []),
               ]}
             />
-            <Table
-              columns={[
-                { title: '节点', dataIndex: 'node_name' },
-                { title: '类型', dataIndex: 'node_type' },
-                { title: '状态', dataIndex: 'status' },
-                {
-                  title: '尝试',
-                  render: (_, node) => `${node.attempt}/${node.max_attempts}`,
-                },
-                {
-                  title: '计划继续',
-                  dataIndex: 'next_attempt_at',
-                  render: formatTime,
-                },
-                { title: '错误', dataIndex: 'error_message', ellipsis: true },
-              ]}
-              dataSource={detail.node_runs}
-              pagination={false}
-              rowKey="id"
-              size="small"
-            />
+            <section className={styles.nodeSection} aria-label="节点执行过程">
+              <h3>
+                节点执行过程{' '}
+                <span>
+                  {
+                    detail.node_runs.filter(
+                      (node) => node.status === 'succeeded',
+                    ).length
+                  }{' '}
+                  / {detail.node_runs.length} 已完成
+                </span>
+              </h3>
+              {detail.node_runs.length === 0 && (
+                <Empty description="流程等待调度，尚无节点记录" />
+              )}
+              <ol className={styles.nodes}>
+                {detail.node_runs.map((node) => {
+                  const meta = runStatusMeta[
+                    node.status as AutomationRunStatus
+                  ] || {
+                    color: 'default',
+                    label:
+                      (
+                        {
+                          skipped: '已跳过',
+                          waiting: '等待中',
+                          retrying: '等待重试',
+                        } as Record<string, string>
+                      )[node.status] || node.status,
+                  };
+                  return (
+                    <li className={styles.node} key={node.id}>
+                      <span
+                        className={styles.nodeIcon}
+                        data-status={node.status}
+                      >
+                        {node.status === 'succeeded' ? (
+                          <CheckCircleOutlined />
+                        ) : node.status === 'failed' ? (
+                          <ExclamationCircleOutlined />
+                        ) : (
+                          <ClockCircleOutlined />
+                        )}
+                      </span>
+                      <div className={styles.nodeContent}>
+                        <div className={styles.nodeHeading}>
+                          <strong>
+                            {node.node_name ||
+                              automationNodeLabel({
+                                id: node.node_id,
+                                type: node.node_type,
+                                position: { x: 0, y: 0 },
+                              })}
+                          </strong>
+                          <Tag color={meta.color}>{meta.label}</Tag>
+                        </div>
+                        <p className={styles.nodeMeta}>
+                          尝试 {node.attempt} / {node.max_attempts}
+                          {node.started_at
+                            ? ` · ${formatTime(node.started_at)}`
+                            : ''}
+                        </p>
+                        {node.next_attempt_at && (
+                          <p className={styles.nodeMeta}>
+                            计划继续：{formatTime(node.next_attempt_at)}
+                          </p>
+                        )}
+                        {node.error_message && (
+                          <Alert
+                            showIcon
+                            title={node.error_message}
+                            type="error"
+                          />
+                        )}
+                        {(node.input_json || node.output_json) && (
+                          <Collapse
+                            ghost
+                            items={[
+                              {
+                                key: 'data',
+                                label: '查看输入与输出',
+                                children: (
+                                  <div className={styles.nodeData}>
+                                    {node.input_json && (
+                                      <>
+                                        <h4>输入</h4>
+                                        <pre>{formatJSON(node.input_json)}</pre>
+                                      </>
+                                    )}
+                                    {node.output_json && (
+                                      <>
+                                        <h4>输出</h4>
+                                        <pre>
+                                          {formatJSON(node.output_json)}
+                                        </pre>
+                                      </>
+                                    )}
+                                  </div>
+                                ),
+                              },
+                            ]}
+                            size="small"
+                          />
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
           </Space>
         )}
       </Drawer>

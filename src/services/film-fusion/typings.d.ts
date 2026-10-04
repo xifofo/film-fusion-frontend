@@ -79,6 +79,7 @@ declare namespace API {
 
   /** 目录配置 */
   type CloudDirectory = {
+    upgrade_policy?: string;
     id: number;
     user_id: number;
     cloud_storage_id: number;
@@ -91,6 +92,7 @@ declare namespace API {
     exclude_extensions?: string;
     exclude_smaller_than_mb?: number;
     classify_by_category?: boolean;
+    recognition_source?: 'moviepilot' | 'local' | 'shadow' | 'medianame' | '';
     created_at: string;
     updated_at: string;
     deleted_at?: string;
@@ -561,6 +563,7 @@ declare namespace API {
 
   /** 创建目录配置参数 */
   type CreateCloudDirectoryParams = {
+    upgrade_policy?: string;
     cloud_storage_id: number;
     directory_name: string;
     directory_id: string;
@@ -571,6 +574,7 @@ declare namespace API {
     exclude_extensions?: string;
     exclude_smaller_than_mb?: number;
     classify_by_category?: boolean;
+    recognition_source?: 'moviepilot' | 'local' | 'shadow' | 'medianame' | '';
   };
 
   /** 更新云盘路径参数 */
@@ -590,6 +594,7 @@ declare namespace API {
 
   /** 更新目录配置参数 */
   type UpdateCloudDirectoryParams = {
+    upgrade_policy?: string;
     id: number;
     cloud_storage_id?: number;
     directory_name?: string;
@@ -601,9 +606,11 @@ declare namespace API {
     exclude_extensions?: string;
     exclude_smaller_than_mb?: number;
     classify_by_category?: boolean;
+    recognition_source?: 'moviepilot' | 'local' | 'shadow' | 'medianame' | '';
   };
 
   type Organize115CookieParams = {
+    plan_id?: string;
     cloud_directory_id: number;
     folder_id?: string;
     folder_ids?: string[];
@@ -615,7 +622,7 @@ declare namespace API {
     }>;
     dry_run?: boolean;
     media_type?: 'movie' | 'tv';
-    recognition_source?: 'moviepilot' | 'local' | 'shadow';
+    recognition_source?: 'moviepilot' | 'local' | 'shadow' | 'medianame';
     category?: string;
     best_version_enabled?: boolean;
     delete_source_folder?: boolean;
@@ -684,6 +691,7 @@ declare namespace API {
   };
 
   type Organize115ShadowComparison = {
+ medianame?: Organize115ItemResult;
     status: string;
     matched: boolean;
     recognition?: OrganizeRecognitionShadowComparison;
@@ -699,7 +707,7 @@ declare namespace API {
       matched: boolean;
     }>;
     differences: Array<{
-      stage: 'recognition' | 'variable' | 'transfer' | 'target';
+      stage: 'recognition' | 'variable' | 'transfer' | 'target' | 'plan';
       field: string;
       label: string;
       moviepilot: string;
@@ -708,6 +716,12 @@ declare namespace API {
   };
 
   type Organize115ItemResult = {
+    upgrade?: import('./upgrade').UpgradeDecision;
+ engine?: string;
+ season_episode?: string;
+ medianame?: MedianameRecognition;
+ recognition_raw?: Record<string, unknown>;
+ rename_context?: Record<string, unknown>;
     file_id: string;
     file_name: string;
     file_size?: number;
@@ -759,13 +773,24 @@ declare namespace API {
     error?: string;
   };
 
-  type Organize115CookieResult = {
+  type MediaPipelineSnapshot = {
+ schema: number; source: string; package_version: string; config_version: string;
+ };
+ type MedianameRecognition = {
+ engine: string; package_version: string; error?: string;
+ result?: {status: string; meta_info: Record<string, unknown>; media_info?: Record<string, unknown>; candidates?: unknown[]; selection_basis?: string};
+ };
+ type Organize115CookieResult = {
+    upgrade_policy?: import('./upgrade').UpgradePolicy;
+    upgrade_job?: import('./upgrade').UpgradeJob;
+ plan_id?: string;
+ pipeline?: MediaPipelineSnapshot;
     cloud_directory_id: number;
     cloud_storage_id: number;
     folder_id: string;
     folder_ids?: string[];
     media_type?: 'movie' | 'tv';
-    recognition_source: 'moviepilot' | 'local' | 'shadow';
+    recognition_source: 'moviepilot' | 'local' | 'shadow' | 'medianame';
     category?: string;
     best_version_enabled?: boolean;
     dry_run: boolean;
@@ -820,7 +845,7 @@ declare namespace API {
     depth: number;
     max_depth: number;
     media_type?: 'movie' | 'tv';
-    recognition_source: 'moviepilot' | 'local' | 'shadow';
+    recognition_source: 'moviepilot' | 'local' | 'shadow' | 'medianame';
     category?: string;
     tmdb_refs?: OrganizePreviewTmdbRef[];
     multi_episode_count?: number;
@@ -855,7 +880,7 @@ declare namespace API {
     recursive_depth?: number;
     task_limit?: number;
     media_type?: 'movie' | 'tv';
-    recognition_source?: 'moviepilot' | 'local' | 'shadow';
+    recognition_source?: 'moviepilot' | 'local' | 'shadow' | 'medianame';
     category?: string;
     best_version_enabled?: boolean;
     filename_regex_enabled?: boolean;
@@ -1640,7 +1665,7 @@ declare namespace API {
       };
     };
     media_recognition: {
-      source: 'moviepilot' | 'local' | 'shadow';
+      source: 'moviepilot' | 'local' | 'shadow' | 'medianame';
     };
     site: {
       login_title: string;

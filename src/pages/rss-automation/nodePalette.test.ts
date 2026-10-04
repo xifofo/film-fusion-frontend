@@ -25,6 +25,12 @@ describe('RSS workflow node palette', () => {
     ]);
     expect(groupTypes('115 OpenAPI')).toEqual([
       'offline115_openapi',
+      'torrent115_openapi',
+      'offline115_bt_openapi',
+      'list115_tasks_openapi',
+      'quota115_openapi',
+      'delete115_task_openapi',
+      'clear115_tasks_openapi',
       'rename115_openapi',
     ]);
     expect(groupTypes('115 Cookie / 通用')).toEqual(['offline115', 'wait115']);

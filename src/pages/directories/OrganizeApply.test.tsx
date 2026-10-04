@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { ConfigProvider } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -62,7 +63,14 @@ vi.mock('antd', async (importOriginal) => {
   };
 });
 
-const preview: API.Organize115CookieResult = {
+const preview = {
+  plan_id: 'confirmed-plan',
+  pipeline: {
+    schema: 1,
+    source: 'moviepilot',
+    package_version: 'v0.1.1',
+    config_version: 'frozen-config',
+  },
   cloud_directory_id: 2,
   cloud_storage_id: 3,
   folder_id: '100',
@@ -88,7 +96,7 @@ const preview: API.Organize115CookieResult = {
       ],
     },
   ],
-};
+} satisfies API.Organize115CookieResult;
 
 const task: API.OrganizePreviewTask = {
   id: 9,
@@ -108,7 +116,37 @@ const task: API.OrganizePreviewTask = {
   updated_at: '2026-09-30T01:00:00Z',
 };
 
-async function applyPreview(previewOnly = false, loadPreview = true) {
+const enginePreview = (
+  source: 'moviepilot' | 'medianame',
+  error?: string,
+): API.Organize115CookieResult => ({
+  ...preview,
+  plan_id: `${source}-selected-plan`,
+  recognition_source: source,
+  pipeline: { ...preview.pipeline, source },
+  groups: [
+    {
+      ...preview.groups[0],
+      items: [
+        {
+          ...preview.groups[0].items[0],
+          engine: source,
+          error,
+          target_path: error ? '' : `/影视/${source}/Selected.S03E21.mkv`,
+          strm_path: `/library/影视/${source}/Selected.S03E21.strm`,
+        },
+      ],
+    },
+  ],
+});
+
+async function applyPreview(
+  previewOnly = false,
+  loadPreview = true,
+  historical = false,
+  beforeConfirm?: () => Promise<boolean | undefined>,
+  beforeOpenConfirm?: () => Promise<void>,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -131,6 +169,7 @@ async function applyPreview(previewOnly = false, loadPreview = true) {
     fireEvent.click(await screen.findByRole('button', { name: /查看结果/ }));
     await screen.findByRole('button', { name: /确认预览 \(1\/1\)/ });
   }
+  await beforeOpenConfirm?.();
   if (!previewOnly) {
     fireEvent.click(screen.getByRole('switch', { name: '预览模式' }));
   }
@@ -143,15 +182,25 @@ async function applyPreview(previewOnly = false, loadPreview = true) {
     expect((confirm as HTMLButtonElement).disabled).toBe(false),
   );
   fireEvent.click(confirm);
+  if (historical) {
+    await screen.findByText('历史预览缺少引擎与配置快照，请重新预览');
+    return;
+  }
+  if (beforeConfirm && (await beforeConfirm()) === false) return;
+  const callsBeforeConfirm = vi.mocked(organize115Cookie).mock.calls.length;
   if (previewOnly) {
     expect(screen.queryByText('整理完成后删除原文件夹')).toBeNull();
   }
-  fireEvent.click(
-    await screen.findByRole('button', {
-      name: previewOnly ? /生成预览/ : /执行整理/,
-    }),
+  const execute = await screen.findByRole('button', {
+    name: previewOnly ? /生成预览/ : /执行整理/,
+  });
+  await waitFor(() =>
+    expect((execute as HTMLButtonElement).disabled).toBe(false),
   );
-  await waitFor(() => expect(organize115Cookie).toHaveBeenCalledOnce());
+  fireEvent.click(execute);
+  await waitFor(() =>
+    expect(organize115Cookie).toHaveBeenCalledTimes(callsBeforeConfirm + 1),
+  );
 }
 
 describe('confirm organize error reporting', () => {
@@ -209,6 +258,312 @@ describe('confirm organize error reporting', () => {
 
   afterEach(cleanup);
 
+  it('executes an upgrade with the original source directory retained for recovery', async () => {
+    const policy = {
+      enabled: true,
+      name: '画质优先',
+      rules: [],
+      bonuses: [],
+      exclude: [],
+      max_size_mb: 0,
+      same_tier: false,
+      min_score_gain: 10,
+    };
+    const upgraded: API.Organize115CookieResult = {
+      ...preview,
+      upgrade_policy: policy,
+      groups: [
+        {
+          ...preview.groups[0],
+          items: [
+            {
+              ...preview.groups[0].items[0],
+              upgrade: {
+                action: 'replace',
+                reason: '优先级提升',
+                media_key: 'tv:91801:s3:e21',
+                rank: { tier: 1, label: '2160p REMUX', score: 0, reasons: [] },
+                existing: [],
+                bindings: [],
+                changes: [],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { task, result: upgraded },
+    });
+    vi.mocked(organize115Cookie).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { ...upgraded, dry_run: false },
+    });
+    await applyPreview(false, true, false, async () => {
+      const checkbox = screen.getByRole('checkbox', {
+        name: '洗版保留源目录，用于失败恢复',
+      }) as HTMLInputElement;
+      expect(checkbox.disabled).toBe(true);
+      expect(checkbox.checked).toBe(false);
+      expect(
+        screen.getByText(/旧 STRM 和字幕内容保存在恢复记录中/),
+      ).toBeTruthy();
+      return undefined;
+    });
+    expect(organize115Cookie).toHaveBeenCalledWith(
+      expect.objectContaining({ plan_id: 'confirmed-plan', file_ids: ['101'] }),
+    );
+    expect(
+      vi.mocked(organize115Cookie).mock.lastCall?.[0].delete_source_folder,
+    ).not.toBe(true);
+  });
+
+  it('prefers medianame for display without changing the engine or plan used at confirmation', async () => {
+    const mp2Item = preview.groups[0].items[0];
+    const medianame = {
+      ...mp2Item,
+      engine: 'medianame',
+      title_year: 'medianame 标题 (2024)',
+      tmdb_id: '123',
+      target_path: '/medianame/Show/S03E21.mkv',
+    };
+    const shadow: API.Organize115CookieResult = {
+      ...preview,
+      recognition_source: 'shadow',
+      pipeline: { ...preview.pipeline, source: 'shadow' },
+      groups: [
+        {
+          ...preview.groups[0],
+          items: [
+            {
+              ...mp2Item,
+              shadow_comparison: {
+                medianame,
+                status: 'different',
+                matched: false,
+                differences: [],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { task, result: shadow },
+    });
+    vi.mocked(organize115Cookie).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { ...shadow, dry_run: false },
+    });
+    await applyPreview(
+      false,
+      true,
+      false,
+      async () => {
+        const dialog = within(screen.getByRole('dialog'));
+        expect(
+          (dialog.getByRole('radio', { name: 'MP2' }) as HTMLInputElement)
+            .checked,
+        ).toBe(true);
+        expect(dialog.getByText(mp2Item.target_path)).toBeTruthy();
+        expect(dialog.queryByText(medianame.target_path)).toBeNull();
+        return undefined;
+      },
+      async () => {
+        expect(
+          (
+            screen.getByRole('radio', {
+              name: 'medianame 识别',
+            }) as HTMLInputElement
+          ).checked,
+        ).toBe(true);
+        expect(screen.getByText(medianame.target_path)).toBeTruthy();
+        expect(screen.getByText(medianame.title_year)).toBeTruthy();
+        expect(screen.queryByText(mp2Item.target_path)).toBeNull();
+        fireEvent.click(screen.getByRole('radio', { name: 'MP2 识别' }));
+        await screen.findByText(mp2Item.target_path);
+        expect(screen.queryByText(medianame.target_path)).toBeNull();
+        fireEvent.click(screen.getByRole('radio', { name: 'medianame 识别' }));
+        await screen.findByText(medianame.target_path);
+        expect(organize115Cookie).not.toHaveBeenCalled();
+        expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+      },
+    );
+    expect(organize115Cookie).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan_id: 'confirmed-plan',
+        recognition_source: 'shadow',
+        dry_run: false,
+        file_ids: ['101'],
+      }),
+    );
+    expect(shadow.groups?.[0].items?.[0].target_path).toBe(mp2Item.target_path);
+  });
+
+  it.each(['medianame', 'moviepilot'] as const)(
+    'can select %s at confirmation and execute only its newly previewed plan',
+    async (source) => {
+      const original =
+        source === 'medianame'
+          ? {
+              ...preview,
+              recognition_source: 'shadow' as const,
+              pipeline: { ...preview.pipeline, source: 'shadow' },
+            }
+          : enginePreview('medianame');
+      vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+        code: 0,
+        message: '',
+        data: { task, result: original },
+      });
+      const selected = enginePreview(source);
+      vi.mocked(organize115Cookie)
+        .mockResolvedValueOnce({ code: 0, message: '', data: selected })
+        .mockResolvedValueOnce({
+          code: 0,
+          message: '',
+          data: { ...selected, dry_run: false },
+        });
+
+      await applyPreview(false, true, false, async () => {
+        const dialog = within(screen.getByRole('dialog'));
+        expect(
+          (
+            dialog.getByRole('radio', {
+              name: source === 'medianame' ? 'MP2' : 'medianame',
+            }) as HTMLInputElement
+          ).checked,
+        ).toBe(true);
+        fireEvent.click(
+          dialog.getByRole('radio', {
+            name: source === 'medianame' ? 'medianame' : 'MP2',
+          }),
+        );
+        await dialog.findByText(`/影视/${source}/Selected.S03E21.mkv`);
+        expect(organize115Cookie).toHaveBeenCalledOnce();
+        expect(vi.mocked(organize115Cookie).mock.calls[0][0]).toMatchObject({
+          dry_run: true,
+          recognition_source: source,
+          folder_ids: ['100'],
+          file_ids: ['101'],
+          folder_contexts: [
+            {
+              folder_id: '100',
+              folder_name: 'Show S03',
+              folder_path: '云下载 / Show S03',
+            },
+          ],
+        });
+        expect(
+          vi.mocked(organize115Cookie).mock.calls[0][0].plan_id,
+        ).toBeUndefined();
+        expect(
+          vi.mocked(organize115Cookie).mock.calls[0][0].delete_source_folder,
+        ).toBeUndefined();
+        expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+        return undefined;
+      });
+      expect(vi.mocked(organize115Cookie).mock.calls[1][0]).toMatchObject({
+        dry_run: false,
+        recognition_source: source,
+        plan_id: `${source}-selected-plan`,
+        file_ids: ['101'],
+      });
+      await waitFor(() =>
+        expect(deleteOrganizePreviewTask).toHaveBeenCalledWith(9),
+      );
+    },
+  );
+
+  it('blocks execution when the selected engine needs review instead of falling back to MP2', async () => {
+    const failed = enginePreview(
+      'medianame',
+      'medianame: review，需要核对冲突',
+    );
+    vi.mocked(organize115Cookie).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: failed,
+    });
+    await applyPreview(false, true, false, async () => {
+      const dialog = within(screen.getByRole('dialog'));
+      fireEvent.click(dialog.getByRole('radio', { name: 'medianame' }));
+      expect((await dialog.findByRole('alert')).textContent).toContain(
+        'review',
+      );
+      const execute = dialog.getByRole('button', {
+        name: /执行整理/,
+      }) as HTMLButtonElement;
+      expect(execute.disabled).toBe(true);
+      fireEvent.click(execute);
+      expect(organize115Cookie).toHaveBeenCalledOnce();
+      expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+      return false;
+    });
+  });
+
+  it('ignores a late preview response after switching back to the original engine', async () => {
+    let finishPreview!: (
+      value: API.Response<API.Organize115CookieResult>,
+    ) => void;
+    vi.mocked(organize115Cookie)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishPreview = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({
+        code: 0,
+        message: '',
+        data: { ...preview, dry_run: false },
+      });
+    await applyPreview(false, true, false, async () => {
+      const dialog = within(screen.getByRole('dialog'));
+      fireEvent.click(dialog.getByRole('radio', { name: 'medianame' }));
+      expect(
+        (dialog.getByRole('button', { name: /执行整理/ }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true);
+      fireEvent.click(dialog.getByRole('radio', { name: 'MP2' }));
+      finishPreview({ code: 0, message: '', data: enginePreview('medianame') });
+      await waitFor(() =>
+        expect(
+          (dialog.getByRole('radio', { name: 'MP2' }) as HTMLInputElement)
+            .checked,
+        ).toBe(true),
+      );
+      expect(
+        dialog.queryByText('/影视/medianame/Selected.S03E21.mkv'),
+      ).toBeNull();
+      return undefined;
+    });
+    expect(vi.mocked(organize115Cookie).mock.calls[1][0]).toMatchObject({
+      plan_id: 'confirmed-plan',
+      recognition_source: 'moviepilot',
+      dry_run: false,
+    });
+  });
+
+  it('requires a new preview for historical results without a saved plan', async () => {
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: {
+        task,
+        result: { ...preview, plan_id: undefined, pipeline: undefined },
+      },
+    });
+    await applyPreview(false, true, true);
+    expect(organize115Cookie).not.toHaveBeenCalled();
+  });
+
   it('keeps directory failures and raw response, without reporting success or deleting the preview task', async () => {
     const error = '批量重命名失败: 115 Cookie 已失效';
     vi.mocked(organize115Cookie).mockResolvedValue({
@@ -221,6 +576,12 @@ describe('confirm organize error reporting', () => {
       },
     });
     await applyPreview();
+    expect(organize115Cookie).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan_id: 'confirmed-plan',
+        recognition_source: 'moviepilot',
+      }),
+    );
     await screen.findByText('有 1 个目录整理失败');
     expect(screen.getByText(error)).toBeTruthy();
     expect(screen.queryByText(/整理完成，共/)).toBeNull();

@@ -45,6 +45,10 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
   ],
   [
     {
+      title: '下载准备',
+      types: ['torrent_to_magnet'],
+    },
+    {
       title: 'qBittorrent',
       types: [
         'qbittorrent',
@@ -55,7 +59,16 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
     },
     {
       title: '115 OpenAPI',
-      types: ['offline115_openapi', 'rename115_openapi'],
+      types: [
+        'offline115_openapi',
+        'torrent115_openapi',
+        'offline115_bt_openapi',
+        'list115_tasks_openapi',
+        'quota115_openapi',
+        'delete115_task_openapi',
+        'clear115_tasks_openapi',
+        'rename115_openapi',
+      ],
     },
     {
       title: '115 Cookie / 通用',

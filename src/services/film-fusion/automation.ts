@@ -83,6 +83,13 @@ export type AutomationNodeType =
   | 'delete_qbittorrent'
   | 'offline115'
   | 'offline115_openapi'
+  | 'torrent_to_magnet'
+  | 'torrent115_openapi'
+  | 'offline115_bt_openapi'
+  | 'list115_tasks_openapi'
+  | 'quota115_openapi'
+  | 'delete115_task_openapi'
+  | 'clear115_tasks_openapi'
   | 'wait115'
   | 'rename115_openapi'
   | 'moviepilot_title_recognize'
@@ -132,6 +139,7 @@ export type AutomationNodeDefinition = {
   name?: string;
   position: AutomationPosition;
   config?: Record<string, unknown>;
+  parameter_bindings?: Record<string, string>;
   max_attempts?: number;
   ui?: Record<string, unknown>;
 };
@@ -146,6 +154,8 @@ export type AutomationEdgeDefinition = {
 
 export type AutomationDefinition = {
   schema_version: 1;
+  parameters?: Record<string, string | number | boolean>;
+  metadata?: Record<string, unknown>;
   nodes: AutomationNodeDefinition[];
   edges: AutomationEdgeDefinition[];
   viewport?: { x: number; y: number; zoom: number };
@@ -172,6 +182,7 @@ export type AutomationWorkflow = {
 };
 
 export type AutomationCreateInput = {
+  expected_version?: number;
   source: AutomationSourceInput;
   workflow: Omit<AutomationWorkflowInput, 'source_id'>;
 };
@@ -328,7 +339,14 @@ export type AutomationRunDetail = {
   node_runs: AutomationNodeRun[];
 };
 
-export type AutomationScanResult = {
+export type RSSCacheMetadata = {
+  cache_hit?: boolean;
+  cache_stale?: boolean;
+  cache_fetched_at?: string;
+  cache_warning?: string;
+};
+
+export type AutomationScanResult = RSSCacheMetadata & {
   source_id: number;
   source_name: string;
   trigger_type: AutomationTriggerType;
@@ -348,6 +366,8 @@ export type AutomationScanResult = {
 };
 
 export type AutomationDashboard = {
+  settings?: AutomationSettings[];
+  alerts?: AutomationAlert[];
   sources: AutomationSource[];
   workflows: AutomationWorkflow[];
   targets: AutomationTarget[];
@@ -359,6 +379,96 @@ export type AutomationDashboard = {
   scanning_count: number;
   node_protocols?: AutomationNodeProtocol[];
 };
+
+export type AutomationSettings = {
+  source_id: number;
+  group_name: string;
+  alerts_enabled: boolean;
+  failure_threshold: number;
+  stuck_minutes: number;
+  source_errors: boolean;
+  cooldown_minutes: number;
+};
+
+export type AutomationAlert = {
+  id: number;
+  source_id: number;
+  kind: 'source_error' | 'failed_runs' | 'stuck_node';
+  message: string;
+  active: boolean;
+  last_sent_at?: string;
+  last_error?: string;
+  updated_at: string;
+};
+
+export type AutomationTemplate = {
+  id: number;
+  name: string;
+  description: string;
+  trigger_type: AutomationTriggerType;
+  configuration_json: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AutomationRevision = {
+  id: number;
+  source_id: number;
+  workflow_id: number;
+  version: number;
+  configuration_json: string;
+  created_at: string;
+};
+
+export type AutomationBatchInput = {
+  source_ids: number[];
+  action: 'enable' | 'disable' | 'group';
+  group_name?: string;
+};
+
+export const getAutomationTemplates = () =>
+  apiClient.get<API.Response<AutomationTemplate[]>>(
+    '/api/automations/templates',
+  );
+export const saveAutomationTemplate = (
+  input: {
+    name: string;
+    description: string;
+    configuration: AutomationCreateInput;
+  },
+  id?: number,
+) =>
+  id
+    ? apiClient.put<API.Response<AutomationTemplate>>(
+        `/api/automations/templates/${id}`,
+        input,
+      )
+    : apiClient.post<API.Response<AutomationTemplate>>(
+        '/api/automations/templates',
+        input,
+      );
+export const deleteAutomationTemplate = (id: number) =>
+  apiClient.delete<API.Response<unknown>>(`/api/automations/templates/${id}`);
+export const saveAutomationSettings = (id: number, input: AutomationSettings) =>
+  apiClient.put<API.Response<AutomationSettings>>(
+    `/api/automations/${id}/settings`,
+    input,
+  );
+export const batchAutomations = (input: AutomationBatchInput) =>
+  apiClient.post<API.Response<unknown>>('/api/automations/batch', input);
+export const getAutomationRevisions = (id: number) =>
+  apiClient.get<API.Response<AutomationRevision[]>>(
+    `/api/automations/${id}/revisions`,
+  );
+export const restoreAutomationRevision = (
+  id: number,
+  revision_id: number,
+  expected_version: number,
+) =>
+  apiClient.post<API.Response<AutomationCreateResult>>(
+    `/api/automations/${id}/restore`,
+    { revision_id, expected_version },
+  );
 
 // Compatibility names keep the mature RSS workflow designer focused on RSS
 // semantics while it now persists through the shared /api/automations API.
@@ -414,13 +524,13 @@ export type RSSAutomationCreateResult = {
   validation: RSSAutomationValidationResult;
 };
 
-export type RSSAutomationParsedFeed = {
+export type RSSAutomationParsedFeed = RSSCacheMetadata & {
   title: string;
   items: Array<{ fields: Record<string, unknown>; errors?: string[] }>;
   selectors?: string[];
 };
 
-export type RSSAutomationRefreshResult = {
+export type RSSAutomationRefreshResult = RSSCacheMetadata & {
   source_id: number;
   source_name: string;
   trigger_type: 'rss';

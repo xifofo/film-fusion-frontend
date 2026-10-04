@@ -44,6 +44,7 @@ import {
   updateRSSAutomationSource,
 } from '@/services/film-fusion';
 import styles from './index.module.less';
+import RSSCacheNotice from './RSSCacheNotice';
 
 const { Paragraph, Text } = Typography;
 
@@ -122,7 +123,11 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
         throw new Error(response.message || '样本解析失败');
       }
       setSample(response.data);
-      messageApi.success(`已解析 ${response.data.items.length} 条样本`);
+      if (response.data.cache_stale) {
+        messageApi.warning('已解析上次成功的 RSS 缓存，请留意缓存时间');
+      } else {
+        messageApi.success(`已解析 ${response.data.items.length} 条样本`);
+      }
     } catch (error: any) {
       if (!error?.errorFields) {
         messageApi.error(error?.data || error?.message || '样本解析失败');
@@ -161,11 +166,17 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
     try {
       const response = await refreshRSSAutomation(source.id);
       if (response.code !== 0) throw new Error(response.message);
-      messageApi.success(
-        source.initialized
-          ? '刷新完成，新条目已进入匹配流程'
-          : '首次基线已建立；基线条目不会执行动作',
-      );
+      if (response.data?.cache_stale) {
+        messageApi.warning(
+          `已读取上次缓存：${response.data.cache_warning || '原站暂未更新'}`,
+        );
+      } else {
+        messageApi.success(
+          source.initialized
+            ? `${response.data?.cache_hit ? '缓存检查' : '刷新'}完成，新条目已进入匹配流程`
+            : '首次基线已建立；基线条目不会执行动作',
+        );
+      }
       await onChanged();
     } catch (error: any) {
       messageApi.error(error?.data || error?.message || '刷新失败');
@@ -484,6 +495,7 @@ const SourcePanel = ({ sources, loading, onChanged }: SourcePanelProps) => {
                   label: `样本预览 · ${sample.title || '未命名源'} · ${sample.items.length} 条`,
                   children: (
                     <>
+                      <RSSCacheNotice cache={sample} />
                       {(sample.items[0]?.errors?.length || 0) > 0 && (
                         <Alert
                           title={sample.items[0].errors?.join('；')}

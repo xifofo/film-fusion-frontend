@@ -1814,8 +1814,8 @@ const SystemSettingsPage: React.FC = () => {
                             className={styles.sectionAlert}
                             type="info"
                             showIcon
-                            title="影子模式用于对齐 FilmFusion 与 MP2"
-                            description="MP2 先执行并作为主结果，FilmFusion 随后使用相同输入运行；差异会记录到识别结果和日志，但本地影子不会替换 MP2 主结果。"
+                            title="影子模式比较 MP2 与 medianame 完整流程"
+                            description="影子模式采用 MP2 的整理计划；medianame 使用独立分类和模板生成对比。默认模式切换仅影响后续任务，已保存预览继续使用原计划，不会重新整理已有媒体。"
                           />
                           <div className={styles.fieldGrid}>
                             <ProFormSelect
@@ -1834,7 +1834,8 @@ const SystemSettingsPage: React.FC = () => {
                                   value: 'shadow',
                                 },
                                 { label: '仅 MP2', value: 'moviepilot' },
-                                { label: '仅 FilmFusion', value: 'local' },
+                                { label: '旧本地（兼容）', value: 'local' },
+                                { label: 'medianame', value: 'medianame' },
                               ]}
                             />
                           </div>

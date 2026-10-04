@@ -128,6 +128,97 @@ describe('automation run history', () => {
     vi.clearAllMocks();
   });
 
+  it('keeps pagination and status requests scoped to the selected automation', async () => {
+    serviceMocks.listAutomationRuns.mockResolvedValue({
+      code: 0,
+      data: { items: [historicalRun], total: 41 },
+    });
+    render(
+      <AutomationHistory
+        initialSourceID={source.id}
+        initialStatus="failed"
+        initialTab="runs"
+        refreshToken={0}
+        sources={[source]}
+        workflows={[workflow]}
+      />,
+    );
+    await screen.findByRole('tab', { name: '运行记录 41' });
+    expect(serviceMocks.listAutomationEntries).toHaveBeenCalledWith({
+      sourceId: source.id,
+      limit: 20,
+      offset: 0,
+    });
+    expect(serviceMocks.listAutomationRuns).toHaveBeenCalledWith({
+      workflowId: workflow.id,
+      status: 'failed',
+      limit: 20,
+      offset: 0,
+    });
+    fireEvent.click(screen.getByTitle('2'));
+    await waitFor(() =>
+      expect(serviceMocks.listAutomationRuns).toHaveBeenLastCalledWith({
+        workflowId: workflow.id,
+        status: 'failed',
+        limit: 20,
+        offset: 20,
+      }),
+    );
+  });
+
+  it('never falls back to all runs when the selected automation has no workflow', async () => {
+    render(
+      <AutomationHistory
+        initialSourceID={source.id}
+        initialTab="runs"
+        refreshToken={0}
+        sources={[source]}
+        workflows={[]}
+      />,
+    );
+    expect(await screen.findByText('暂无运行记录')).toBeTruthy();
+    expect(serviceMocks.listAutomationEntries).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceId: source.id }),
+    );
+    expect(serviceMocks.listAutomationRuns).not.toHaveBeenCalled();
+  });
+
+  it('opens a selected run directly and identifies the failing node', async () => {
+    serviceMocks.getAutomationRun.mockResolvedValue({
+      code: 0,
+      data: {
+        run: { ...historicalRun, status: 'failed' },
+        entry: baselineEntry.entry,
+        node_runs: [
+          {
+            id: 1,
+            node_id: 'download',
+            node_type: 'qbittorrent',
+            node_name: '下载资源',
+            status: 'failed',
+            attempt: 3,
+            max_attempts: 3,
+            error_message: '下载器无法连接',
+          },
+        ],
+      },
+    });
+    render(
+      <AutomationHistory
+        initialRunID={historicalRun.id}
+        initialTab="runs"
+        refreshToken={0}
+        sources={[source]}
+        workflows={[workflow]}
+      />,
+    );
+    expect(await screen.findByText('下载器无法连接')).toBeTruthy();
+    expect(screen.getByText('下载资源')).toBeTruthy();
+    expect(serviceMocks.getAutomationRun).toHaveBeenCalledWith(
+      historicalRun.id,
+    );
+  });
+
   it('creates a new run from a selected terminal history record', async () => {
     render(
       <AutomationHistory
