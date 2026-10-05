@@ -613,6 +613,14 @@ function buildTmdbUrl(tmdbId?: string, mediaType?: string): string | undefined {
   return `https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${id}`;
 }
 
+function mergeTreeChildren(previous: DataNode[], children: DataNode[]) {
+  const previousByKey = new Map(previous.map((node) => [node.key, node]));
+  return children.map((node) => {
+    const existing = previousByKey.get(node.key);
+    return existing ? { ...existing, title: node.title } : node;
+  });
+}
+
 function updateTreeData(
   list: DataNode[],
   key: string,
@@ -620,25 +628,17 @@ function updateTreeData(
 ): DataNode[] {
   return list.map((node) => {
     if (node.key === key) {
-      return { ...node, children };
+      return {
+        ...node,
+        isLeaf: children.length === 0,
+        children: mergeTreeChildren(node.children || [], children),
+      };
     }
     if (node.children) {
       return {
         ...node,
         children: updateTreeData(node.children, key, children),
       };
-    }
-    return node;
-  });
-}
-
-function markLeaf(list: DataNode[], key: string): DataNode[] {
-  return list.map((node) => {
-    if (node.key === key) {
-      return { ...node, isLeaf: true };
-    }
-    if (node.children) {
-      return { ...node, children: markLeaf(node.children, key) };
     }
     return node;
   });
@@ -951,8 +951,15 @@ const useStyles = createStyles(({ css, token }) => ({
   directoryBody: css`
     padding: 12px;
   `,
-  directorySearch: css`
+  directoryToolbar: css`
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 12px;
+  `,
+  directorySearch: css`
+    min-width: 0;
+    flex: 1;
   `,
   directoryTree: css`
     max-height: calc(100vh - 380px);
@@ -1227,10 +1234,22 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
   const [modalApi, modalContextHolder] = Modal.useModal();
 
   const [treeData, setTreeData] = useState<DataNode[]>([]);
-  const [nodeMeta, setNodeMeta] = useState<Map<string, TreeItemMeta>>(
-    new Map(),
-  );
+  const nodeMeta = useMemo(() => {
+    const meta = new Map<string, TreeItemMeta>();
+    const visit = (nodes: DataNode[], parentKey: string) => {
+      nodes.forEach((node) => {
+        const key = String(node.key);
+        meta.set(key, { name: String(node.title ?? ''), parentKey });
+        if (node.children) visit(node.children, key);
+      });
+    };
+    visit(treeData, ROOT_KEY);
+    return meta;
+  }, [treeData]);
+  const directoryRequestsRef = useRef(new Map<string, symbol>());
   const [rootLoading, setRootLoading] = useState(false);
+  const [directoryRefreshing, setDirectoryRefreshing] = useState(false);
+  const [loadedKeys, setLoadedKeys] = useState<React.Key[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [selectedKey, setSelectedKey] = useState<string>();
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
@@ -1583,22 +1602,22 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     return () => clearInterval(timer);
   }, [previewRealtimeStatus, refreshPreviewTasks]);
 
-  const registerMeta = useCallback(
-    (entries: Array<{ key: string; name: string; parentKey: string }>) => {
-      setNodeMeta((prev) => {
-        const next = new Map(prev);
-        entries.forEach(({ key, name, parentKey }) => {
-          next.set(key, { name, parentKey });
-        });
-        return next;
-      });
-    },
-    [],
-  );
+  useEffect(() => {
+    const retainExistingKeys = <T extends React.Key>(keys: T[]) => {
+      const next = keys.filter((key) => nodeMeta.has(String(key)));
+      return next.length === keys.length ? keys : next;
+    };
+    setLoadedKeys(retainExistingKeys);
+    setExpandedKeys(retainExistingKeys);
+    setCheckedKeys(retainExistingKeys);
+    setSelectedKey((key) => (key && nodeMeta.has(key) ? key : undefined));
+  }, [nodeMeta]);
 
   const loadChildren = useCallback(
     async (parentKey: string) => {
       if (!cloudStorageId) return { success: false, count: 0 };
+      const requestId = Symbol();
+      directoryRequestsRef.current.set(parentKey, requestId);
       try {
         const res = await get115CookieDirs({
           cloud_storage_id: cloudStorageId,
@@ -1606,6 +1625,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           offset: 0,
           limit: PAGE_LIMIT,
         });
+        if (directoryRequestsRef.current.get(parentKey) !== requestId) {
+          return { success: false, count: 0 };
+        }
         if (res.code !== 0) {
           messageApi.error(res.message || '获取目录失败');
           return { success: false, count: 0 };
@@ -1617,33 +1639,28 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           isLeaf: false,
           icon: <FolderOutlined />,
         }));
-        registerMeta(
-          items.map((item) => ({
-            key: item.file_id,
-            name: item.name,
-            parentKey,
-          })),
-        );
         if (parentKey === ROOT_KEY) {
-          setTreeData(children);
-        } else if (children.length === 0) {
-          setTreeData((prev) => markLeaf(prev, parentKey));
+          setTreeData((prev) => mergeTreeChildren(prev, children));
         } else {
           setTreeData((prev) => updateTreeData(prev, parentKey, children));
         }
         return { success: true, count: children.length };
       } catch (err: any) {
-        messageApi.error(err?.message || '获取目录失败');
+        if (directoryRequestsRef.current.get(parentKey) === requestId) {
+          messageApi.error(err?.message || '获取目录失败');
+        }
         return { success: false, count: 0 };
       }
     },
-    [cloudStorageId, messageApi, registerMeta],
+    [cloudStorageId, messageApi],
   );
 
   useEffect(() => {
     if (!cloudStorageId) return;
+    const requests = directoryRequestsRef.current;
+    requests.clear();
     setTreeData([]);
-    setNodeMeta(new Map());
+    setLoadedKeys([]);
     setSelectedKey(undefined);
     setCheckedKeys([]);
     setExpandedKeys([]);
@@ -1653,8 +1670,45 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     setSelectedItemRowKeys([]);
     setActiveVersionKey(ALL_VERSION_KEY);
     setRootLoading(true);
-    loadChildren(ROOT_KEY).finally(() => setRootLoading(false));
+    let cancelled = false;
+    loadChildren(ROOT_KEY).finally(() => {
+      if (!cancelled) setRootLoading(false);
+    });
+    return () => {
+      cancelled = true;
+      requests.clear();
+    };
   }, [cloudStorageId, loadChildren]);
+
+  const handleRefreshDirectories = useCallback(async () => {
+    if (!cloudStorageId || rootLoading || directoryRefreshing) return;
+    const parentKey = selectedKey || ROOT_KEY;
+    setDirectoryRefreshing(true);
+    try {
+      const result = await loadChildren(parentKey);
+      if (!result.success) return;
+      if (parentKey !== ROOT_KEY) {
+        setLoadedKeys((keys) =>
+          keys.includes(parentKey) ? keys : [...keys, parentKey],
+        );
+        if (result.count > 0) {
+          setExpandedKeys((keys) =>
+            keys.includes(parentKey) ? keys : [...keys, parentKey],
+          );
+        }
+      }
+      messageApi.success('目录已刷新');
+    } finally {
+      setDirectoryRefreshing(false);
+    }
+  }, [
+    cloudStorageId,
+    rootLoading,
+    directoryRefreshing,
+    selectedKey,
+    loadChildren,
+    messageApi,
+  ]);
 
   useEffect(() => {
     saveFilenameRegexConfig(filenameRegexStorageKey, filenameRegexConfig);
@@ -3422,15 +3476,35 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               </Space>
             </header>
             <div className={`${styles.sectionBody} ${styles.directoryBody}`}>
-              <Input.Search
-                allowClear
-                className={styles.directorySearch}
-                placeholder="搜索目录"
-                size="small"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
-              <Spin spinning={rootLoading}>
+              <div className={styles.directoryToolbar}>
+                <Input.Search
+                  allowClear
+                  className={styles.directorySearch}
+                  placeholder="搜索目录"
+                  size="small"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                />
+                <Tooltip
+                  title={
+                    selectedKey
+                      ? `刷新「${nodeMeta.get(selectedKey)?.name || selectedKey}」下的目录`
+                      : '刷新根目录'
+                  }
+                >
+                  <Button
+                    aria-label="刷新 115 目录"
+                    disabled={!cloudStorageId || rootLoading}
+                    icon={<ReloadOutlined />}
+                    loading={directoryRefreshing}
+                    onClick={handleRefreshDirectories}
+                    size="small"
+                  >
+                    刷新
+                  </Button>
+                </Tooltip>
+              </div>
+              <Spin spinning={rootLoading || directoryRefreshing}>
                 {filteredTreeData.length === 0 && !rootLoading ? (
                   <Empty
                     description="暂无目录"
@@ -3445,6 +3519,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     checkStrictly
                     treeData={filteredTreeData}
                     loadData={onLoadData}
+                    loadedKeys={loadedKeys}
+                    onLoad={(keys) => setLoadedKeys(keys)}
                     expandedKeys={expandedKeys}
                     onExpand={(keys) => setExpandedKeys(keys)}
                     selectedKeys={selectedKey ? [selectedKey] : []}
