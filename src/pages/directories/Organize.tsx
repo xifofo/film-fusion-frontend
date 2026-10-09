@@ -95,6 +95,7 @@ const DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
   'film-fusion.organize.directoryPanelVisible';
 const EPISODE_DIRECTORY_PANEL_VISIBLE_STORAGE_KEY =
   'film-fusion.episodeOrganize.directoryPanelVisible';
+const PREVIEW_MODE_STORAGE_KEY = 'film-fusion.organize.previewMode';
 const DEFAULT_FILENAME_REGEX_PATTERN = '.* - (.*)';
 const DEFAULT_FILENAME_REGEX_REPLACEMENT = '$1';
 const EPISODE_FILENAME_REGEX_PATTERN = '.* - (.*)-.*';
@@ -226,6 +227,24 @@ function saveDirectoryPanelVisible(storageKey: string, visible: boolean) {
     window.localStorage.setItem(storageKey, String(visible));
   } catch {
     return;
+  }
+}
+
+function loadPreviewMode(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return window.localStorage.getItem(PREVIEW_MODE_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function savePreviewMode(enabled: boolean) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PREVIEW_MODE_STORAGE_KEY, String(enabled));
+  } catch {
+    // Keep the current selection usable when browser storage is unavailable.
   }
 }
 
@@ -1299,7 +1318,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     API.OrganizePreviewTaskStatus | undefined
   >(undefined);
 
-  const [dryRun, setDryRun] = useState(true);
+  const [dryRun, setDryRun] = useState(loadPreviewMode);
   const [organizeRequestMode, setOrganizeRequestMode] = useState<
     'dry' | 'apply'
   >();
@@ -2004,7 +2023,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           messageApi.warning('这个预整理任务还没有可查看的结果');
           return;
         }
-        setDryRun(true);
         setOrganizeError(undefined);
         setActivePreviewTask(payload.task);
         setFilenameRegexConfig({
@@ -4271,7 +4289,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
               disabled={organizeLoading}
               checkedChildren="是"
               unCheckedChildren="否"
-              onChange={(checked) => setDryRun(checked)}
+              onChange={(checked) => {
+                setDryRun(checked);
+                savePreviewMode(checked);
+              }}
             />
           </div>
           <Button

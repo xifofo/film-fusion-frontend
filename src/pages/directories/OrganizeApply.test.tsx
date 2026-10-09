@@ -140,17 +140,11 @@ const enginePreview = (
   ],
 });
 
-async function applyPreview(
-  previewOnly = false,
-  loadPreview = true,
-  historical = false,
-  beforeConfirm?: () => Promise<boolean | undefined>,
-  beforeOpenConfirm?: () => Promise<void>,
-) {
+function renderPage() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  render(
+  return render(
     <QueryClientProvider client={client}>
       <ConfigProvider theme={{ token: { motion: false } }}>
         <MemoryRouter initialEntries={['/directories/organize/2']}>
@@ -164,6 +158,16 @@ async function applyPreview(
       </ConfigProvider>
     </QueryClientProvider>,
   );
+}
+
+async function applyPreview(
+  previewOnly = false,
+  loadPreview = true,
+  historical = false,
+  beforeConfirm?: () => Promise<boolean | undefined>,
+  beforeOpenConfirm?: () => Promise<void>,
+) {
+  renderPage();
   fireEvent.click(await screen.findByRole('checkbox', { name: '云下载' }));
   if (loadPreview) {
     fireEvent.click(await screen.findByRole('button', { name: /查看结果/ }));
@@ -257,6 +261,44 @@ describe('confirm organize error reporting', () => {
   });
 
   afterEach(cleanup);
+
+  it('remembers both preview mode choices across visits and loading task results', async () => {
+    const firstVisit = renderPage();
+    await screen.findByRole('button', { name: /查看结果/ });
+    expect(
+      screen
+        .getByRole('switch', { name: '预览模式' })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    fireEvent.click(screen.getByRole('switch', { name: '预览模式' }));
+    firstVisit.unmount();
+
+    const secondVisit = renderPage();
+    expect(
+      screen
+        .getByRole('switch', { name: '预览模式' })
+        .getAttribute('aria-checked'),
+    ).toBe('false');
+    fireEvent.click(await screen.findByRole('button', { name: /查看结果/ }));
+    await screen.findByRole('button', { name: /确认整理 \(1\/1\)/ });
+    expect(
+      screen
+        .getByRole('switch', { name: '预览模式' })
+        .getAttribute('aria-checked'),
+    ).toBe('false');
+    fireEvent.click(screen.getByRole('switch', { name: '预览模式' }));
+    secondVisit.unmount();
+
+    renderPage();
+    expect(
+      screen
+        .getByRole('switch', { name: '预览模式' })
+        .getAttribute('aria-checked'),
+    ).toBe('true');
+    fireEvent.click(await screen.findByRole('button', { name: /查看结果/ }));
+    await screen.findByRole('button', { name: /确认预览 \(1\/1\)/ });
+    expect(organize115Cookie).not.toHaveBeenCalled();
+  });
 
   it('executes an upgrade with the original source directory retained for recovery', async () => {
     const policy = {
