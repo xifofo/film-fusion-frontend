@@ -37,7 +37,7 @@ const Match302Form: React.FC<StorageSectionFormProps> = ({
         { label: '仅 OpenAPI', value: 'openapi_only' },
         { label: '仅 Cookie（DownloadWithUA）', value: 'cookie_only' },
       ]}
-      extra="控制路径解析、播放直链和秒传源直链。选择“仅 Cookie”后，即使保留 AccessToken，Match302 链路也不会调用 OpenAPI；多账号秒传本身仍需有效 Cookie。"
+      extra="控制路径解析、播放直链、秒传和缓存清理。自动模式有 AccessToken 时优先使用 OpenAPI 秒传；源账号和目标账号均选择“仅 OpenAPI”时无需登录 Cookie。秒传提交失败后不会自动切换接口重复上传。"
     />
     <ProFormDigit
       colProps={HALF_COL}
