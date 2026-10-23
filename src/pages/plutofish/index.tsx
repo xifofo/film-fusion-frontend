@@ -13,9 +13,10 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Play, RefreshCw, Square } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ConsolePage from '@/components/ConsolePage';
 import {
+  getPlutoFishAccounts,
   getPlutoFishCloudPaths,
   getPlutoFishConfig,
   getPlutoFishEvents,
@@ -23,6 +24,7 @@ import {
   type PlutoFishConfig,
   type PlutoFishConfigInput,
   type PlutoFishEvent,
+  type PlutoFishReceivingAccount,
   type PlutoFishStatus,
   retryPlutoFishEvent,
   startPlutoFish,
@@ -106,6 +108,51 @@ const PlutoFishPage = () => {
   const [configError, setConfigError] = useState('');
   const [cloudPaths, setCloudPaths] = useState<API.CloudPath[]>([]);
   const [pathsError, setPathsError] = useState('');
+  const [accounts, setAccounts] = useState<PlutoFishReceivingAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [accountsError, setAccountsError] = useState('');
+  const accountRequest = useRef<AbortController | null>(null);
+  const accountSource = useRef({ baseURL: '', ownerUID: '' });
+
+  const loadAccounts = useCallback(async () => {
+    accountRequest.current?.abort();
+    const controller = new AbortController();
+    accountRequest.current = controller;
+    const baseURL = form.getFieldValue('baseURL')?.trim() || '';
+    const apiKey = form.getFieldValue('apiKey')?.trim() || undefined;
+    setAccountsLoading(true);
+    setAccountsError('');
+    try {
+      const next = unwrap(
+        await getPlutoFishAccounts({ baseURL, apiKey }, controller.signal),
+      );
+      if (controller.signal.aborted) return null;
+      const previous = accountSource.current;
+      if (
+        previous.ownerUID &&
+        (previous.ownerUID !== next.ownerUID ||
+          previous.baseURL.replace(/\/+$/, '') !== baseURL.replace(/\/+$/, ''))
+      ) {
+        form.setFieldValue('mappings', []);
+      }
+      accountSource.current = { baseURL, ownerUID: next.ownerUID };
+      form.setFieldValue('ownerUID', next.ownerUID);
+      setAccounts(next.items);
+      setAccountsLoaded(true);
+      return next;
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setAccountsLoaded(false);
+        setAccountsError(errorText(error, '获取接收网盘失败'));
+      }
+      return null;
+    } finally {
+      if (!controller.signal.aborted) setAccountsLoading(false);
+    }
+  }, [form]);
+
+  useEffect(() => () => accountRequest.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -137,6 +184,11 @@ const PlutoFishPage = () => {
         const next = unwrap(response);
         setConfig(next);
         form.setFieldsValue({ ...next, apiKey: '' });
+        accountSource.current = {
+          baseURL: next.baseURL,
+          ownerUID: next.ownerUID,
+        };
+        if (next.keyConfigured) void loadAccounts();
         setConfigError('');
       })
       .catch((error: unknown) => {
@@ -144,7 +196,7 @@ const PlutoFishPage = () => {
           setConfigError(errorText(error, '读取通知配置失败'));
       });
     return () => controller.abort();
-  }, [form]);
+  }, [form, loadAccounts]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -185,6 +237,11 @@ const PlutoFishPage = () => {
   const save = async (values: PlutoFishConfigInput) => {
     setSaving(true);
     try {
+      if (!values.ownerUID) {
+        const discovered = await loadAccounts();
+        if (!discovered) return;
+        values = form.getFieldsValue(true);
+      }
       const input = { ...values, apiKey: values.apiKey?.trim() || undefined };
       const next = unwrap(await updatePlutoFishConfig(input));
       setConfig(next);
@@ -397,6 +454,16 @@ const PlutoFishPage = () => {
             form={form}
             layout="vertical"
             onFinish={(values) => void save(values)}
+            onValuesChange={(changed) => {
+              if ('baseURL' in changed || 'apiKey' in changed) {
+                accountRequest.current?.abort();
+                setAccountsLoading(false);
+                setAccountsLoaded(false);
+                setAccounts([]);
+                setAccountsError('');
+                form.setFieldValue('ownerUID', '');
+              }
+            }}
             autoComplete="off"
             clearOnDestroy
             disabled={saving || !!action || !config}
@@ -428,19 +495,8 @@ const PlutoFishPage = () => {
                   autoComplete="off"
                 />
               </Form.Item>
-              <Form.Item
-                name="ownerUID"
-                label="PlutoFish 用户 UID"
-                rules={[
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: '请输入所属用户 UID',
-                  },
-                ]}
-                extra="用于隔离用户进度。同一用户换密钥保留此值继续原进度；更换用户必须填写新 UID 和新密钥，旧用户历史仍会保留。"
-              >
-                <Input placeholder="密钥所属用户的 UID" autoComplete="off" />
+              <Form.Item name="ownerUID" hidden>
+                <Input type="hidden" />
               </Form.Item>
               <Form.Item
                 name="apiKey"
@@ -501,11 +557,36 @@ const PlutoFishPage = () => {
             </div>
             <h3>成功事件 → 本地 STRM</h3>
             <p>
-              将 PlutoFish 接收网盘 ID 绑定到已有的云路径映射，沿用其 STRM
+              选择 PlutoFish 接收网盘并绑定到已有的云路径映射，沿用其 STRM
               内容前缀和本地目录。这里只读取本地配置并生成文件，不扫描网盘，也不刷新
               Emby。
               未配置映射或通知缺少目标目录路径、文件名时，事件会保留为待处理。
             </p>
+            <Button
+              loading={accountsLoading}
+              onClick={() => void loadAccounts()}
+              style={{ marginBottom: 16 }}
+            >
+              {accountsLoaded ? '刷新接收网盘' : '获取接收网盘'}
+            </Button>
+            {accountsLoaded && (
+              <p>
+                已识别密钥所属账号，找到 {accounts.length}{' '}
+                个接收网盘。更换账号后请重新选择映射。
+              </p>
+            )}
+            {!accountsLoaded && !accountsError && (
+              <p>填写服务地址和 API Key 后获取网盘列表，无需填写任何 ID。</p>
+            )}
+            {accountsError && (
+              <Alert
+                type="warning"
+                showIcon
+                title="获取接收网盘失败"
+                description={accountsError}
+                style={{ marginBottom: 16 }}
+              />
+            )}
             {pathsError && (
               <Alert
                 type="warning"
@@ -528,17 +609,62 @@ const PlutoFishPage = () => {
                     >
                       <Form.Item
                         name={[field.name, 'targetAccountID']}
-                        label="PlutoFish 接收网盘 ID"
+                        label="PlutoFish 接收网盘"
                         style={{ flex: '1 1 220px', marginBottom: 0 }}
                         rules={[
                           {
                             required: true,
                             whitespace: true,
-                            message: '请输入接收网盘 ID',
+                            message: '请选择接收网盘',
+                          },
+                          {
+                            validator: (_, value) =>
+                              accountsLoaded &&
+                              value &&
+                              !accounts.some((account) => account.id === value)
+                                ? Promise.reject(
+                                    new Error(
+                                      '原接收网盘已移除，请重新选择或移除此映射',
+                                    ),
+                                  )
+                                : Promise.resolve(),
                           },
                         ]}
                       >
-                        <Input placeholder="事件中的 targetAccountId" />
+                        <Select
+                          placeholder="按名称选择接收网盘"
+                          loading={accountsLoading}
+                          disabled={!accountsLoaded || accountsLoading}
+                          showSearch={{ optionFilterProp: 'label' }}
+                          options={[
+                            ...accounts.map((account) => ({
+                              value: account.id,
+                              label: `${account.name} · ${account.provider}${account.enabled ? '' : '（已停用）'}`,
+                              disabled: !account.enabled,
+                            })),
+                            ...(form.getFieldValue('mappings') || [])
+                              .filter(
+                                (mapping: { targetAccountID: string }) =>
+                                  mapping.targetAccountID &&
+                                  !accounts.some(
+                                    (account) =>
+                                      account.id === mapping.targetAccountID,
+                                  ),
+                              )
+                              .map((mapping: { targetAccountID: string }) => ({
+                                value: mapping.targetAccountID,
+                                label: accountsLoaded
+                                  ? '原接收网盘已移除，请重新选择'
+                                  : '已保存的接收网盘（等待获取名称）',
+                                disabled: true,
+                              })),
+                          ]}
+                          notFoundContent={
+                            accountsLoaded
+                              ? '暂无接收网盘，请先在 PlutoFish 绑定网盘后刷新'
+                              : '请先获取接收网盘'
+                          }
+                        />
                       </Form.Item>
                       <Form.Item
                         name={[field.name, 'cloudPathID']}
@@ -580,7 +706,12 @@ const PlutoFishPage = () => {
                 </div>
               )}
             </Form.List>
-            <Button type="primary" htmlType="submit" loading={saving}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={saving}
+              disabled={accountsLoading}
+            >
               保存配置
             </Button>
           </Form>

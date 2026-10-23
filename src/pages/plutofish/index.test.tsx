@@ -8,6 +8,7 @@ import {
 import { App } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  getPlutoFishAccounts,
   getPlutoFishCloudPaths,
   getPlutoFishConfig,
   getPlutoFishEvents,
@@ -22,6 +23,7 @@ import {
 import PlutoFishPage, { redactPlutoFishError } from './index';
 
 vi.mock('@/services/film-fusion/plutofish', () => ({
+  getPlutoFishAccounts: vi.fn(),
   getPlutoFishCloudPaths: vi.fn(),
   getPlutoFishConfig: vi.fn(),
   getPlutoFishEvents: vi.fn(),
@@ -71,6 +73,21 @@ const event = (
 
 describe('PlutoFish notification page', () => {
   beforeEach(() => {
+    vi.mocked(getPlutoFishAccounts)
+      .mockReset()
+      .mockResolvedValue(
+        result({
+          ownerUID: config.ownerUID,
+          items: [
+            {
+              id: 'account-1',
+              name: '我的追剧网盘',
+              provider: '115',
+              enabled: true,
+            },
+          ],
+        }),
+      );
     vi.mocked(getPlutoFishConfig).mockResolvedValue(result(config));
     vi.mocked(getPlutoFishStatus).mockResolvedValue(
       result({
@@ -193,5 +210,102 @@ describe('PlutoFish notification page', () => {
     expect(redactPlutoFishError('Authorization: Bearer opaque-key')).toBe(
       'Authorization: Bearer [已隐藏密钥]',
     );
+  });
+
+  it('loads named receiving accounts and does not ask for account or owner IDs', async () => {
+    render(
+      <App>
+        <PlutoFishPage />
+      </App>,
+    );
+    expect(await screen.findByText('我的追剧网盘 · 115')).toBeTruthy();
+    expect(screen.queryByLabelText('PlutoFish 用户 UID')).toBeNull();
+    expect(screen.queryByLabelText('PlutoFish 接收网盘 ID')).toBeNull();
+    expect(
+      screen.getByRole('combobox', { name: 'PlutoFish 接收网盘' }),
+    ).toBeTruthy();
+    expect(vi.mocked(getPlutoFishAccounts).mock.calls[0][0]).toEqual({
+      baseURL: config.baseURL,
+      apiKey: undefined,
+    });
+  });
+
+  it('ignores stale discovery and clears mappings when the key belongs to another user', async () => {
+    let finishOld!: (
+      value: Awaited<ReturnType<typeof getPlutoFishAccounts>>,
+    ) => void;
+    vi.mocked(getPlutoFishAccounts).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    render(
+      <App>
+        <PlutoFishPage />
+      </App>,
+    );
+    await waitFor(() => expect(getPlutoFishAccounts).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('API Key（已配置）'), {
+      target: { value: 'pf_events_new_user' },
+    });
+    expect(vi.mocked(getPlutoFishAccounts).mock.calls[0][1]?.aborted).toBe(
+      true,
+    );
+    finishOld(
+      result({
+        ownerUID: 'old-user',
+        items: [
+          {
+            id: 'stale-account',
+            name: '过时的网盘',
+            provider: '115',
+            enabled: true,
+          },
+        ],
+      }),
+    );
+    vi.mocked(getPlutoFishAccounts).mockResolvedValueOnce(
+      result({
+        ownerUID: 'new-user',
+        items: [
+          {
+            id: 'new-account',
+            name: '新账号的网盘',
+            provider: '115',
+            enabled: true,
+          },
+        ],
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /获取接收网盘/ }),
+    );
+    await screen.findByRole('button', { name: /刷新接收网盘/ });
+    expect(screen.queryByText('过时的网盘 · 115')).toBeNull();
+    expect(
+      screen.queryByRole('combobox', { name: 'PlutoFish 接收网盘' }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(updatePlutoFishConfig).toHaveBeenCalledTimes(1));
+    const submitted = vi.mocked(updatePlutoFishConfig).mock.calls[0][0];
+    expect(submitted.ownerUID).toBe('new-user');
+    expect(submitted.mappings).toEqual([]);
+  });
+
+  it('shows discovery errors without exposing secrets or losing saved mappings', async () => {
+    vi.mocked(getPlutoFishAccounts).mockRejectedValueOnce(
+      new Error('旧服务不支持接口 pf_events_mock_secret'),
+    );
+    render(
+      <App>
+        <PlutoFishPage />
+      </App>,
+    );
+    expect(
+      await screen.findByText('旧服务不支持接口 [已隐藏密钥]'),
+    ).toBeTruthy();
+    expect(screen.getByText('已保存的接收网盘（等待获取名称）')).toBeTruthy();
+    expect(screen.queryByText('account-1')).toBeNull();
   });
 });

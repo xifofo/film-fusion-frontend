@@ -14,6 +14,21 @@ export type PlutoFishConfigInput = Omit<PlutoFishConfig, 'keyConfigured'> & {
   apiKey?: string;
 };
 
+export type PlutoFishReceivingAccount = {
+  id: string;
+  name: string;
+  provider: string;
+  enabled: boolean;
+};
+
+export const getPlutoFishAccounts = (
+  input: { baseURL: string; apiKey?: string },
+  signal?: AbortSignal,
+) =>
+  apiClient.post<
+    API.Response<{ ownerUID: string; items: PlutoFishReceivingAccount[] }>
+  >('/api/plutofish/accounts/query', input, { signal, skipErrorHandler: true });
+
 export type PlutoFishStatus = {
   state: string;
   lastEventAt?: string;
