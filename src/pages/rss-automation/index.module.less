@@ -320,6 +320,12 @@
     min-height: 650px;
   }
 
+  .flowCanvasActions:global(.react-flow__panel.top) {
+    top: 52px;
+    right: auto;
+    left: 0;
+  }
+
   .flowSpin,
   .flowSpin > :global(.ant-spin),
   .flowSpin :global(.ant-spin-container) {
@@ -2054,9 +2060,15 @@
     margin: 8px;
     padding: 4px;
 
-    :global(.ant-btn > span:not(.anticon)) {
+    :global(.ant-btn:has(.ant-btn-icon) > span:not(.ant-btn-icon):not(.anticon)) {
       display: none;
     }
+  }
+
+  .flowCanvasActions:global(.react-flow__panel.top) {
+    top: 52px;
+    right: auto;
+    left: 0;
   }
 
   .flowSpin,

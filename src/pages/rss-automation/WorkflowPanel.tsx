@@ -166,6 +166,9 @@ type WorkflowPanelProps = {
   mode?: 'manage' | 'wizard';
   initialDefinition?: RSSAutomationDefinition;
   sourceMapping?: RSSAutomationMapping;
+  itemReferences?: NodeFieldReference[];
+  eventLabel?: string;
+  showWizardTemplates?: boolean;
   previewFeed?: RSSAutomationParsedFeed;
   onWizardBack?: (definition: RSSAutomationDefinition) => void;
   onWizardNext?: (definition: RSSAutomationDefinition) => Promise<void> | void;
@@ -371,6 +374,9 @@ const WorkflowPanelInner = ({
   mode = 'manage',
   initialDefinition,
   sourceMapping,
+  itemReferences,
+  eventLabel = 'RSS 条目',
+  showWizardTemplates = true,
   previewFeed,
   onWizardBack,
   onWizardNext,
@@ -568,7 +574,8 @@ const WorkflowPanelInner = ({
     const mapping =
       sourceMapping ||
       parseRSSSourceMapping(sourceByID.get(meta.sourceId)?.mapping_json);
-    for (const reference of buildRSSItemReferences(mapping, sampleFields)) {
+    for (const reference of itemReferences ||
+      buildRSSItemReferences(mapping, sampleFields)) {
       addReference(reference);
     }
 
@@ -792,6 +799,7 @@ const WorkflowPanelInner = ({
     previewItemIndex,
     sourceByID,
     sourceMapping,
+    itemReferences,
     meta.sourceId,
     selectedNode,
     selectedNodeId,
@@ -1501,7 +1509,7 @@ const WorkflowPanelInner = ({
                     className={styles.flowCanvasPrimary}
                     position="top-left"
                   >
-                    {mode === 'wizard' && (
+                    {mode === 'wizard' && showWizardTemplates && (
                       <Tooltip title="选择模板会替换当前画板，载入后仍可继续修改">
                         <Dropdown
                           menu={{
@@ -1569,11 +1577,11 @@ const WorkflowPanelInner = ({
                             ? selectedPreviewFeed
                               ? '重新选择一个已有 RSS 条目并预览当前流程'
                               : '选择一个已有 RSS 条目并预览当前流程'
-                            : '用真实 RSS 条目模拟当前流程，不会执行任何动作'
+                            : `用${eventLabel}模拟当前流程，不会执行任何动作`
                         }
                       >
                         <Button
-                          aria-label="RSS 条目预览"
+                          aria-label={`${eventLabel}预览`}
                           icon={<EyeOutlined />}
                           onClick={() => {
                             if (mode === 'manage') {
@@ -1587,7 +1595,7 @@ const WorkflowPanelInner = ({
                             ? selectedPreviewFeed
                               ? '重新选择 RSS 条目'
                               : '选择 RSS 条目'
-                            : `RSS 条目预览 (${effectivePreviewFeed?.items.length || 0})`}
+                            : `${eventLabel}预览 (${effectivePreviewFeed?.items.length || 0})`}
                         </Button>
                       </Tooltip>
                     )}
@@ -1639,17 +1647,19 @@ const WorkflowPanelInner = ({
                       </Button>
                     ) : (
                       <>
-                        <Tooltip title="不校验流程，保存到当前浏览器，下次新建时自动恢复">
-                          <Button
-                            aria-label="保存草稿"
-                            icon={<SaveOutlined />}
-                            onClick={() =>
-                              onWizardSaveDraft?.(currentDefinition())
-                            }
-                          >
-                            保存草稿
-                          </Button>
-                        </Tooltip>
+                        {onWizardSaveDraft && (
+                          <Tooltip title="不校验流程，保存到当前浏览器，下次新建时自动恢复">
+                            <Button
+                              aria-label="保存草稿"
+                              icon={<SaveOutlined />}
+                              onClick={() =>
+                                onWizardSaveDraft?.(currentDefinition())
+                              }
+                            >
+                              保存草稿
+                            </Button>
+                          </Tooltip>
+                        )}
                         <Tooltip title="上一步">
                           <Button
                             aria-label="上一步"

@@ -5,6 +5,7 @@ import type {
   AutomationWorkflow,
   RSSAutomationMapping,
 } from '@/services/film-fusion';
+import { readLocalDirectoryConfig } from './localDirectory';
 
 export const copyName = (name: string, existingNames: string[]): string => {
   const names = new Set(existingNames);
@@ -80,14 +81,22 @@ export const buildAutomationCopy = (
             interval_minutes: source.interval_minutes,
             mapping,
           }
-        : {
-            cloud_storage_id: source.cloud_storage_id,
-            directory_id: source.directory_id,
-            directory_path: source.directory_path,
-            recursive: source.recursive,
-            interval_seconds: source.interval_seconds,
-            quiet_seconds: source.quiet_seconds,
-          }),
+        : source.trigger_type === 'local_directory'
+          ? {
+              directory_path: source.directory_path,
+              recursive: source.recursive,
+              interval_seconds: source.interval_seconds,
+              quiet_seconds: source.quiet_seconds,
+              local_config: readLocalDirectoryConfig(source),
+            }
+          : {
+              cloud_storage_id: source.cloud_storage_id,
+              directory_id: source.directory_id,
+              directory_path: source.directory_path,
+              recursive: source.recursive,
+              interval_seconds: source.interval_seconds,
+              quiet_seconds: source.quiet_seconds,
+            }),
     },
     workflow: {
       name:

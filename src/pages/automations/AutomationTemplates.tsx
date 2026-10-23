@@ -25,6 +25,7 @@ import {
   getAutomationTemplates,
   saveAutomationTemplate,
 } from '@/services/film-fusion';
+import { automationTriggerLabel } from './localDirectory';
 import styles from './Management.module.less';
 import {
   portableAutomationTemplate,
@@ -270,9 +271,7 @@ export default function AutomationTemplates({
           {visible.map((template) => (
             <article className={styles.template} key={template.id}>
               <div>
-                <Tag>
-                  {template.trigger_type === 'rss' ? 'RSS' : '115 目录'}
-                </Tag>
+                <Tag>{automationTriggerLabel(template.trigger_type)}</Tag>
               </div>
               <h3>{template.name}</h3>
               <p className={styles.hint}>

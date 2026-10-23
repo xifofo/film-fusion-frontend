@@ -51,10 +51,20 @@ import {
   readAutomationConfiguration,
 } from './copyAutomation';
 import styles from './index.module.less';
+import LocalDirectoryEditor from './LocalDirectoryEditor';
+import {
+  localDirectoryScanMessage,
+  readLocalDirectoryConfig,
+} from './localDirectory';
 import { defaultAutomationSettings } from './management';
 import TriggerSelectorModal from './TriggerSelectorModal';
 
-type PageView = 'overview' | 'rss-create' | 'rss-edit';
+type PageView =
+  | 'overview'
+  | 'rss-create'
+  | 'rss-edit'
+  | 'local-create'
+  | 'local-edit';
 
 const emptyDashboard = (): AutomationDashboard => ({
   sources: [],
@@ -212,6 +222,10 @@ const AutomationPage = () => {
       setView('rss-create');
       return;
     }
+    if (trigger === 'local_directory') {
+      setView('local-create');
+      return;
+    }
     setEditorOpen(true);
   };
 
@@ -219,6 +233,10 @@ const AutomationPage = () => {
     setEditingSourceID(source.id);
     if (source.trigger_type === 'rss') {
       setView('rss-edit');
+      return;
+    }
+    if (source.trigger_type === 'local_directory') {
+      setView('local-edit');
       return;
     }
     setEditorOpen(true);
@@ -233,6 +251,7 @@ const AutomationPage = () => {
         throw new Error(response.message || '保存自动化失败');
       }
       messageApi.success(editingSource ? '自动化已更新' : '自动化已创建');
+      setView('overview');
       setEditorOpen(false);
       setEditingSourceID(undefined);
       await load(true);
@@ -365,6 +384,13 @@ const AutomationPage = () => {
             `RSS ${result.cache_hit ? '缓存检查' : '刷新'}完成：新增 ${result.new_entries || 0} 条，创建 ${result.created_runs} 次运行`,
           );
         }
+      } else if (source.trigger_type === 'local_directory') {
+        messageApi.success(
+          localDirectoryScanMessage(
+            result,
+            readLocalDirectoryConfig(source).initial_scan,
+          ),
+        );
       } else if (result.baseline) {
         messageApi.success(
           `115 基线建立完成：扫描 ${result.scanned_items} 个对象，未触发存量内容`,
@@ -374,6 +400,8 @@ const AutomationPage = () => {
           `扫描 ${result.scanned_items} 个对象，创建 ${result.created_runs} 次运行，${result.pending_stable} 个对象等待稳定`,
         );
       }
+      if (result.local_monitor?.warning)
+        messageApi.warning(result.local_monitor.warning);
       await load(true);
       setHistoryRefreshToken((value) => value + 1);
     } catch (error: any) {
@@ -422,11 +450,15 @@ const AutomationPage = () => {
       actions={pageActions}
       eyebrow={view === 'overview' ? 'Automation' : 'Automation / Editor'}
       title={
-        view === 'rss-create'
-          ? '新建 RSS 自动化'
-          : view === 'rss-edit'
-            ? editingSource?.name || '编辑自动化'
-            : '自动化中心'
+        view === 'local-create'
+          ? '新建本机 / NAS 目录监控'
+          : view === 'local-edit'
+            ? editingSource?.name || '编辑目录监控'
+            : view === 'rss-create'
+              ? '新建 RSS 自动化'
+              : view === 'rss-edit'
+                ? editingSource?.name || '编辑自动化'
+                : '自动化中心'
       }
     >
       {view === 'overview' && (
@@ -436,6 +468,28 @@ const AutomationPage = () => {
       )}
 
       {contextHolder}
+
+      {(view === 'local-create' ||
+        (view === 'local-edit' &&
+          editingSource?.trigger_type === 'local_directory' &&
+          editingWorkflow)) && (
+        <LocalDirectoryEditor
+          key={editingSource?.id || 'new-local'}
+          source={view === 'local-edit' ? editingSource : undefined}
+          workflow={view === 'local-edit' ? editingWorkflow : undefined}
+          cloudDirectories={cloudDirectories}
+          cloudStorages={cloudStorages}
+          targets={dashboard.targets}
+          nodeProtocols={dashboard.node_protocols || []}
+          onSubmit={saveAutomation}
+          onCancel={returnToOverview}
+        />
+      )}
+      {view === 'local-edit' && (!editingSource || !editingWorkflow) && (
+        <Empty description="目录监控或对应流程不存在">
+          <Button onClick={returnToOverview}>返回自动化列表</Button>
+        </Empty>
+      )}
 
       {view === 'rss-create' && (
         <RSSAutomationWizard

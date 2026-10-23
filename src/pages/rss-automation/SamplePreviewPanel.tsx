@@ -87,7 +87,7 @@ const SamplePreviewPanel = ({
       <div className={styles.previewSection}>
         <div className={styles.previewSectionHeading}>
           <Text className={styles.previewSectionLabel} type="secondary">
-            RSS 字段
+            触发事件字段
           </Text>
           <Text className={styles.previewSectionCount} type="secondary">
             {fields.length}

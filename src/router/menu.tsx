@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeftRight,
+  Bell,
   ChartNoAxesCombined,
   Clapperboard,
   Cloud,
@@ -52,6 +53,11 @@ export const menuItems: AppMenuItem[] = [
     path: '/media-recognition',
   },
   {
+    name: '洗版规则',
+    icon: ListRestart,
+    path: '/upgrade-rules',
+  },
+  {
     name: '下载队列',
     icon: Download,
     path: '/download-queue',
@@ -95,6 +101,11 @@ export const menuItems: AppMenuItem[] = [
         name: '图片优化',
         icon: Images,
         path: '/emby/image-optimization',
+      },
+      {
+        name: '批量查入库',
+        icon: ScanSearch,
+        path: '/emby/library-check',
       },
       {
         name: '缺集扫描',
@@ -149,6 +160,11 @@ export const menuItems: AppMenuItem[] = [
     name: 'RSS 中转',
     icon: Rss,
     path: '/rss-relay',
+  },
+  {
+    name: 'PlutoFish 通知',
+    icon: Bell,
+    path: '/plutofish',
   },
   {
     name: '系统信息',

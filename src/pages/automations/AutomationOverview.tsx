@@ -44,6 +44,12 @@ import type {
   AutomationSource,
 } from '@/services/film-fusion';
 import styles from './AutomationOverview.module.less';
+import {
+  automationTriggerLabel,
+  localDirectoryPhaseLabel,
+  readLocalDirectoryConfig,
+  readLocalDirectoryStatus,
+} from './localDirectory';
 import managementStyles from './Management.module.less';
 import {
   automationNeedsAttention,
@@ -279,11 +285,13 @@ const AutomationOverview = ({
             <div className={styles.toolbar}>
               <Segmented
                 aria-label="触发器类型"
+                className={styles.triggerFilter}
                 onChange={setTrigger}
                 options={[
                   { label: '全部', value: 'all' },
                   { label: 'RSS', value: 'rss' },
                   { label: '115 目录', value: '115_directory' },
+                  { label: '本机 / NAS', value: 'local_directory' },
                 ]}
                 value={trigger}
               />
@@ -452,6 +460,17 @@ const AutomationOverview = ({
                 const status = automationStatus(source, workflow, latestRun);
                 const preview = workflowPreview(workflow?.definition_json);
                 const isRSS = source.trigger_type === 'rss';
+                const isLocal = source.trigger_type === 'local_directory';
+                const localStatus = isLocal
+                  ? readLocalDirectoryStatus(source.local_status_json)
+                  : undefined;
+                let localMode = 'auto';
+                try {
+                  if (isLocal)
+                    localMode = readLocalDirectoryConfig(source).mode;
+                } catch {
+                  /* Editing reports corrupt configuration. */
+                }
                 const storageName = cloudStorages.find(
                   (storage) => storage.id === source.cloud_storage_id,
                 )?.storage_name;
@@ -492,7 +511,7 @@ const AutomationOverview = ({
                       </span>
                       <div className={styles.cardTitle}>
                         <span className={styles.typeLabel}>
-                          {isRSS ? 'RSS / ATOM' : '115 目录'}
+                          {automationTriggerLabel(source.trigger_type)}
                           {workflow && <span>v{workflow.version}</span>}
                         </span>
                         <h3>{source.name}</h3>
@@ -523,7 +542,9 @@ const AutomationOverview = ({
                       {source.description ||
                         (isRSS
                           ? '发现订阅更新，自动处理新增条目'
-                          : '等待新媒体稳定后，自动进入处理流程')}
+                          : isLocal
+                            ? '监听目录变化，稳定后执行自定义动作'
+                            : '等待新媒体稳定后，自动进入处理流程')}
                     </p>
                     <div className={styles.origin}>
                       <span>
@@ -556,7 +577,11 @@ const AutomationOverview = ({
                       </div>
                       <div className={styles.flowSteps}>
                         <span className={styles.triggerStep}>
-                          {isRSS ? '订阅更新' : '新增媒体'}
+                          {isRSS
+                            ? '订阅更新'
+                            : isLocal
+                              ? '目录变化'
+                              : '新增媒体'}
                         </span>
                         {preview.invalid ? (
                           <span className={styles.unavailableFlow}>
@@ -601,19 +626,30 @@ const AutomationOverview = ({
                     <div className={styles.cardStatus}>
                       <span className={styles.status} data-tone={status.tone}>
                         <i />
-                        {status.label}
+                        {isLocal &&
+                        source.enabled &&
+                        !source.last_error &&
+                        localStatus?.in_progress
+                          ? source.initialized
+                            ? '分段扫描中'
+                            : '首次基线扫描中'
+                          : status.label}
                       </span>
                       <span>
                         {isRSS
                           ? `每 ${source.interval_minutes || 5} 分钟检查`
-                          : `每 ${source.interval_seconds || 300} 秒检查`}
+                          : isLocal && localMode === 'auto'
+                            ? `系统监听 · 每 ${source.interval_seconds || 300} 秒补扫`
+                            : `每 ${source.interval_seconds || 300} 秒检查`}
                       </span>
                     </div>
                     <div className={styles.lastCheck}>
                       {!source.enabled ? (
                         <>
-                          <PauseCircleOutlined /> 已停用，不再检查
-                          {isRSS ? ' RSS 源' : '目录'}
+                          <PauseCircleOutlined />{' '}
+                          {isLocal
+                            ? '已暂停监听'
+                            : `已停用，不再检查${isRSS ? ' RSS 源' : '目录'}`}
                         </>
                       ) : (
                         <>
@@ -622,6 +658,90 @@ const AutomationOverview = ({
                         </>
                       )}
                     </div>
+                    {isLocal && source.enabled && localStatus && (
+                      <div className={styles.lastCheck}>
+                        {localMode === 'poll'
+                          ? '定期扫描'
+                          : `系统监听 ${localStatus.watched_directories} 个目录`}
+                        {` · ${source.recursive ? '包含子目录' : '仅当前目录'}`}
+                        {localStatus.degraded && (
+                          <Tag color="warning">部分目录由补扫覆盖</Tag>
+                        )}
+                      </div>
+                    )}
+                    {isLocal && localStatus && (
+                      <div className={styles.lastCheck}>
+                        {localStatus.in_progress !== undefined ||
+                        localStatus.cycle_completed !== undefined
+                          ? '最近分段扫描'
+                          : '最近扫描'}{' '}
+                        {localStatus.scanned_folders ?? 0} 个目录 ·{' '}
+                        {localStatus.scanned_items ?? 0} 个对象 ·{' '}
+                        {localStatus.pending_stable ?? 0} 项等待稳定
+                      </div>
+                    )}
+                    {isLocal &&
+                      localStatus &&
+                      (localStatus.in_progress !== undefined ||
+                        localStatus.phase) && (
+                        <div className={styles.lastCheck}>
+                          {source.enabled ? '扫描进度：' : '上次进度：'}
+                          {localStatus.in_progress
+                            ? `${localDirectoryPhaseLabel(localStatus.phase)} · 本轮尚未完成`
+                            : localStatus.cycle_completed
+                              ? '本轮扫描完成'
+                              : localDirectoryPhaseLabel(localStatus.phase)}
+                          {` · ${localStatus.pending_directories ?? 0} 个目录待扫描`}
+                        </div>
+                      )}
+                    {isLocal && localStatus?.queued_runs !== undefined && (
+                      <div className={styles.lastCheck}>
+                        {source.enabled ? '待处理运行' : '最近记录的待处理运行'}
+                        ：{localStatus.queued_runs} 项
+                      </div>
+                    )}
+                    {isLocal &&
+                      localStatus &&
+                      (localStatus.full_scan_completed_at ||
+                        localStatus.in_progress !== undefined) && (
+                        <div className={styles.lastCheck}>
+                          最近完整扫描：
+                          {localStatus.full_scan_completed_at
+                            ? formatAutomationTime(
+                                localStatus.full_scan_completed_at,
+                              )
+                            : '尚未完成'}
+                        </div>
+                      )}
+                    {isLocal &&
+                      source.enabled &&
+                      localStatus?.backpressured && (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          title={
+                            localStatus.backpressure_reason === 'readers'
+                              ? '等待目录读取资源'
+                              : localStatus.backpressure_reason === 'history'
+                                ? '历史记录超过上限，暂缓派发新运行'
+                                : '运行积压，暂缓派发新运行'
+                          }
+                          description={
+                            localStatus.backpressure_reason === 'readers'
+                              ? '目录读取数量已达到上限，等待其他扫描释放资源后继续，已有进度会保留。'
+                              : localStatus.backpressure_reason === 'history'
+                                ? '正在分批清理可清理的历史；候选事件保留，历史数量降低后继续派发。受引用保护的记录会保留。'
+                                : `已有 ${localStatus.queued_runs ?? 0} 项运行待处理。候选事件保留，积压降低后继续派发。`
+                          }
+                        />
+                      )}
+                    {isLocal && source.enabled && localStatus?.warning && (
+                      <Alert
+                        type="warning"
+                        showIcon
+                        title={localStatus.warning}
+                      />
+                    )}
                     {error && (
                       <button
                         className={styles.cardError}

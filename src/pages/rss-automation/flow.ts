@@ -56,7 +56,7 @@ export type RSSFlowNode = Node<RSSFlowNodeData, 'rssAutomationNode'>;
 export type RSSFlowEdge = Edge<RSSFlowEdgeData, 'workflow'>;
 
 export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
-  trigger: 'RSS 触发器',
+  trigger: '触发器',
   delay: '延迟执行',
   regex: '正则提取',
   extract_between: '文本区间提取',

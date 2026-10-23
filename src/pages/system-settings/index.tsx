@@ -1840,6 +1840,14 @@ const SystemSettingsPage: React.FC = () => {
                             />
                           </div>
                         </SettingsSection>
+                        <SettingsSection
+                          title="洗版规则"
+                          description="集中维护画质、音轨、字幕与组合条件，再由目录选择引用。"
+                        >
+                          <Button href="/upgrade-rules" target="_blank">
+                            管理洗版规则组
+                          </Button>
+                        </SettingsSection>
                       </div>
                     ),
                   },

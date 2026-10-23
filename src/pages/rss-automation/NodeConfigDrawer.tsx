@@ -1097,7 +1097,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('input')) ||
-                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+                '选择当前 触发事件字段，或前面节点已经生成的变量。'
               }
               label="输入字段"
               name="input"
@@ -1105,7 +1105,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 触发事件字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1188,7 +1188,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('input')) ||
-                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+                '选择当前 触发事件字段，或前面节点已经生成的变量。'
               }
               label="输入字段"
               name="input"
@@ -1196,7 +1196,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 触发事件字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1368,7 +1368,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('input')) ||
-                '选择当前 RSS 字段，或前面节点已经生成的变量。'
+                '选择当前 触发事件字段，或前面节点已经生成的变量。'
               }
               label="输入字段"
               name="input"
@@ -1376,7 +1376,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="输入字段"
-                placeholder="点击“插入变量”选择 RSS 字段或上游变量"
+                placeholder="点击“插入变量”选择 触发事件字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -1394,7 +1394,7 @@ const NodeConfigModal = ({
         return (
           <>
             <Text className={styles.nodeConfigHint} type="secondary">
-              将固定值、RSS 字段或上游输出写入流程变量；精确引用会保留原始类型。
+              将固定值、触发事件字段或上游输出写入流程变量；精确引用会保留原始类型。
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
@@ -1432,7 +1432,7 @@ const NodeConfigModal = ({
         return (
           <>
             <Text className={styles.nodeConfigHint} type="secondary">
-              用 RSS 字段和上游变量拼接文本，例如：
+              用 触发事件字段和上游变量拼接文本，例如：
               {'{{item.title}} · {{vars.quality}}'}。
             </Text>
             <Form.Item
@@ -1865,7 +1865,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="多路分支比较输入"
-                placeholder="选择 RSS 字段或上游变量"
+                placeholder="选择 触发事件字段或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -2719,7 +2719,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('condition.field')) ||
-                '只列出当前 RSS 字段和这个判断节点之前生成的变量。'
+                '只列出当前 触发事件字段和这个判断节点之前生成的变量。'
               }
               label="比较字段"
               name="condition_field"
@@ -3111,7 +3111,7 @@ const NodeConfigModal = ({
             <Text className={styles.nodeConfigHint} type="secondary">
               {recognitionMode === 'file'
                 ? '直接连接“等待 115 下载完成”的成功出口，递归读取其中的视频文件；不会修改云端文件名，也不会调用 MP2。'
-                : '读取 RSS 标题或任意流程变量，应用“识别词管理”中已保存的词表后，由 FilmFusion 本地内核解析。'}
+                : '读取 条目标题或任意流程变量，应用“识别词管理”中已保存的词表后，由 FilmFusion 本地内核解析。'}
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
@@ -3140,7 +3140,7 @@ const NodeConfigModal = ({
               >
                 <TemplateVariableInput
                   ariaLabel="FilmFusion 本地识别标题"
-                  placeholder="点击“插入变量”选择 RSS 标题或上游变量"
+                  placeholder="点击“插入变量”选择 条目标题或上游变量"
                   references={fieldReferences}
                 />
               </Form.Item>
@@ -3240,7 +3240,7 @@ const NodeConfigModal = ({
             <Alert
               className={styles.nodeConfigFull}
               description="可放在关键词或 IF 筛选后、下载节点前。节点会输出 TMDB ID、标题、年份、分类、评分和海报地址，供下载路径或通知继续使用。"
-              title="使用 RSS 标题调用 MoviePilot 识别，不依赖 115 下载。"
+              title="使用 条目标题调用 MoviePilot 识别，不依赖 115 下载。"
               showIcon
               type="info"
             />
@@ -3256,7 +3256,7 @@ const NodeConfigModal = ({
             >
               <TemplateVariableInput
                 ariaLabel="待识别标题"
-                placeholder="点击“插入变量”选择 RSS 标题或上游变量"
+                placeholder="点击“插入变量”选择 条目标题或上游变量"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -3693,7 +3693,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('body')) ||
-                '最大 1 MiB；点击“插入变量”可选择 RSS 字段或上游输出。'
+                '最大 1 MiB；点击“插入变量”可选择 触发事件字段或上游输出。'
               }
               label="请求体（可选）"
               name="body"
@@ -3750,7 +3750,7 @@ const NodeConfigModal = ({
               <TemplateVariableInput
                 ariaLabel="通知标题"
                 insertMode="template"
-                placeholder="RSS 自动化命中"
+                placeholder="自动化命中"
                 references={fieldReferences}
               />
             </Form.Item>
@@ -3777,7 +3777,7 @@ const NodeConfigModal = ({
         return (
           <Text className={styles.nodeConfigFull} type="secondary">
             {node.type === 'trigger'
-              ? '每个新 RSS 条目从这里进入流程。'
+              ? '每个触发事件从这里进入流程。'
               : '该节点没有额外配置。'}
           </Text>
         );

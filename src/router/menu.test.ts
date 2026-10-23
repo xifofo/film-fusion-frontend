@@ -3,6 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { findMenuTrail } from './menu';
 
 describe('findMenuTrail', () => {
+  it('exposes centralized upgrade rules', () => {
+    expect(findMenuTrail('/upgrade-rules').map((item) => item.name)).toEqual([
+      '洗版规则',
+    ]);
+  });
+  it('exposes the Emby batch library check', () => {
+    expect(
+      findMenuTrail('/emby/library-check').map((item) => item.name),
+    ).toEqual(['Emby', '批量查入库']);
+  });
+
   it('finds a nested Emby page', () => {
     expect(
       findMenuTrail('/emby/library-tools').map((item) => item.name),

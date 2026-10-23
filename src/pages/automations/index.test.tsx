@@ -302,6 +302,143 @@ describe('multi-trigger automation center', () => {
     expect(screen.getByText('automation-editor-open')).toBeTruthy();
   });
 
+  it('opens the local monitor editor after choosing the local / NAS trigger', async () => {
+    render(<AutomationPage />);
+    await screen.findByText('115 入库监控');
+    fireEvent.click(screen.getByRole('button', { name: /新建自动化/ }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('radio', {
+        name: '本机 / NAS 目录',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /下一步：配置触发器/ }));
+    expect(
+      screen.getByRole('heading', { name: '监控哪些目录变化？' }),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('监控目录')).toBeTruthy();
+    expect(screen.queryByText('automation-editor-open')).toBeNull();
+  });
+
+  it('filters local monitors and displays degraded watcher coverage', async () => {
+    const localSource: AutomationSource = {
+      ...dashboard.sources[0],
+      id: 80,
+      name: 'NAS 监控',
+      trigger_type: 'local_directory',
+      directory_path: '/mnt/nas',
+      initialized: true,
+      local_status_json: JSON.stringify({
+        watched_directories: 64,
+        degraded: true,
+        warning: '监听上限已达，其余目录由补扫覆盖',
+      }),
+    };
+    serviceMocks.getAutomationDashboard.mockResolvedValue({
+      code: 0,
+      data: {
+        ...dashboard,
+        sources: [...dashboard.sources, localSource],
+        workflows: [
+          ...dashboard.workflows,
+          { ...dashboard.workflows[0], id: 81, source_id: 80 },
+        ],
+      },
+    });
+    render(<AutomationPage />);
+    await screen.findByText('NAS 监控');
+    fireEvent.click(screen.getByRole('radio', { name: '本机 / NAS' }));
+    expect(screen.getByRole('heading', { name: 'NAS 监控' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: '115 入库监控' })).toBeNull();
+    expect(screen.getByText(/系统监听 64 个目录/)).toBeTruthy();
+    expect(screen.getByText('监听上限已达，其余目录由补扫覆盖')).toBeTruthy();
+    expect(serviceMocks.scanAutomation).not.toHaveBeenCalled();
+  });
+
+  it('reports existing local items pending stability instead of claiming they were ignored', async () => {
+    const localSource: AutomationSource = {
+      ...dashboard.sources[0],
+      id: 80,
+      name: '存量监控',
+      trigger_type: 'local_directory',
+      directory_path: '/mnt/nas',
+      local_config_json: JSON.stringify({ initial_scan: 'process_existing' }),
+    };
+    serviceMocks.getAutomationDashboard.mockResolvedValue({
+      code: 0,
+      data: {
+        ...dashboard,
+        sources: [localSource],
+        workflows: [{ ...dashboard.workflows[0], id: 81, source_id: 80 }],
+      },
+    });
+    serviceMocks.scanAutomation.mockResolvedValue({
+      code: 0,
+      data: {
+        baseline: true,
+        scanned_items: 7,
+        pending_stable: 7,
+        created_runs: 0,
+      },
+    });
+    render(<AutomationPage />);
+    await screen.findByText('存量监控');
+    fireEvent.click(screen.getByRole('button', { name: /立即检查/ }));
+    expect(await screen.findByText(/7 个对象等待稳定后进入流程/)).toBeTruthy();
+    expect(screen.queryByText(/未触发存量内容/)).toBeNull();
+  });
+
+  it('shows resumable scan progress and backpressure without claiming full tree completion', async () => {
+    const localSource: AutomationSource = {
+      ...dashboard.sources[0],
+      id: 80,
+      name: '大目录监控',
+      trigger_type: 'local_directory',
+      directory_path: '/mnt/nas',
+      initialized: true,
+      local_status_json: JSON.stringify({
+        watched_directories: 1024,
+        degraded: true,
+        in_progress: true,
+        phase: 'dispatch',
+        pending_directories: 250000,
+        queued_runs: 1000,
+        backpressured: true,
+        cycle_completed: false,
+        scanned_items: 4096,
+        scanned_folders: 50,
+        pending_stable: 72,
+      }),
+    };
+    serviceMocks.getAutomationDashboard.mockResolvedValue({
+      code: 0,
+      data: {
+        ...dashboard,
+        sources: [localSource],
+        workflows: [{ ...dashboard.workflows[0], id: 81, source_id: 80 }],
+      },
+    });
+    serviceMocks.scanAutomation.mockResolvedValue({
+      code: 0,
+      data: {
+        baseline: false,
+        scanned_items: 4096,
+        pending_stable: 72,
+        created_runs: 0,
+        local_monitor: JSON.parse(localSource.local_status_json || '{}'),
+      },
+    });
+    render(<AutomationPage />);
+    await screen.findByText('大目录监控');
+    expect(screen.getByText('分段扫描中')).toBeTruthy();
+    expect(screen.getByText(/派发稳定事件 · 本轮尚未完成/)).toBeTruthy();
+    expect(screen.getByText(/250000 个目录待扫描/)).toBeTruthy();
+    expect(screen.getByText('运行积压，暂缓派发新运行')).toBeTruthy();
+    expect(screen.getByText(/最近完整扫描：尚未完成/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /立即检查/ }));
+    expect(await screen.findByText(/本段扫描 4096 个对象/)).toBeTruthy();
+    expect(screen.queryByText(/本地目录本轮扫描完成/)).toBeNull();
+  });
+
   it('opens the RSS workflow wizard after choosing RSS', async () => {
     render(<AutomationPage />);
     await screen.findByText('新番下载');

@@ -6,6 +6,8 @@ export * from './appConfig';
 export * from './auth115';
 // 115 目录增量监控与自动化流程
 export * from './automation';
+// 115 文件选择与创建文件夹后移动
+export * from './cloudFileMove';
 // 云盘路径相关API
 export * from './cloudPath';
 // 云存储相关API
@@ -22,6 +24,8 @@ export * from './embyBinding';
 export * from './embyCover';
 // Emby 图片尺寸、质量控制与真实图片测试
 export * from './embyImageOptimization';
+// Emby 名称批量查入库
+export * from './embyLibraryCheck';
 // Emby 缺集扫描
 export * from './embyMissing';
 // Emby 代理 302 重定向日志

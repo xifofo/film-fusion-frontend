@@ -1,6 +1,40 @@
 import { apiClient } from '@/lib/api-client';
 
-export type AutomationTriggerType = 'rss' | '115_directory';
+export type AutomationTriggerType = 'rss' | '115_directory' | 'local_directory';
+
+export type LocalDirectoryConfig = {
+  mode: 'auto' | 'poll';
+  events: ('created' | 'modified')[];
+  item_type: 'file' | 'directory' | 'all';
+  include_extensions: string[];
+  exclude_patterns: string[];
+  max_watches: number;
+  batch_size: number;
+  scan_budget_ms: number;
+  scan_item_limit: number;
+  max_pending_runs: number;
+  history_retention_days: number;
+  history_max_runs: number;
+  missing_retention_days: number;
+  initial_scan: 'baseline' | 'process_existing';
+};
+
+export type LocalDirectoryStatus = {
+  watched_directories: number;
+  degraded: boolean;
+  warning?: string;
+  scanned_folders?: number;
+  scanned_items?: number;
+  pending_stable?: number;
+  in_progress?: boolean;
+  phase?: string;
+  pending_directories?: number;
+  backpressured?: boolean;
+  backpressure_reason?: 'history' | 'queue' | 'readers';
+  queued_runs?: number;
+  cycle_completed?: boolean;
+  full_scan_completed_at?: string;
+};
 
 export type RSSAutomationFieldType =
   | 'string'
@@ -36,6 +70,7 @@ export type AutomationSourceInput = {
   recursive?: boolean;
   interval_seconds?: number;
   quiet_seconds?: number;
+  local_config?: LocalDirectoryConfig;
   feed_url?: string;
   interval_minutes?: number;
   mapping?: RSSAutomationMapping;
@@ -45,6 +80,8 @@ export type AutomationSource = AutomationSourceInput & {
   id: number;
   trigger_type: AutomationTriggerType;
   mapping_json?: string;
+  local_config_json?: string;
+  local_status_json?: string;
   initialized: boolean;
   last_checked_at?: string;
   last_success_at?: string;
@@ -355,6 +392,7 @@ export type AutomationScanResult = RSSCacheMetadata & {
   fetched?: number;
   new_entries?: number;
   parse_warnings?: number;
+  local_monitor?: LocalDirectoryStatus;
   scanned_folders: number;
   scanned_items: number;
   baseline_items: number;

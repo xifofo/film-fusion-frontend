@@ -17,6 +17,7 @@ const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
 const CloudPaths = lazy(() => import('@/pages/cloud-paths'));
 const Directories = lazy(() => import('@/pages/directories'));
 const MediaRecognition = lazy(() => import('@/pages/media-recognition'));
+const UpgradeRules = lazy(() => import('@/pages/upgrade-rules'));
 const DownloadQueue = lazy(() => import('@/pages/download-queue'));
 const Downloaders = lazy(() => import('@/pages/downloaders'));
 const Organize = lazy(() => import('@/pages/directories/Organize'));
@@ -32,6 +33,7 @@ const EmbyImageOptimization = lazy(
   () => import('@/pages/emby-image-optimization'),
 );
 const EmbyMissing = lazy(() => import('@/pages/emby-missing'));
+const EmbyLibraryCheck = lazy(() => import('@/pages/emby-library-check'));
 const EmbyVersionCheck = lazy(() => import('@/pages/emby-version-check'));
 const EmbyBindings = lazy(() => import('@/pages/emby-bindings'));
 const EmbyAccounts = lazy(() => import('@/pages/emby-accounts'));
@@ -40,6 +42,7 @@ const WatchCalendar = lazy(() => import('@/pages/watch-calendar'));
 const OrganizeLogs = lazy(() => import('@/pages/organize-logs'));
 const Automation = lazy(() => import('@/pages/automations'));
 const RSSRelay = lazy(() => import('@/pages/rss-relay'));
+const PlutoFish = lazy(() => import('@/pages/plutofish'));
 const ServerLogs = lazy(() => import('@/pages/server-logs'));
 const SystemInfo = lazy(() => import('@/pages/system-info'));
 const SystemSettings = lazy(() => import('@/pages/system-settings'));
@@ -155,6 +158,10 @@ const routes: RouteObject[] = [
         element: <MediaRecognition />,
       },
       {
+        path: 'upgrade-rules',
+        element: <UpgradeRules />,
+      },
+      {
         path: 'download-queue',
         element: <DownloadQueue />,
       },
@@ -203,6 +210,10 @@ const routes: RouteObject[] = [
         element: <EmbyImageOptimization />,
       },
       {
+        path: 'emby/library-check',
+        element: <EmbyLibraryCheck />,
+      },
+      {
         path: 'emby/missing',
         element: <EmbyMissing />,
       },
@@ -233,6 +244,10 @@ const routes: RouteObject[] = [
       {
         path: 'rss-relay',
         element: <RSSRelay />,
+      },
+      {
+        path: 'plutofish',
+        element: <PlutoFish />,
       },
       {
         path: 'server-logs',

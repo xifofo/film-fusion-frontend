@@ -28,6 +28,14 @@ const triggerOptions: Array<{
     icon: <DownloadOutlined />,
   },
   {
+    value: 'local_directory',
+    title: '本机 / NAS 目录',
+    description: '监听本机和挂载目录中的文件变化',
+    detail:
+      '自动发现新子目录，等待写入稳定，再按配置发送通知、请求 HTTP 或执行流程。',
+    icon: <FolderOpenOutlined />,
+  },
+  {
     value: '115_directory',
     title: '115 目录',
     description: '发现目录里新增且已稳定的媒体',
@@ -61,7 +69,7 @@ const TriggerSelectorModal = ({
       onCancel={onCancel}
       open={open}
       title="选择触发器"
-      width={760}
+      width={1040}
     >
       <Paragraph type="secondary">
         自动化从哪里开始？选择一种内容来源，接下来配置它的处理流程。
@@ -74,7 +82,7 @@ const TriggerSelectorModal = ({
       >
         <Row gutter={[16, 16]}>
           {triggerOptions.map((option) => (
-            <Col key={option.value} sm={12} xs={24}>
+            <Col key={option.value} md={8} sm={12} xs={24}>
               <Card
                 className={
                   selected === option.value
@@ -105,7 +113,9 @@ const TriggerSelectorModal = ({
                     <div className={styles.triggerExample}>
                       {option.value === 'rss'
                         ? '订阅更新 → 下载 → 后续处理'
-                        : '目录新增 → 媒体识别 → 整理入库'}
+                        : option.value === 'local_directory'
+                          ? '目录变化 → 条件判断 → 自定义动作'
+                          : '目录新增 → 媒体识别 → 整理入库'}
                     </div>
                   </div>
                 </div>

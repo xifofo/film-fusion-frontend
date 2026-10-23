@@ -146,6 +146,9 @@ export const collectAutomationBindings = (
     add('directory_id', input.source.directory_id || '', '触发器');
     add('directory_path', input.source.directory_path || '/', '触发器');
   }
+  if (input.source.trigger_type === 'local_directory') {
+    add('directory_path', input.source.directory_path || '', '触发器');
+  }
   const definition = resolveDefinitionParameters(input.workflow.definition);
   for (const node of definition.nodes) {
     const config = { ...node.config };
@@ -288,7 +291,9 @@ export const readTemplateConfiguration = (
   const input = JSON.parse(raw) as AutomationCreateInput;
   if (
     !input.source ||
-    !['rss', '115_directory'].includes(input.source.trigger_type) ||
+    !['rss', '115_directory', 'local_directory'].includes(
+      input.source.trigger_type,
+    ) ||
     input.workflow?.definition?.schema_version !== 1 ||
     !Array.isArray(input.workflow.definition.nodes) ||
     !input.workflow.definition.nodes.length ||
