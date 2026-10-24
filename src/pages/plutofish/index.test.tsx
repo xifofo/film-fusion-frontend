@@ -32,6 +32,8 @@ vi.mock('@/services/film-fusion/plutofish', () => ({
   retryPlutoFishEvent: vi.fn(),
   startPlutoFish: vi.fn(),
   stopPlutoFish: vi.fn(),
+  previewPlutoFishSTRMRepairs: vi.fn(),
+  repairPlutoFishSTRMs: vi.fn(),
 }));
 
 const config: PlutoFishConfig = {

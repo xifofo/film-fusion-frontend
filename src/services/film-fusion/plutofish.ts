@@ -106,3 +106,43 @@ export const retryPlutoFishEvent = (id: number) =>
       skipErrorHandler: true,
     },
   );
+
+export type PlutoFishRepairItem = {
+  eventID: number;
+  fileName: string;
+  workTitle: string;
+  oldPath: string;
+  newPath: string;
+  oldContent: string;
+  content: string;
+  state: 'ready' | 'resume' | 'blocked' | 'current' | 'repaired' | 'failed';
+  reason: string;
+  canRepair: boolean;
+  snapshot: string;
+};
+
+export type PlutoFishRepairPreview = {
+  items: PlutoFishRepairItem[];
+  nextAfter: number;
+  hasMore: boolean;
+};
+
+export const previewPlutoFishSTRMRepairs = (
+  afterID: number,
+  signal?: AbortSignal,
+) =>
+  apiClient.post<API.Response<PlutoFishRepairPreview>>(
+    '/api/plutofish/strm-repairs/preview',
+    { afterID, limit: 100 },
+    { signal, skipErrorHandler: true, timeout: 120_000 },
+  );
+
+export const repairPlutoFishSTRMs = (
+  items: Pick<PlutoFishRepairItem, 'eventID' | 'snapshot'>[],
+  signal?: AbortSignal,
+) =>
+  apiClient.post<API.Response<{ items: PlutoFishRepairItem[] }>>(
+    '/api/plutofish/strm-repairs/apply',
+    { items },
+    { signal, skipErrorHandler: true, timeout: 120_000 },
+  );

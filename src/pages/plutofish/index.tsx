@@ -31,6 +31,7 @@ import {
   stopPlutoFish,
   updatePlutoFishConfig,
 } from '@/services/film-fusion/plutofish';
+import STRMRepairPanel from './STRMRepairPanel';
 
 const connectionLabels: Record<string, [string, string]> = {
   stopped: ['已停止', 'default'],
@@ -103,6 +104,7 @@ const PlutoFishPage = () => {
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [repairBusy, setRepairBusy] = useState(false);
   const [action, setAction] = useState('');
   const [loadError, setLoadError] = useState('');
   const [configError, setConfigError] = useState('');
@@ -342,7 +344,7 @@ const PlutoFishPage = () => {
         event.state === 'review' ? (
           <Button
             size="small"
-            disabled={!!action || saving}
+            disabled={!!action || saving || repairBusy}
             loading={action === `retry-${event.id}`}
             onClick={() =>
               void runAction(
@@ -416,7 +418,11 @@ const PlutoFishPage = () => {
             <Button
               icon={<Play size={16} />}
               disabled={
-                !config?.keyConfigured || !config.enabled || saving || !!action
+                !config?.keyConfigured ||
+                !config.enabled ||
+                saving ||
+                !!action ||
+                repairBusy
               }
               loading={action === 'start'}
               onClick={() =>
@@ -427,7 +433,7 @@ const PlutoFishPage = () => {
             </Button>
             <Button
               icon={<Square size={16} />}
-              disabled={saving || !!action}
+              disabled={saving || !!action || repairBusy}
               loading={action === 'stop'}
               onClick={() =>
                 void runAction('stop', stopPlutoFish, '已停止通知接收')
@@ -466,7 +472,7 @@ const PlutoFishPage = () => {
             }}
             autoComplete="off"
             clearOnDestroy
-            disabled={saving || !!action || !config}
+            disabled={saving || !!action || !config || repairBusy}
             initialValues={{
               enabled: false,
               baseURL: 'https://plutofish.shop',
@@ -710,12 +716,22 @@ const PlutoFishPage = () => {
               type="primary"
               htmlType="submit"
               loading={saving}
-              disabled={accountsLoading}
+              disabled={accountsLoading || repairBusy}
             >
               保存配置
             </Button>
           </Form>
         </Card>
+        <STRMRepairPanel
+          key={JSON.stringify([
+            config?.baseURL,
+            config?.ownerUID,
+            config?.mappings,
+          ])}
+          disabled={!config?.ownerUID || saving || !!action}
+          onRepaired={refresh}
+          onBusyChange={setRepairBusy}
+        />
         <Card title="本地事件与待处理队列">
           <p>
             补充配置后可重新处理成功事件；此操作仅重试 FilmFusion

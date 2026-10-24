@@ -14,12 +14,16 @@ import {
   getCloudDirectoryList,
   getCloudStorageList,
 } from '@/services/film-fusion';
+import CloudBrowser, {
+  type CloudBrowserHandle,
+} from './components/CloudBrowser';
 import CreateForm from './components/CreateForm';
 import UpdateForm from './components/UpdateForm';
 
 const DirectoryList: React.FC = () => {
   const navigate = useNavigate();
   const actionRef = useRef<ActionType | null>(null);
+  const cloudBrowserRef = useRef<CloudBrowserHandle>(null);
 
   const [showDetail, setShowDetail] = useState(false);
   const [currentRow, setCurrentRow] = useState<API.CloudDirectory>();
@@ -208,10 +212,21 @@ const DirectoryList: React.FC = () => {
       title: '操作',
       dataIndex: 'option',
       valueType: 'option',
-      width: 260,
+      width: 340,
       fixed: 'right',
       render: (_, record) => (
         <Space size={8}>
+          <Button
+            type="link"
+            size="small"
+            disabled={
+              !!record.cloud_storage?.storage_type &&
+              !record.cloud_storage.storage_type.startsWith('115')
+            }
+            onClick={() => cloudBrowserRef.current?.open(record)}
+          >
+            浏览网盘
+          </Button>
           <UpdateForm
             record={record}
             storageOptions={storageOptions}
@@ -352,6 +367,8 @@ const DirectoryList: React.FC = () => {
         }}
         columns={columns}
       />
+
+      <CloudBrowser ref={cloudBrowserRef} />
 
       <Drawer
         size={600}
