@@ -186,6 +186,88 @@ describe('PlutoFish notification page', () => {
     expect(storage).not.toHaveBeenCalled();
   });
 
+  it('adds and saves another cloud path for the same receiving account', async () => {
+    vi.mocked(getPlutoFishCloudPaths).mockResolvedValue(
+      result({
+        list: [
+          {
+            id: 1,
+            user_id: 1,
+            cloud_storage_id: 1,
+            source_path: '/Movies',
+            local_path: '/strm/movies',
+            link_type: 'strm',
+            created_at: '',
+            updated_at: '',
+          },
+          {
+            id: 2,
+            user_id: 1,
+            cloud_storage_id: 1,
+            source_path: '/TV',
+            local_path: '/strm/tv',
+            link_type: 'strm',
+            created_at: '',
+            updated_at: '',
+          },
+        ],
+        total: 2,
+        current: 1,
+        pageSize: 100,
+      }),
+    );
+    const saved = {
+      ...config,
+      mappings: [
+        ...config.mappings,
+        { targetAccountID: 'account-1', cloudPathID: 2 },
+      ],
+    };
+    vi.mocked(updatePlutoFishConfig).mockResolvedValue(result(saved));
+    render(
+      <App>
+        <PlutoFishPage />
+      </App>,
+    );
+    await screen.findByRole('button', { name: /刷新接收网盘/ });
+    fireEvent.click(
+      screen.getByRole('button', { name: '添加网盘与 STRM 映射' }),
+    );
+    const accounts = screen.getAllByRole('combobox', {
+      name: 'PlutoFish 接收网盘',
+    });
+    expect(accounts).toHaveLength(2);
+    fireEvent.mouseDown(accounts[1]);
+    fireEvent.click(
+      await screen.findByText('我的追剧网盘 · 115', {
+        selector: '.ant-select-item-option-content',
+      }),
+    );
+    const paths = screen.getAllByRole('combobox', {
+      name: 'FilmFusion 云路径映射',
+    });
+    fireEvent.mouseDown(paths[1]);
+    fireEvent.click(
+      await screen.findByText(/#2.*\/TV/, {
+        selector: '.ant-select-item-option-content',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(updatePlutoFishConfig).toHaveBeenCalledOnce());
+    expect(vi.mocked(updatePlutoFishConfig).mock.calls[0][0].mappings).toEqual(
+      saved.mappings,
+    );
+    expect(
+      screen.getAllByRole('combobox', { name: 'FilmFusion 云路径映射' }),
+    ).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '移除第 1 条映射' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存配置' }));
+    await waitFor(() => expect(updatePlutoFishConfig).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(updatePlutoFishConfig).mock.calls[1][0].mappings).toEqual([
+      saved.mappings[1],
+    ]);
+  });
+
   it('offers local retry only for successful review events, never failed or unknown transfers', async () => {
     render(
       <App>

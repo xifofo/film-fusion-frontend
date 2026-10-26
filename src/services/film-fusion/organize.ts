@@ -1,5 +1,23 @@
 import { apiClient } from '@/lib/api-client';
 
+/** 采用已保存的 Medianame 候选，生成新的整理预览。 */
+export async function selectOrganizeMedianameCandidate(
+  data: {
+    plan_id: string;
+    file_ids: string[];
+    tmdb_id: string;
+    media_type: 'movie' | 'tv';
+    preview_task_id?: number;
+  },
+  options?: { signal?: AbortSignal },
+) {
+  return apiClient.post<API.Response<API.Organize115CookieResult>>(
+    '/api/organize/medianame-candidate',
+    data,
+    { timeout: 0, ...options },
+  );
+}
+
 /** 获取 MoviePilot 分类配置 */
 export async function getOrganizeCategoryConfig(options?: {
   [key: string]: any;

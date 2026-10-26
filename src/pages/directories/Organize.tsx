@@ -79,6 +79,10 @@ import {
   canApplyUpgrade,
   upgradeActionLabels,
 } from '@/services/film-fusion/upgrade';
+import MedianameCandidatePicker, {
+  medianameCandidates,
+  medianameEvidence,
+} from './components/MedianameCandidatePicker';
 import OrganizeEngineConfirmation, {
   organizeEngineLabel,
 } from './components/OrganizeEngineConfirmation';
@@ -1323,6 +1327,11 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     'dry' | 'apply'
   >();
   const [resultData, setResultData] = useState<API.Organize115CookieResult>();
+  const [candidateSelection, setCandidateSelection] = useState<{
+    item: API.Organize115ItemResult;
+    preview: API.Organize115CookieResult;
+  }>();
+  const [candidateLoading, setCandidateLoading] = useState(false);
   const [recognitionDisplay, setRecognitionDisplay] = useState<{
     result: API.Organize115CookieResult;
     source: RecognitionDisplaySource;
@@ -2478,6 +2487,10 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
 
   const triggerOrganize = useCallback(
     (mode: 'dry' | 'apply') => {
+      if (candidateLoading) {
+        messageApi.warning('正在更新候选预览，请稍候');
+        return;
+      }
       if (mode === 'dry') {
         if (checkedKeys.length === 0) {
           messageApi.warning('请先在左侧勾选至少一个 115 目录');
@@ -2694,6 +2707,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     [
       activePreviewTask,
       activeVersionGroup,
+      candidateLoading,
       buildOrganizeParams,
       checkedKeys,
       dryRun,
@@ -2719,12 +2733,27 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           return (
             <div>
               {status && <span>{medianameStatusLabels[status] || status}</span>}
+              {medianameEvidence(row)?.result?.selection_basis === 'manual' && (
+                <span className="ml-2 text-blue-600">已手动选择</span>
+              )}
               {row.error && (
                 <Typography.Text type="danger" className="block">
                   {row.error}
                 </Typography.Text>
               )}
               {!status && !row.error && '-'}
+              {resultData?.dry_run && medianameCandidates(row).length > 0 && (
+                <Button
+                  className="mt-2"
+                  size="small"
+                  disabled={!resultData.plan_id || candidateLoading}
+                  onClick={() =>
+                    setCandidateSelection({ item: row, preview: resultData })
+                  }
+                >
+                  选择候选（{medianameCandidates(row).length}）
+                </Button>
+              )}
             </div>
           );
         },
@@ -3001,7 +3030,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         render: (_, row) => renderVersionTag(row),
       },
     ],
-    [buildPathByKey, episodeMode, resultData?.recognition_source],
+    [buildPathByKey, candidateLoading, episodeMode, resultData],
   );
 
   const dirDebugColumns = useMemo<ProColumns<OrganizeDirDebugRow>[]>(
@@ -4054,6 +4083,37 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         </div>
       </div>
 
+      {candidateSelection && candidateSelection.preview === resultData && (
+        <MedianameCandidatePicker
+          key={`${resultData.plan_id}:${candidateSelection.item.file_id}`}
+          item={candidateSelection.item}
+          preview={resultData}
+          previewTaskId={activePreviewTask?.id}
+          onClose={() => setCandidateSelection(undefined)}
+          onBusyChange={setCandidateLoading}
+          onSelected={(result) => {
+            const availableKeys = new Set(
+              getDefaultSelectedItemKeys(flattenOrganizeMediaItems(result)),
+            );
+            setResultData(result);
+            setRawResponse(result);
+            setOrganizeRecognitionSource('medianame');
+            recognitionSourceOverriddenRef.current = true;
+            setActiveVersionKey((key) =>
+              result.version_groups?.some((group) => group.key === key)
+                ? key
+                : ALL_VERSION_KEY,
+            );
+            setSelectedItemRowKeys((keys) =>
+              keys.filter((key) => availableKeys.has(String(key))),
+            );
+            setCandidateSelection(undefined);
+            setOrganizeError(undefined);
+            refreshPreviewTasks();
+            messageApi.success('已采用候选，请核对新的整理路径');
+          }}
+        />
+      )}
       <Modal
         title="指定 TMDB ID"
         open={!!assignTMDBTask}

@@ -2,6 +2,9 @@ import { Button, Radio } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { organize115Cookie } from '@/services/film-fusion';
 import { canApplyUpgrade } from '@/services/film-fusion/upgrade';
+import MedianameCandidatePicker, {
+  medianameCandidates,
+} from './MedianameCandidatePicker';
 import UpgradeComparison from './UpgradeComparison';
 
 type ExecutionEngine = 'moviepilot' | 'medianame' | 'local';
@@ -75,6 +78,9 @@ export default function OrganizeEngineConfirmation({
   const [plan, setPlan] = useState<Plan | undefined>(initial);
   const [error, setError] = useState(() => planError(initial));
   const [loading, setLoading] = useState(false);
+  const [candidateItem, setCandidateItem] =
+    useState<API.Organize115ItemResult>();
+  const [candidateLoading, setCandidateLoading] = useState(false);
   const generation = useRef(0);
   const plans = useRef(
     new Map<ExecutionEngine, Plan>([[initialEngine, initial]]),
@@ -122,6 +128,10 @@ export default function OrganizeEngineConfirmation({
       } = params;
       const response = await organize115Cookie({
         ...input,
+        candidate_plan_id:
+          next === 'medianame'
+            ? plans.current.get('medianame')?.result.plan_id
+            : undefined,
         recognition_source: next,
         dry_run: true,
       });
@@ -166,6 +176,7 @@ export default function OrganizeEngineConfirmation({
           {params.dry_run ? '本次预览引擎' : '本次实际整理引擎'}
         </legend>
         <Radio.Group
+          disabled={candidateLoading}
           name="confirm-organize-engine"
           value={source}
           options={[
@@ -191,7 +202,11 @@ export default function OrganizeEngineConfirmation({
           <p role="alert" className="text-red-600">
             {error}
           </p>
-          <Button size="small" onClick={() => void chooseEngine(source, true)}>
+          <Button
+            size="small"
+            disabled={candidateLoading}
+            onClick={() => void chooseEngine(source, true)}
+          >
             重新生成预览
           </Button>
         </div>
@@ -206,11 +221,63 @@ export default function OrganizeEngineConfirmation({
               <li key={item.file_id} className="break-all">
                 <div className="text-neutral-500">{item.file_name}</div>
                 <div>{item.error || item.target_path || '未生成路径'}</div>
+                {source === 'medianame' &&
+                  medianameCandidates(item).length > 0 && (
+                    <Button
+                      size="small"
+                      disabled={candidateLoading}
+                      onClick={() => setCandidateItem(item)}
+                    >
+                      选择候选（{medianameCandidates(item).length}）
+                    </Button>
+                  )}
                 {item.upgrade && <UpgradeComparison decision={item.upgrade} />}
               </li>
             ))}
           </ul>
         </div>
+      )}
+      {candidateItem && plan && (
+        <MedianameCandidatePicker
+          key={`${plan.result.plan_id}:${candidateItem.file_id}`}
+          item={candidateItem}
+          preview={plan.result}
+          onClose={() => setCandidateItem(undefined)}
+          onBusyChange={(busy) => {
+            setCandidateLoading(busy);
+            if (busy) onChange({ source, loading: true });
+            else {
+              const current = plans.current.get(source);
+              onChange({
+                source,
+                loading: false,
+                params:
+                  current && !planError(current) ? current.params : undefined,
+              });
+            }
+          }}
+          onSelected={(result) => {
+            const ready: Plan = {
+              result,
+              params: {
+                ...plan.params,
+                plan_id: result.plan_id,
+                recognition_source: 'medianame',
+              },
+            };
+            plans.current.set('medianame', ready);
+            setPlan(ready);
+            setSource('medianame');
+            const failure = planError(ready);
+            setError(failure);
+            setCandidateItem(undefined);
+            onChange({
+              source: 'medianame',
+              loading: false,
+              params: failure ? undefined : ready.params,
+            });
+          }}
+        />
       )}
     </section>
   );

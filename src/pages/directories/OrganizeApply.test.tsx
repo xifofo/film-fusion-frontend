@@ -20,6 +20,7 @@ import {
   getOrganizePreviewTasks,
   organize115Cookie,
   requeueOrganizePreviewTask,
+  selectOrganizeMedianameCandidate,
   subscribeOrganizePreviewTaskEvents,
 } from '@/services/film-fusion';
 import OrganizePage from './Organize';
@@ -37,6 +38,7 @@ vi.mock('@/services/film-fusion', () => ({
   getOrganizePreviewTasks: vi.fn(),
   organize115Cookie: vi.fn(),
   requeueOrganizePreviewTask: vi.fn(),
+  selectOrganizeMedianameCandidate: vi.fn(),
   subscribeOrganizePreviewTaskEvents: vi.fn(),
 }));
 
@@ -261,6 +263,106 @@ describe('confirm organize error reporting', () => {
   });
 
   afterEach(cleanup);
+
+  it('selects a shadow candidate in the details table and confirms the saved medianame plan', async () => {
+    const evidence: API.MedianameRecognition = {
+      engine: 'medianame',
+      package_version: 'v0.1.3',
+      result: {
+        status: 'review',
+        meta_info: {},
+        candidates: [
+          {
+            media_info: {
+              tmdb_id: '777',
+              type: 'tv',
+              title: '选定剧集',
+              year: 2024,
+            },
+          },
+        ],
+      },
+    };
+    const original: API.Organize115CookieResult = {
+      ...preview,
+      recognition_source: 'shadow',
+      pipeline: { ...preview.pipeline, source: 'shadow' },
+      groups: [
+        {
+          ...preview.groups[0],
+          items: [
+            {
+              ...preview.groups[0].items[0],
+              shadow_comparison: {
+                status: 'local_error',
+                matched: false,
+                differences: [],
+                medianame: {
+                  ...preview.groups[0].items[0],
+                  error: 'medianame: review',
+                  target_path: '',
+                  medianame: evidence,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const chosen = enginePreview('medianame');
+    const chosenItem = chosen.groups?.[0].items?.[0];
+    if (!chosenItem || !evidence.result) throw new Error('missing fixture');
+    chosenItem.medianame = {
+      ...evidence,
+      result: {
+        ...evidence.result,
+        status: 'compatible',
+        selection_basis: 'manual',
+        media_info: evidence.result.candidates?.[0].media_info,
+      },
+    };
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { task, result: original },
+    });
+    vi.mocked(selectOrganizeMedianameCandidate).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: chosen,
+    });
+    vi.mocked(organize115Cookie).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { ...chosen, dry_run: false },
+    });
+    await applyPreview(false, true, false, undefined, async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /选择候选/ }));
+      fireEvent.click(screen.getByRole('radio', { name: /选定剧集/ }));
+      fireEvent.click(
+        screen.getByRole('button', { name: '采用候选并重新预览' }),
+      );
+      await screen.findByText('已手动选择');
+      expect(selectOrganizeMedianameCandidate).toHaveBeenCalledWith(
+        {
+          plan_id: 'confirmed-plan',
+          file_ids: ['101'],
+          tmdb_id: '777',
+          media_type: 'tv',
+          preview_task_id: 9,
+        },
+        expect.anything(),
+      );
+      expect(organize115Cookie).not.toHaveBeenCalled();
+    });
+    expect(organize115Cookie).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        plan_id: chosen.plan_id,
+        recognition_source: 'medianame',
+        dry_run: false,
+      }),
+    );
+  });
 
   it('remembers both preview mode choices across visits and loading task results', async () => {
     const firstVisit = renderPage();

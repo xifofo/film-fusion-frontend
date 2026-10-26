@@ -563,8 +563,11 @@ const PlutoFishPage = () => {
             </div>
             <h3>成功事件 → 本地 STRM</h3>
             <p>
-              选择 PlutoFish 接收网盘并绑定到已有的云路径映射，沿用其 STRM
-              内容前缀和本地目录。这里只读取本地配置并生成文件，不扫描网盘，也不刷新
+              同一个 PlutoFish
+              接收网盘可添加多条云路径映射，例如分别绑定电影和剧集目录。
+              按转存目录选择最具体的源目录，沿用该映射的 STRM
+              内容前缀和本地目录。
+              同等范围匹配多条映射时保留待核对。这里只读取本地配置并生成文件，不扫描网盘，也不刷新
               Emby。
               未配置映射或通知缺少目标目录路径、文件名时，事件会保留为待处理。
             </p>
@@ -648,22 +651,28 @@ const PlutoFishPage = () => {
                               label: `${account.name} · ${account.provider}${account.enabled ? '' : '（已停用）'}`,
                               disabled: !account.enabled,
                             })),
-                            ...(form.getFieldValue('mappings') || [])
-                              .filter(
-                                (mapping: { targetAccountID: string }) =>
-                                  mapping.targetAccountID &&
-                                  !accounts.some(
-                                    (account) =>
-                                      account.id === mapping.targetAccountID,
+                            ...Array.from(
+                              new Set<string>(
+                                (form.getFieldValue('mappings') || [])
+                                  .map(
+                                    (mapping: { targetAccountID: string }) =>
+                                      mapping.targetAccountID,
+                                  )
+                                  .filter(
+                                    (id: string) =>
+                                      id &&
+                                      !accounts.some(
+                                        (account) => account.id === id,
+                                      ),
                                   ),
-                              )
-                              .map((mapping: { targetAccountID: string }) => ({
-                                value: mapping.targetAccountID,
-                                label: accountsLoaded
-                                  ? '原接收网盘已移除，请重新选择'
-                                  : '已保存的接收网盘（等待获取名称）',
-                                disabled: true,
-                              })),
+                              ),
+                            ).map((id) => ({
+                              value: id,
+                              label: accountsLoaded
+                                ? '原接收网盘已移除，请重新选择'
+                                : '已保存的接收网盘（等待获取名称）',
+                              disabled: true,
+                            })),
                           ]}
                           notFoundContent={
                             accountsLoaded

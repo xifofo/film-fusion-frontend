@@ -610,6 +610,7 @@ declare namespace API {
   };
 
   type Organize115CookieParams = {
+    candidate_plan_id?: string;
     plan_id?: string;
     cloud_directory_id: number;
     folder_id?: string;
@@ -776,10 +777,33 @@ declare namespace API {
   type MediaPipelineSnapshot = {
  schema: number; source: string; package_version: string; config_version: string;
  };
- type MedianameRecognition = {
- engine: string; package_version: string; error?: string;
- result?: {status: string; meta_info: Record<string, unknown>; media_info?: Record<string, unknown>; candidates?: unknown[]; selection_basis?: string};
- };
+  type MedianameMediaInfo = {
+    tmdb_id: string;
+    type: 'movie' | 'tv';
+    title: string;
+    original_title?: string;
+    year?: number;
+    overview?: string;
+    category?: string;
+  };
+  type MedianameCandidate = {
+    media_info?: MedianameMediaInfo | null;
+    conflicts?: Array<{ field: string; expected: string; actual: string }>;
+    resolved_conflicts?: Array<{ field: string; expected: string; actual: string }>;
+  };
+  type MedianameRecognition = {
+    engine: string;
+    package_version: string;
+    error?: string;
+    result?: {
+      status: string;
+      meta_info: Record<string, unknown>;
+      media_info?: MedianameMediaInfo | null;
+      candidates?: MedianameCandidate[];
+      selection_basis?: string;
+      truncated?: boolean;
+    };
+  };
  type Organize115CookieResult = {
     upgrade_policy?: import('./upgrade').UpgradePolicy;
     upgrade_job?: import('./upgrade').UpgradeJob;
