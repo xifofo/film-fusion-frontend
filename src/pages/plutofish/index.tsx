@@ -27,6 +27,7 @@ import {
   type PlutoFishReceivingAccount,
   type PlutoFishStatus,
   retryPlutoFishEvent,
+  reviewPlutoFishEvent,
   startPlutoFish,
   stopPlutoFish,
   updatePlutoFishConfig,
@@ -51,6 +52,7 @@ const connectionLabels: Record<string, [string, string]> = {
 const eventStates: Record<PlutoFishEvent['state'], [string, string]> = {
   pending: ['待处理', 'processing'],
   review: ['待人工核对', 'warning'],
+  reviewed: ['已人工核对', 'default'],
   completed: ['本地处理完成', 'success'],
   recorded: ['已记录结果', 'default'],
   duplicate: ['重复任务', 'default'],
@@ -92,7 +94,7 @@ const formatTime = (value?: string) => {
 };
 
 const PlutoFishPage = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [form] = Form.useForm<PlutoFishConfigInput>();
   const mode = Form.useWatch('mode', form);
   const [config, setConfig] = useState<PlutoFishConfig>();
@@ -299,10 +301,17 @@ const PlutoFishPage = () => {
     {
       title: '本地处理',
       dataIndex: 'state',
-      width: 140,
-      render: (value: PlutoFishEvent['state']) => {
+      width: 185,
+      render: (value: PlutoFishEvent['state'], event) => {
         const [label, color] = eventStates[value] || [value, 'warning'];
-        return <Tag color={color}>{label || '未知状态'}</Tag>;
+        return (
+          <div>
+            <Tag color={color}>{label || '未知状态'}</Tag>
+            {event.reviewedAt && (
+              <div>核对时间：{formatTime(event.reviewedAt)}</div>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -336,26 +345,68 @@ const PlutoFishPage = () => {
     {
       title: '操作',
       key: 'action',
-      width: 165,
+      width: 180,
       render: (_, event) =>
-        event.type === 'transfer.succeeded' &&
-        event.schemaVersion === 1 &&
-        event.status === 'succeeded' &&
         event.state === 'review' ? (
-          <Button
-            size="small"
-            disabled={!!action || saving || repairBusy}
-            loading={action === `retry-${event.id}`}
-            onClick={() =>
-              void runAction(
-                `retry-${event.id}`,
-                () => retryPlutoFishEvent(event.id),
-                '已重新提交本地处理',
-              )
-            }
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'start',
+              gap: 8,
+            }}
           >
-            重新处理本地任务
-          </Button>
+            {event.type === 'transfer.succeeded' &&
+              event.schemaVersion === 1 &&
+              event.status === 'succeeded' && (
+                <Button
+                  size="small"
+                  disabled={!!action || saving || repairBusy}
+                  loading={action === `retry-${event.id}`}
+                  onClick={() =>
+                    void runAction(
+                      `retry-${event.id}`,
+                      () => retryPlutoFishEvent(event.id),
+                      '已重新提交本地处理',
+                    )
+                  }
+                >
+                  重新处理本地任务
+                </Button>
+              )}
+            <Button
+              size="small"
+              disabled={!!action || saving || repairBusy}
+              loading={action === `review-${event.id}`}
+              onClick={() =>
+                modal.confirm({
+                  title: '标记这条事件为已人工核对？',
+                  content: (
+                    <div>
+                      <p style={{ overflowWrap: 'anywhere' }}>
+                        {event.workTitle || event.fileName || event.eventID}
+                      </p>
+                      <p>
+                        此操作只关闭这条事件的本地待核对提醒，不代表转存成功，不会生成
+                        STRM
+                        或操作网盘，也不会删除历史记录。原始转存结果与处理说明保持不变。
+                      </p>
+                    </div>
+                  ),
+                  okText: '确认已核对',
+                  cancelText: '取消',
+                  onOk: () =>
+                    runAction(
+                      `review-${event.id}`,
+                      () => reviewPlutoFishEvent(event.id),
+                      '已标记人工核对，原始转存结果已保留',
+                    ),
+                })
+              }
+            >
+              标记已核对
+            </Button>
+          </div>
         ) : (
           '—'
         ),
@@ -744,14 +795,14 @@ const PlutoFishPage = () => {
         <Card title="本地事件与待处理队列">
           <p>
             补充配置后可重新处理成功事件；此操作仅重试 FilmFusion
-            本地处理，不会重新转存。
+            本地处理，不会重新转存。标记已核对仅关闭本地提醒，原始转存结果和历史仍会保留。
           </p>
           <Table<PlutoFishEvent>
             rowKey="id"
             columns={columns}
             dataSource={events}
             loading={loading}
-            scroll={{ x: 1345 }}
+            scroll={{ x: 1405 }}
             pagination={{
               current: page,
               pageSize,

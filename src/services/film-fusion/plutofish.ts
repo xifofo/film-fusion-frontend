@@ -47,10 +47,18 @@ export type PlutoFishEvent = {
   status: string;
   workTitle: string;
   fileName: string;
-  state: 'pending' | 'review' | 'completed' | 'recorded' | 'duplicate';
+  state:
+    | 'pending'
+    | 'review'
+    | 'reviewed'
+    | 'completed'
+    | 'recorded'
+    | 'duplicate';
   reason: string;
   occurredAt: string;
   outputPath?: string;
+  reviewedAt?: string;
+  reviewedBy?: number;
 };
 
 export const getPlutoFishConfig = (signal?: AbortSignal) =>
@@ -105,6 +113,13 @@ export const retryPlutoFishEvent = (id: number) =>
     {
       skipErrorHandler: true,
     },
+  );
+
+export const reviewPlutoFishEvent = (id: number) =>
+  apiClient.post<API.Response<null>>(
+    `/api/plutofish/events/${id}/review`,
+    { confirmed: true },
+    { skipErrorHandler: true },
   );
 
 export type PlutoFishRepairItem = {

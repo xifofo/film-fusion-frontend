@@ -4,8 +4,9 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
-import { App } from 'antd';
+import { App, ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getPlutoFishAccounts,
@@ -16,11 +17,21 @@ import {
   type PlutoFishConfig,
   type PlutoFishEvent,
   retryPlutoFishEvent,
+  reviewPlutoFishEvent,
   startPlutoFish,
   stopPlutoFish,
   updatePlutoFishConfig,
 } from '@/services/film-fusion/plutofish';
 import PlutoFishPage, { redactPlutoFishError } from './index';
+
+const renderReviewPage = () =>
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <App>
+        <PlutoFishPage />
+      </App>
+    </ConfigProvider>,
+  );
 
 vi.mock('@/services/film-fusion/plutofish', () => ({
   getPlutoFishAccounts: vi.fn(),
@@ -30,6 +41,7 @@ vi.mock('@/services/film-fusion/plutofish', () => ({
   getPlutoFishStatus: vi.fn(),
   updatePlutoFishConfig: vi.fn(),
   retryPlutoFishEvent: vi.fn(),
+  reviewPlutoFishEvent: vi.fn(),
   startPlutoFish: vi.fn(),
   stopPlutoFish: vi.fn(),
   previewPlutoFishSTRMRepairs: vi.fn(),
@@ -104,7 +116,7 @@ describe('PlutoFish notification page', () => {
       result({
         items: [
           event(1, 'failed', 'recorded'),
-          event(2, 'unknown', 'recorded'),
+          event(2, 'unknown', 'review'),
           event(3, 'succeeded', 'review'),
           {
             ...event(4, 'succeeded', 'review'),
@@ -136,6 +148,7 @@ describe('PlutoFish notification page', () => {
     );
     vi.mocked(updatePlutoFishConfig).mockResolvedValue(result(config));
     vi.mocked(retryPlutoFishEvent).mockResolvedValue(result(null));
+    vi.mocked(reviewPlutoFishEvent).mockReset().mockResolvedValue(result(null));
     vi.mocked(startPlutoFish).mockResolvedValue(result(null));
     vi.mocked(stopPlutoFish).mockResolvedValue(result(null));
   });
@@ -283,8 +296,100 @@ describe('PlutoFish notification page', () => {
     expect(screen.queryByText('本地处理完成')).toBeNull();
     const buttons = screen.getAllByRole('button', { name: '重新处理本地任务' });
     expect(buttons).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '标记已核对' })).toHaveLength(
+      3,
+    );
     fireEvent.click(buttons[0]);
     await waitFor(() => expect(retryPlutoFishEvent).toHaveBeenCalledWith(3));
+  });
+
+  it('confirms an unknown result, refreshes the review count and preserves its original result and reason', async () => {
+    const original = event(2, 'unknown', 'review');
+    vi.mocked(getPlutoFishEvents).mockResolvedValue(
+      result({ items: [original], total: 1 }),
+    );
+    renderReviewPage();
+    expect(await screen.findByText('转存待核对')).toBeTruthy();
+    expect(screen.getByText('待核对：1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '标记已核对' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        /只关闭这条事件的本地待核对提醒，不代表转存成功/,
+      ),
+    ).toBeTruthy();
+    expect(within(dialog).getByText(/不会删除历史记录/)).toBeTruthy();
+    expect(reviewPlutoFishEvent).not.toHaveBeenCalled();
+    const reviewedAt = '2026-10-27T02:30:00Z';
+    vi.mocked(getPlutoFishEvents).mockResolvedValue(
+      result({
+        items: [{ ...original, state: 'reviewed', reviewedAt, reviewedBy: 1 }],
+        total: 1,
+      }),
+    );
+    vi.mocked(getPlutoFishStatus).mockResolvedValue(
+      result({
+        state: 'streaming',
+        lastError: '',
+        cursor: 'opaque-cursor',
+        pendingCount: 0,
+        reviewCount: 0,
+      }),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: '确认已核对' }));
+    await waitFor(() =>
+      expect(reviewPlutoFishEvent).toHaveBeenCalledExactlyOnceWith(2),
+    );
+    expect(await screen.findByText('已人工核对')).toBeTruthy();
+    expect(screen.getByText('待核对：0')).toBeTruthy();
+    expect(screen.getByText('转存待核对')).toBeTruthy();
+    expect(screen.getByText(original.reason)).toBeTruthy();
+    expect(
+      screen.getByText(
+        `核对时间：${new Date(reviewedAt).toLocaleString('zh-CN', { hour12: false })}`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '标记已核对' })).toBeNull();
+    expect(screen.queryByText('本地处理完成')).toBeNull();
+    expect(retryPlutoFishEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not send a review request when the confirmation is canceled', async () => {
+    vi.mocked(getPlutoFishEvents).mockResolvedValue(
+      result({ items: [event(2, 'unknown', 'review')], total: 1 }),
+    );
+    renderReviewPage();
+    fireEvent.click(await screen.findByRole('button', { name: '标记已核对' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(reviewPlutoFishEvent).not.toHaveBeenCalled();
+    expect(screen.getByText('待人工核对')).toBeTruthy();
+    expect(screen.getByText('待核对：1')).toBeTruthy();
+  });
+
+  it('leaves an event in review when saving the acknowledgement fails', async () => {
+    vi.mocked(getPlutoFishEvents).mockResolvedValue(
+      result({ items: [event(2, 'unknown', 'review')], total: 1 }),
+    );
+    vi.mocked(reviewPlutoFishEvent).mockResolvedValue({
+      code: 400,
+      message: '模拟核对失败',
+      data: null,
+    });
+    renderReviewPage();
+    fireEvent.click(await screen.findByRole('button', { name: '标记已核对' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '确认已核对' }));
+    expect(await screen.findByText('模拟核对失败')).toBeTruthy();
+    expect(reviewPlutoFishEvent).toHaveBeenCalledExactlyOnceWith(2);
+    expect(screen.getByText('待人工核对')).toBeTruthy();
+    expect(screen.getByText('待核对：1')).toBeTruthy();
+    expect(screen.getByText('转存待核对')).toBeTruthy();
+    expect(screen.queryByText('已人工核对')).toBeNull();
+    expect(
+      await screen.findByRole('button', { name: '标记已核对' }),
+    ).toBeTruthy();
   });
 
   it('redacts event API keys and bearer credentials in displayed errors', () => {
