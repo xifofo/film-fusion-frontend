@@ -42,7 +42,7 @@ const directory: API.CloudDirectory = {
 const firstPage: CloudBrowserPage = {
   cid: '100',
   offset: 0,
-  limit: 50,
+  limit: 1150,
   total: 101,
   has_more: true,
   access_method: 'openapi',
@@ -151,7 +151,7 @@ describe('115 directory browser', () => {
     await openBrowser();
     expect(getCloudBrowserPage).toHaveBeenCalledExactlyOnceWith(
       7,
-      { access_method: 'openapi', cid: '100', offset: 0, limit: 50 },
+      { access_method: 'openapi', cid: '100', offset: 0, limit: 1150 },
       expect.any(AbortSignal),
     );
     view.rerender(
@@ -172,7 +172,7 @@ describe('115 directory browser', () => {
     await screen.findByText('第 2 页 · 共 101 项');
     expect(getCloudBrowserPage).toHaveBeenLastCalledWith(
       7,
-      expect.objectContaining({ offset: 4, limit: 50 }),
+      expect.objectContaining({ offset: 4, limit: 1150 }),
       expect.any(AbortSignal),
     );
     expect(getCloudBrowserPage).toHaveBeenCalledTimes(2);
@@ -205,7 +205,7 @@ describe('115 directory browser', () => {
     await screen.findByText('第 2 页 · 共 101 项');
     expect(getCloudBrowserPage).toHaveBeenLastCalledWith(
       7,
-      expect.objectContaining({ offset: 10, limit: 50 }),
+      expect.objectContaining({ offset: 10, limit: 1150 }),
       expect.any(AbortSignal),
     );
     expect(getCloudBrowserPage).toHaveBeenCalledTimes(2);
@@ -213,10 +213,39 @@ describe('115 directory browser', () => {
     await screen.findByText('第 1 页 · 共 101 项');
     expect(getCloudBrowserPage).toHaveBeenLastCalledWith(
       7,
-      expect.objectContaining({ offset: 0, limit: 50 }),
+      expect.objectContaining({ offset: 0, limit: 1150 }),
       expect.any(AbortSignal),
     );
     expect(getCloudBrowserPage).toHaveBeenCalledTimes(3);
+  });
+
+  it('defaults to 1150 items and resets pagination when the page size changes', async () => {
+    vi.mocked(getCloudBrowserPage).mockImplementation(async (_, query) =>
+      ok({ ...firstPage, offset: query.offset, limit: query.limit }),
+    );
+    render(<Harness />);
+    await openBrowser();
+    expect(screen.getByText('1150 项 / 页')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    await screen.findByText('第 2 页 · 共 101 项');
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '每页数量' }));
+    fireEvent.click(await screen.findByText('100 项 / 页'));
+    await screen.findByText('第 1 页 · 共 101 项');
+    expect(getCloudBrowserPage).toHaveBeenLastCalledWith(
+      7,
+      expect.objectContaining({ offset: 0, limit: 100 }),
+      expect.any(AbortSignal),
+    );
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '每页数量' }));
+    fireEvent.click(await screen.findByText('1150 项 / 页'));
+    await waitFor(() =>
+      expect(getCloudBrowserPage).toHaveBeenLastCalledWith(
+        7,
+        expect.objectContaining({ offset: 0, limit: 1150 }),
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(getCloudBrowserPage).toHaveBeenCalledTimes(4);
   });
 
   it('blocks repeated clicks while a page is pending and aborts it on unmount', () => {

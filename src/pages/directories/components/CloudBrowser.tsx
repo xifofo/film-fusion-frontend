@@ -42,6 +42,8 @@ export type CloudBrowserHandle = {
 };
 type JobState = { directoryId: number; name: string; data: CloudSTRMResult };
 
+const maxPageSize = 1150;
+
 const jobLabels: Record<CloudSTRMResult['status'], string> = {
   queued: '等待执行',
   running: '正在生成',
@@ -88,7 +90,7 @@ const CloudBrowser = forwardRef<CloudBrowserHandle>(
       access_method: 'openapi',
       cid: '0',
       offset: 0,
-      limit: 50,
+      limit: maxPageSize,
     });
     const [page, setPage] = useState<CloudBrowserPage>();
     const [pageOffsets, setPageOffsets] = useState([0]);
@@ -221,7 +223,7 @@ const CloudBrowser = forwardRef<CloudBrowserHandle>(
           access_method: accessMethod,
           cid: anchor.directory_id || '0',
           offset: 0,
-          limit: 50,
+          limit: maxPageSize,
         });
       },
     }));
@@ -656,7 +658,7 @@ const CloudBrowser = forwardRef<CloudBrowserHandle>(
               aria-label="每页数量"
               value={query.limit}
               disabled={!!busy}
-              options={[25, 50, 100].map((value) => ({
+              options={[25, 50, 100, 200, 500, maxPageSize].map((value) => ({
                 value,
                 label: `${value} 项 / 页`,
               }))}
