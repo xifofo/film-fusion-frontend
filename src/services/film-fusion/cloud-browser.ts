@@ -72,7 +72,7 @@ export function getCloudBrowserPage(
   signal?: AbortSignal,
 ) {
   return apiClient.get<API.Response<CloudBrowserPage>>(
-    `/api/directories/${directoryId}/browser`,
+    `/api/media-directories/${directoryId}/browser`,
     { params: query, signal, skipErrorHandler: true },
   );
 }
@@ -83,7 +83,7 @@ export function generateCloudBrowserSTRM(
   signal?: AbortSignal,
 ) {
   return apiClient.post<API.Response<CloudSTRMResult>>(
-    `/api/directories/${directoryId}/browser/strm`,
+    `/api/media-directories/${directoryId}/browser/strm`,
     { selection_token: selectionToken },
     { signal, skipErrorHandler: true },
   );
@@ -95,7 +95,7 @@ export function getActiveCloudBrowserSTRMJob(
   signal?: AbortSignal,
 ) {
   return apiClient.get<API.Response<CloudSTRMResult | null>>(
-    `/api/directories/${directoryId}/browser/jobs`,
+    `/api/media-directories/${directoryId}/browser/jobs`,
     { signal, skipErrorHandler: true },
   );
 }
@@ -106,7 +106,7 @@ export function getCloudBrowserSTRMJob(
   signal?: AbortSignal,
 ) {
   return apiClient.get<API.Response<CloudSTRMResult>>(
-    `/api/directories/${directoryId}/browser/jobs/${encodeURIComponent(jobId)}`,
+    `/api/media-directories/${directoryId}/browser/jobs/${encodeURIComponent(jobId)}`,
     { signal, skipErrorHandler: true },
   );
 }
@@ -117,7 +117,7 @@ export function cancelCloudBrowserSTRMJob(
   signal?: AbortSignal,
 ) {
   return apiClient.delete<API.Response<CloudSTRMResult>>(
-    `/api/directories/${directoryId}/browser/jobs/${encodeURIComponent(jobId)}`,
+    `/api/media-directories/${directoryId}/browser/jobs/${encodeURIComponent(jobId)}`,
     { signal, skipErrorHandler: true },
   );
 }

@@ -17,7 +17,7 @@ const baseConfig = {
     security: { enabled: true },
   },
   media_recognition: {
-    source: 'shadow',
+    source: 'medianame',
   },
   emby: {
     enabled: true,
@@ -86,18 +86,18 @@ describe('system settings tab scopes', () => {
     expect(result.emby.cover.width).toBe(2000);
   });
 
-  it('saves media recognition mode without carrying another tab change', () => {
+  it('preserves the fixed recognition engine when saving another tab', () => {
     const formValues = structuredClone(baseConfig);
     formValues.media_recognition.source = 'local';
     formValues.server.port = '9999';
 
     const result = buildScopedAppConfig(
       baseConfig,
-      'mediaRecognition',
+      'server',
       valuesFrom(formValues),
     );
 
-    expect(result.media_recognition.source).toBe('local');
-    expect(result.server.port).toBe('9000');
+    expect(result.media_recognition.source).toBe('medianame');
+    expect(result.server.port).toBe('9999');
   });
 });

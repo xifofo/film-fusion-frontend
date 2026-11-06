@@ -1012,7 +1012,7 @@ const previewNode = (
             detail: `${lookupTMDB ? '本地解析后查询 TMDB' : '仅执行本地解析'}；样本预览不会读取真实 115 文件或调用 MP2`,
             selectedPorts: ['success'],
             output: {
-              engine: 'local',
+              engine: 'medianame',
               mode: 'file',
               requested_tmdb_id: tmdbID,
               tmdb_id: tmdbID || '本地解析或运行时匹配',
@@ -1040,7 +1040,7 @@ const previewNode = (
           detail: `${String(input || '标题尚未解析')} · ${lookupTMDB ? '查询 TMDB' : '仅本地解析'} · 不调用 MP2`,
           selectedPorts: [input ? 'success' : 'failure'],
           output: {
-            engine: 'local',
+            engine: 'medianame',
             mode: 'title',
             input,
             recognize_input: input,
@@ -1060,16 +1060,16 @@ const previewNode = (
           },
         };
       }
-      case 'moviepilot_recognize': {
+      case 'media_file_recognize': {
         const configuredTMDB = String(config.tmdb_id || '').trim();
         const tmdbID = resolveConfiguredString(context, configuredTMDB);
         return {
           active: true,
           tone: 'success',
           label: tmdbID
-            ? `将用 TMDB ${String(tmdbID)} 辅助 MP 识别`
-            : '将调用 MP 自动识别下载媒体',
-          detail: '样本预览不会调用真实 MoviePilot',
+            ? `将用 TMDB ${String(tmdbID)} 辅助 媒体识别`
+            : '将调用内置引擎识别下载媒体',
+          detail: '样本预览不会调用真实识别服务',
           selectedPorts: ['success'],
           output: {
             tmdb_id: tmdbID || '运行时识别',
@@ -1085,7 +1085,7 @@ const previewNode = (
           },
         };
       }
-      case 'moviepilot_title_recognize': {
+      case 'media_title_recognize': {
         const input = resolveConfiguredString(context, config.input);
         const configuredTMDB = String(config.tmdb_id || '').trim();
         const tmdbID = resolveConfiguredString(context, configuredTMDB);
@@ -1094,7 +1094,7 @@ const previewNode = (
           tone: input ? 'success' : 'warning',
           label: tmdbID
             ? `将用 TMDB ${String(tmdbID)} 辅助识别 RSS 标题`
-            : '将调用 MP 识别 RSS 标题',
+            : '将调用 媒体识别 RSS 标题',
           detail: String(input || '标题尚未解析'),
           selectedPorts: [input ? 'success' : 'failure'],
           output: {

@@ -18,7 +18,7 @@ export async function selectOrganizeMedianameCandidate(
   );
 }
 
-/** 获取 MoviePilot 分类配置 */
+/** 获取项目内置引擎的分类配置 */
 export async function getOrganizeCategoryConfig(options?: {
   [key: string]: any;
 }) {

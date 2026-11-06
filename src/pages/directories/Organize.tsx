@@ -83,9 +83,7 @@ import MedianameCandidatePicker, {
   medianameCandidates,
   medianameEvidence,
 } from './components/MedianameCandidatePicker';
-import OrganizeEngineConfirmation, {
-  organizeEngineLabel,
-} from './components/OrganizeEngineConfirmation';
+import OrganizePlanConfirmation from './components/OrganizePlanConfirmation';
 import OrganizeUpgradeControls from './components/OrganizeUpgradeControls';
 import UpgradeComparison from './components/UpgradeComparison';
 import { parseUpgradePolicy } from './components/UpgradePolicyEditor';
@@ -107,7 +105,7 @@ const DEFAULT_PREVIEW_TASK_LIMIT = 100;
 const MAX_PREVIEW_TASK_LIMIT = 1000;
 type OrganizeMediaType = 'auto' | 'movie' | 'tv';
 
-type RecognitionSource = 'moviepilot' | 'local' | 'shadow' | 'medianame';
+type RecognitionSource = 'medianame';
 type PreviewQueueOptions = {
   mediaType: OrganizeMediaType;
   recognitionSource: RecognitionSource;
@@ -134,24 +132,6 @@ const organizeMediaTypeText = (value?: string): string => {
     default:
       return (value || '').trim();
   }
-};
-const recognitionSourceOptions: Array<{
-  label: string;
-  value: RecognitionSource;
-}> = [
-  { label: '仅 MP2', value: 'moviepilot' },
-  { label: '旧本地（兼容）', value: 'local' },
-  { label: 'medianame', value: 'medianame' },
-  { label: '影子模式', value: 'shadow' },
-];
-const recognitionSourcePresentation: Record<
-  RecognitionSource,
-  { label: string; color: string }
-> = {
-  moviepilot: { label: '仅 MP2', color: 'blue' },
-  local: { label: '旧本地（兼容）', color: 'geekblue' },
-  medianame: { label: 'medianame', color: 'cyan' },
-  shadow: { label: '影子模式', color: 'purple' },
 };
 type FilenameRegexConfig = {
   enabled: boolean;
@@ -515,7 +495,7 @@ function renderOrganizeItemDiagnostics(displayRow: OrganizeItemRow) {
         description={
           errors.length
             ? errors.join('；')
-            : 'MP2 始终作为主结果，medianame 仅生成独立计划并记录差异。'
+            : '历史影子计划中的 MP2 主结果与 medianame 对照；执行前请用内置引擎重新预览。'
         }
       />
       <Table<OrganizeShadowFieldRow>
@@ -1288,14 +1268,14 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
     episodeMode ? 'tv' : 'auto',
   );
   const [organizeRecognitionSource, setOrganizeRecognitionSource] =
-    useState<RecognitionSource>('shadow');
+    useState<RecognitionSource>('medianame');
   const [organizeCategory, setOrganizeCategory] = useState<string>();
   const [bestVersionEnabled, setBestVersionEnabled] = useState(episodeMode);
   const [previewOptionsOpen, setPreviewOptionsOpen] = useState(false);
   const [previewMediaTypeDraft, setPreviewMediaTypeDraft] =
     useState<OrganizeMediaType>(episodeMode ? 'tv' : 'auto');
   const [previewRecognitionSourceDraft, setPreviewRecognitionSourceDraft] =
-    useState<RecognitionSource>('shadow');
+    useState<RecognitionSource>('medianame');
   const recognitionSourceOverriddenRef = useRef(false);
   const [previewCategoryDraft, setPreviewCategoryDraft] = useState<string>();
   const [previewBestVersionDraft, setPreviewBestVersionDraft] =
@@ -1367,8 +1347,9 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         ) {
           return;
         }
-        setOrganizeRecognitionSource(source);
-        setPreviewRecognitionSourceDraft(source);
+        const builtinSource = 'medianame';
+        setOrganizeRecognitionSource(builtinSource);
+        setPreviewRecognitionSourceDraft(builtinSource);
       })
       .catch(() => undefined);
     return () => {
@@ -1423,8 +1404,8 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
       directoryDetail?.recognition_source &&
       !recognitionSourceOverriddenRef.current
     ) {
-      setOrganizeRecognitionSource(directoryDetail.recognition_source);
-      setPreviewRecognitionSourceDraft(directoryDetail.recognition_source);
+      setOrganizeRecognitionSource('medianame');
+      setPreviewRecognitionSourceDraft('medianame');
       recognitionSourceOverriddenRef.current = true;
     }
   }, [directoryDetail?.recognition_source]);
@@ -2043,11 +2024,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
           setOrganizeMediaType(payload.task?.media_type || 'auto');
         }
         recognitionSourceOverriddenRef.current = true;
-        setOrganizeRecognitionSource(
-          (previewResult.pipeline?.source as RecognitionSource) ||
-            payload.task?.recognition_source ||
-            'shadow',
-        );
+        setOrganizeRecognitionSource('medianame');
         setOrganizeCategory(payload.task?.category || undefined);
         setBestVersionEnabled(!!payload.task?.best_version_enabled);
         const selection = getInitialPreviewSelection(previewResult);
@@ -2572,15 +2549,13 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     ? '只执行已选的新增或替换项，同步 STRM 和关联字幕。旧版保留在恢复目录；中途失败时暂停本次任务，可在洗版记录中继续或恢复。'
                     : '将只处理当前预览表格中已选择的记录（创建/重命名/移动/字幕下载）。单个目录失败不会阻断其它，错误会标注在对应分组上。'}
               </Typography.Text>
-              <OrganizeEngineConfirmation
+              <OrganizePlanConfirmation
                 params={organizeParams}
                 preview={resultData}
                 onChange={(choice) => {
                   confirmedParams = choice.params;
                   confirmation.update({
-                    okText: dryRun
-                      ? '生成预览'
-                      : `使用 ${organizeEngineLabel(choice.source)} 执行整理`,
+                    okText: dryRun ? '生成预览' : '执行整理',
                     okButtonProps: {
                       danger: !dryRun,
                       disabled: !choice.params || choice.loading,
@@ -3178,19 +3153,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         },
       },
       {
-        title: '识别方式',
-        dataIndex: 'recognition_source',
-        width: 130,
-        render: (_, row) => {
-          const mode = recognitionSourcePresentation[row.recognition_source];
-          return (
-            <Tag color={mode.color} style={{ marginInlineEnd: 0 }}>
-              {mode.label}
-            </Tag>
-          );
-        },
-      },
-      {
         title: 'TMDB',
         dataIndex: 'tmdb_refs',
         width: 150,
@@ -3604,21 +3566,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                     显示 115 目录
                   </Button>
                 ) : null}
-                <div className={styles.compactRule}>
-                  <span className={styles.compactRuleLabel}>识别方式</span>
-                  <Segmented<RecognitionSource>
-                    name="organize-recognition-source"
-                    size="small"
-                    value={organizeRecognitionSource}
-                    options={recognitionSourceOptions}
-                    disabled={organizeLoading || createPreviewLoading}
-                    onChange={(value) => {
-                      recognitionSourceOverriddenRef.current = true;
-                      setOrganizeRecognitionSource(value);
-                    }}
-                  />
-                </div>
-
                 <div className={`${styles.compactRule} ${styles.filenameRule}`}>
                   <span className={styles.compactRuleLabel}>文件名处理</span>
                   <Button
@@ -3841,7 +3788,7 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                       {resultData.pipeline.package_version} · 配置{' '}
                       {resultData.pipeline.config_version.slice(0, 12)}
                       {resultData.dry_run
-                        ? '；确认整理时选择实际引擎并核对最终计划。'
+                        ? '；确认整理前请核对最终目标路径。'
                         : '；执行结果来自此计划。'}
                     </Typography.Paragraph>
                   )}
@@ -3852,15 +3799,18 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
                         value={recognitionDisplaySource}
                         options={[
                           { label: 'medianame 识别', value: 'medianame' },
-                          { label: 'MP2 识别', value: 'moviepilot' },
+                          { label: '历史 MP2 结果', value: 'moviepilot' },
                         ]}
                         onChange={(source) =>
                           setRecognitionDisplay({ result: resultData, source })
                         }
                       />
                       <p className="m-0 text-sm text-neutral-500">
-                        当前展示 {organizeEngineLabel(recognitionDisplaySource)}
-                        的识别与目标路径；实际整理引擎在确认框中选择。
+                        当前展示{' '}
+                        {recognitionDisplaySource === 'medianame'
+                          ? 'medianame'
+                          : '历史 MP2'}
+                        的历史识别与目标路径；执行前需使用内置引擎重新预览。
                       </p>
                     </div>
                   )}
@@ -4177,32 +4127,6 @@ const OrganizePage: React.FC<OrganizePageProps> = ({ episodeMode = false }) => {
         cancelText="取消"
       >
         <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-          <div>
-            <Typography.Text type="secondary">识别方式</Typography.Text>
-            <Segmented<RecognitionSource>
-              block
-              name="preview-recognition-source"
-              value={previewRecognitionSourceDraft}
-              options={recognitionSourceOptions}
-              onChange={(value) => {
-                recognitionSourceOverriddenRef.current = true;
-                setPreviewRecognitionSourceDraft(value);
-              }}
-              style={{ marginTop: 6 }}
-            />
-            <Typography.Text
-              type="secondary"
-              style={{ display: 'block', marginTop: 6, fontSize: 12 }}
-            >
-              {previewRecognitionSourceDraft === 'shadow'
-                ? '同一输入分别运行 medianame 和 MP2，优先展示 medianame；实际整理引擎在确认时选择。'
-                : previewRecognitionSourceDraft === 'moviepilot'
-                  ? '只运行 MP2 识别与 MoviePilot 转名，不执行 FilmFusion 本地识别。'
-                  : previewRecognitionSourceDraft === 'medianame'
-                    ? '使用 medianame 独立完成解析、识别、分类与命名。'
-                    : '使用旧本地引擎（兼容模式）。'}
-            </Typography.Text>
-          </div>
           <Row gutter={12}>
             <Col span={12}>
               <Typography.Text type="secondary">媒体类型</Typography.Text>

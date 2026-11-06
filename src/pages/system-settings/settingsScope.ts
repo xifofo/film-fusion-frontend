@@ -7,7 +7,6 @@ export type SettingsTabKey =
   | 'webhook'
   | 'emby'
   | 'notifications'
-  | 'mediaRecognition'
   | 'moviepilot'
   | 'tmdb'
   | 'log'
@@ -65,10 +64,6 @@ export const SETTINGS_TAB_SCOPES: Record<SettingsTabKey, SettingsTabScope> = {
   notifications: {
     label: '通知',
     fields: [['notifications']],
-  },
-  mediaRecognition: {
-    label: '媒体识别',
-    fields: [['media_recognition']],
   },
   moviepilot: {
     label: 'MoviePilot',

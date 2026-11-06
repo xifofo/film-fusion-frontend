@@ -49,10 +49,10 @@ const nodeTypes: RSSAutomationNodeType[] = [
   ...OPENAPI_115_CLOUD_NODES,
   'wait115',
   'rename115_openapi',
-  'moviepilot_title_recognize',
+  'media_title_recognize',
   'filmfusion_recognize',
   'media_exists',
-  'moviepilot_recognize',
+  'media_file_recognize',
   'organize_strm',
   'strm_verify',
   'strm_regenerate',
@@ -563,7 +563,13 @@ const validateTransferNodeConfig = (
 const parseNode = (value: unknown): RSSAutomationNodeDefinition => {
   if (!isRecord(value)) throw new Error('流程节点格式不正确');
   const id = requiredString(value.id, '节点 ID');
-  const type = requiredString(value.type, `节点 ${id} 类型`);
+  const legacyType = requiredString(value.type, `节点 ${id} 类型`);
+  const type =
+    legacyType === 'moviepilot_title_recognize'
+      ? 'media_title_recognize'
+      : legacyType === 'moviepilot_recognize'
+        ? 'media_file_recognize'
+        : legacyType;
   if (!nodeTypeSet.has(type)) throw new Error(`节点 ${id} 使用了未知类型`);
   if (!isRecord(value.position)) throw new Error(`节点 ${id} 缺少画板位置`);
   const x = Number(value.position.x);
@@ -647,6 +653,16 @@ export const validateWorkflowTransferDefinition = (
         : undefined,
     }));
   } else nodes = value.nodes.map(parseNode);
+  for (const node of nodes) {
+    if (
+      node.config &&
+      ['moviepilot', 'shadow', 'mp', 'mp2'].includes(
+        String(node.config.recognition_source),
+      )
+    ) {
+      node.config.recognition_source = 'medianame';
+    }
+  }
   const nodeIDs = new Set(nodes.map((node) => node.id));
   if (nodeIDs.size !== nodes.length) throw new Error('流程中存在重复节点 ID');
   if (nodes.filter((node) => node.type === 'trigger').length !== 1) {

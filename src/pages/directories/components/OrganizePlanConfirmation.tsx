@@ -1,4 +1,6 @@
-import { Button, Radio } from 'antd';
+/** 核对并执行服务器保存的整理计划；重新预览只更新计划，不执行文件操作。 */
+
+import { Button } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { organize115Cookie } from '@/services/film-fusion';
 import { canApplyUpgrade } from '@/services/film-fusion/upgrade';
@@ -7,28 +9,17 @@ import MedianameCandidatePicker, {
 } from './MedianameCandidatePicker';
 import UpgradeComparison from './UpgradeComparison';
 
-type ExecutionEngine = 'moviepilot' | 'medianame' | 'local';
-export const organizeEngineLabel = (source: ExecutionEngine) =>
-  source === 'medianame'
-    ? 'medianame'
-    : source === 'local'
-      ? '旧本地引擎'
-      : 'MP2';
+type ExecutionEngine = 'medianame';
 
 type Plan = {
   params: API.Organize115CookieParams;
   result: API.Organize115CookieResult;
 };
-export type OrganizeEngineChoice = {
+export type OrganizePlanChoice = {
   source: ExecutionEngine;
   loading: boolean;
   params?: API.Organize115CookieParams;
 };
-
-function executionEngine(result: API.Organize115CookieResult): ExecutionEngine {
-  const source = result.pipeline?.source || result.recognition_source;
-  return source === 'medianame' || source === 'local' ? source : 'moviepilot';
-}
 
 function selectedPlanItems(plan: Plan) {
   const selected = new Set(plan.params.file_ids || []);
@@ -43,7 +34,13 @@ function selectedPlanItems(plan: Plan) {
 }
 
 function planError(plan: Plan): string | undefined {
-  if (!plan.result.plan_id || !plan.result.pipeline || !plan.result.dry_run)
+  if (
+    !plan.result.plan_id ||
+    !plan.result.pipeline ||
+    !plan.result.dry_run ||
+    plan.result.pipeline.source !== 'medianame' ||
+    plan.result.recognition_source !== 'medianame'
+  )
     return '缺少有效预览计划，请重新预览';
   const items = selectedPlanItems(plan);
   const found = new Set(items.map((item) => item.file_id));
@@ -63,18 +60,17 @@ function planError(plan: Plan): string | undefined {
   return undefined;
 }
 
-export default function OrganizeEngineConfirmation({
+export default function OrganizePlanConfirmation({
   params,
   preview,
   onChange,
 }: {
   params: API.Organize115CookieParams;
   preview: API.Organize115CookieResult;
-  onChange: (choice: OrganizeEngineChoice) => void;
+  onChange: (choice: OrganizePlanChoice) => void;
 }) {
   const initial: Plan = { params, result: preview };
-  const initialEngine = executionEngine(preview);
-  const [source, setSource] = useState(initialEngine);
+  const source = 'medianame';
   const [plan, setPlan] = useState<Plan | undefined>(initial);
   const [error, setError] = useState(() => planError(initial));
   const [loading, setLoading] = useState(false);
@@ -82,14 +78,12 @@ export default function OrganizeEngineConfirmation({
     useState<API.Organize115ItemResult>();
   const [candidateLoading, setCandidateLoading] = useState(false);
   const generation = useRef(0);
-  const plans = useRef(
-    new Map<ExecutionEngine, Plan>([[initialEngine, initial]]),
-  );
+  const currentPlan = useRef(initial);
 
   useEffect(() => {
     const original = { params, result: preview };
     onChange({
-      source: executionEngine(preview),
+      source: 'medianame',
       loading: false,
       params: planError(original) ? undefined : params,
     });
@@ -98,29 +92,15 @@ export default function OrganizeEngineConfirmation({
     };
   }, [params, preview, onChange]);
 
-  const chooseEngine = async (next: ExecutionEngine, refresh = false) => {
+  const regenerate = async () => {
+    const next = source;
     const current = ++generation.current;
-    setSource(next);
     setError(undefined);
-    const cached = refresh ? undefined : plans.current.get(next);
-    if (cached) {
-      const failure = planError(cached);
-      setPlan(cached);
-      setLoading(false);
-      setError(failure);
-      onChange({
-        source: next,
-        loading: false,
-        params: failure ? undefined : cached.params,
-      });
-      return;
-    }
     setPlan(undefined);
     setLoading(true);
     onChange({ source: next, loading: true });
     try {
-      // A different engine creates a fresh, server-owned plan. Nothing is executed
-      // by this request, and the old plan remains available if the user switches back.
+      // 历史引擎计划统一重新生成 medianame 预览，不执行文件操作。
       const {
         plan_id: _planID,
         delete_source_folder: _deleteSource,
@@ -129,15 +109,15 @@ export default function OrganizeEngineConfirmation({
       const response = await organize115Cookie({
         ...input,
         candidate_plan_id:
-          next === 'medianame'
-            ? plans.current.get('medianame')?.result.plan_id
+          currentPlan.current.result.recognition_source === 'medianame'
+            ? currentPlan.current.result.plan_id
             : undefined,
         recognition_source: next,
         dry_run: true,
       });
       if (current !== generation.current) return;
       if (response.code !== 0 || !response.data)
-        throw new Error(response.message || '生成所选引擎的预览失败');
+        throw new Error(response.message || '生成预览失败');
       if (
         response.data.pipeline?.source !== next ||
         response.data.recognition_source !== next
@@ -152,7 +132,7 @@ export default function OrganizeEngineConfirmation({
         },
       };
       const failure = planError(ready);
-      plans.current.set(next, ready);
+      currentPlan.current = ready;
       setPlan(ready);
       setError(failure);
       onChange({
@@ -170,33 +150,11 @@ export default function OrganizeEngineConfirmation({
   };
 
   return (
-    <section aria-label="选择整理引擎" className="space-y-3">
-      <fieldset>
-        <legend className="mb-2 font-semibold">
-          {params.dry_run ? '本次预览引擎' : '本次实际整理引擎'}
-        </legend>
-        <Radio.Group
-          disabled={candidateLoading}
-          name="confirm-organize-engine"
-          value={source}
-          options={[
-            { label: 'MP2', value: 'moviepilot' },
-            { label: 'medianame', value: 'medianame' },
-            ...(initialEngine === 'local'
-              ? [{ label: '旧本地引擎（兼容）', value: 'local' }]
-              : []),
-          ]}
-          onChange={(event) => void chooseEngine(event.target.value)}
-        />
-      </fieldset>
+    <section aria-label="核对整理计划" className="space-y-3">
       <p className="text-sm text-neutral-500">
-        切换引擎会重新生成已选文件的预览。请核对下方路径后确认，仅影响本次整理。
+        请核对下方目标路径，确认后按此预览计划执行整理。
       </p>
-      {loading && (
-        <output className="block">
-          正在生成 {organizeEngineLabel(source)} 预览…
-        </output>
-      )}
+      {loading && <output className="block">正在重新生成预览…</output>}
       {error && (
         <div>
           <p role="alert" className="text-red-600">
@@ -205,7 +163,7 @@ export default function OrganizeEngineConfirmation({
           <Button
             size="small"
             disabled={candidateLoading}
-            onClick={() => void chooseEngine(source, true)}
+            onClick={() => void regenerate()}
           >
             重新生成预览
           </Button>
@@ -213,9 +171,7 @@ export default function OrganizeEngineConfirmation({
       )}
       {plan && (
         <div className="max-h-64 overflow-auto rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
-          <p className="mb-2 font-semibold">
-            {organizeEngineLabel(source)} 的目标路径
-          </p>
+          <p className="mb-2 font-semibold">目标路径</p>
           <ul className="space-y-3 text-sm">
             {selectedPlanItems(plan).map((item) => (
               <li key={item.file_id} className="break-all">
@@ -247,7 +203,7 @@ export default function OrganizeEngineConfirmation({
             setCandidateLoading(busy);
             if (busy) onChange({ source, loading: true });
             else {
-              const current = plans.current.get(source);
+              const current = currentPlan.current;
               onChange({
                 source,
                 loading: false,
@@ -265,9 +221,8 @@ export default function OrganizeEngineConfirmation({
                 recognition_source: 'medianame',
               },
             };
-            plans.current.set('medianame', ready);
+            currentPlan.current = ready;
             setPlan(ready);
-            setSource('medianame');
             const failure = planError(ready);
             setError(failure);
             setCandidateItem(undefined);

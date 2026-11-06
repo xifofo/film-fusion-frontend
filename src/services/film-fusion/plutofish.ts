@@ -74,11 +74,14 @@ export const updatePlutoFishConfig = (input: PlutoFishConfigInput) =>
 
 // Read existing local CloudPath configuration; this endpoint never scans a provider.
 export const getPlutoFishCloudPaths = (page: number, signal?: AbortSignal) =>
-  apiClient.get<API.Response<API.PageResult<API.CloudPath>>>('/api/paths', {
-    params: { page, page_size: 100 },
-    signal,
-    skipErrorHandler: true,
-  });
+  apiClient.get<API.Response<API.PageResult<API.CloudPath>>>(
+    '/api/media-directories',
+    {
+      params: { capability: 'mapping', page, page_size: 100 },
+      signal,
+      skipErrorHandler: true,
+    },
+  );
 
 export const getPlutoFishStatus = (signal?: AbortSignal) =>
   apiClient.get<API.Response<PlutoFishStatus>>('/api/plutofish/status', {
@@ -93,7 +96,11 @@ export const getPlutoFishEvents = (
 ) =>
   apiClient.get<API.Response<{ items: PlutoFishEvent[]; total: number }>>(
     '/api/plutofish/events',
-    { params: { page, pageSize }, signal, skipErrorHandler: true },
+    {
+      params: { capability: 'mapping', page, pageSize },
+      signal,
+      skipErrorHandler: true,
+    },
   );
 
 export const startPlutoFish = () =>

@@ -12,7 +12,7 @@ import {
   selectOrganizeMedianameCandidate,
 } from '@/services/film-fusion';
 import MedianameCandidatePicker from './MedianameCandidatePicker';
-import OrganizeEngineConfirmation from './OrganizeEngineConfirmation';
+import OrganizePlanConfirmation from './OrganizePlanConfirmation';
 
 vi.mock('@/services/film-fusion', () => ({
   organize115Cookie: vi.fn(),
@@ -203,7 +203,7 @@ describe('Medianame candidate selection', () => {
     });
     render(
       <ConfigProvider theme={{ token: { motion: false } }}>
-        <OrganizeEngineConfirmation
+        <OrganizePlanConfirmation
           params={{
             cloud_directory_id: 2,
             folder_ids: ['100'],

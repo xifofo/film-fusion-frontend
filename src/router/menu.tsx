@@ -38,14 +38,9 @@ export const menuItems: AppMenuItem[] = [
     path: '/cloud-storage',
   },
   {
-    name: '云路径映射',
-    icon: Link2,
-    path: '/cloud-paths',
-  },
-  {
-    name: '目录配置',
+    name: '媒体目录',
     icon: Folder,
-    path: '/directories',
+    path: '/media-directories',
   },
   {
     name: '媒体识别',

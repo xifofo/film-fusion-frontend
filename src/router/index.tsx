@@ -14,8 +14,8 @@ import RequireAuth from '@/router/RequireAuth';
 const Login = lazy(() => import('@/pages/user/login'));
 const UserProfile = lazy(() => import('@/pages/account/profile'));
 const CloudStorage = lazy(() => import('@/pages/cloud-storage'));
-const CloudPaths = lazy(() => import('@/pages/cloud-paths'));
-const Directories = lazy(() => import('@/pages/directories'));
+
+const MediaDirectories = lazy(() => import('@/pages/media-directories'));
 const MediaRecognition = lazy(() => import('@/pages/media-recognition'));
 const UpgradeRules = lazy(() => import('@/pages/upgrade-rules'));
 const DownloadQueue = lazy(() => import('@/pages/download-queue'));
@@ -147,11 +147,12 @@ const routes: RouteObject[] = [
       },
       {
         path: 'cloud-paths',
-        element: <CloudPaths />,
+        element: <MediaDirectories />,
       },
+      { path: 'media-directories', element: <MediaDirectories /> },
       {
         path: 'directories',
-        element: <Directories />,
+        element: <MediaDirectories />,
       },
       {
         path: 'media-recognition',

@@ -15,7 +15,7 @@ describe('115 directory automation workflow', () => {
     });
     expect(definition.nodes.map((node) => node.type)).toEqual([
       'trigger',
-      'moviepilot_recognize',
+      'media_file_recognize',
       'organize_strm',
       'notification',
       'end',
@@ -35,7 +35,7 @@ describe('115 directory automation workflow', () => {
       cloud_directory_id: 9,
     });
     for (const node of definition.nodes.filter((node) =>
-      ['moviepilot_recognize', 'organize_strm'].includes(node.type),
+      ['media_file_recognize', 'organize_strm'].includes(node.type),
     ))
       expect(node.config?.recognition_source).toBe('medianame');
     expect(
@@ -86,7 +86,7 @@ describe('115 directory automation workflow', () => {
     ]);
   });
 
-  it('reads the editable actions from a persisted workflow', () => {
+  it('migrates legacy recognition actions to the built-in engine', () => {
     const definition = buildAutomationDefinition({
       ...defaultAutomationActions(),
       delay_value: 10,
@@ -98,13 +98,17 @@ describe('115 directory automation workflow', () => {
       category: '剧集',
       notification_message: '{{item.title}} 已完成',
     });
+    for (const node of definition.nodes.filter((node) =>
+      ['media_file_recognize', 'organize_strm'].includes(node.type),
+    ))
+      expect(node.config?.recognition_source).toBe('medianame');
     const workflow = {
       definition_json: JSON.stringify(definition),
     } as AutomationWorkflow;
     expect(readAutomationActions(workflow)).toMatchObject({
       delay_value: 10,
       delay_unit: 'minutes',
-      recognition: 'moviepilot',
+      recognition: 'medianame',
       organize_enabled: true,
       cloud_directory_id: 12,
       media_type: 'tv',

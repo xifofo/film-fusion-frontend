@@ -432,10 +432,7 @@ const AutomationEditorModal = ({
               <Form.Item label="媒体识别" name="recognition">
                 <Select
                   options={[
-                    { label: '旧本地识别（兼容）', value: 'local' },
                     { label: 'medianame', value: 'medianame' },
-                    { label: '仅 MP2', value: 'moviepilot' },
-                    { label: '影子模式（MP2 优先）', value: 'shadow' },
                     { label: '不识别', value: 'none' },
                   ]}
                 />
@@ -458,7 +455,7 @@ const AutomationEditorModal = ({
                     label="仅生成整理预览"
                     name="organize_dry_run"
                     valuePropName="checked"
-                    extra="保存完整计划与影子对比，不移动文件或写入 STRM。"
+                    extra="保存内置引擎的完整预览计划，不移动文件或写入 STRM。"
                   >
                     <Switch />
                   </Form.Item>

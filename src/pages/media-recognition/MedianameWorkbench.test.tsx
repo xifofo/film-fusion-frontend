@@ -58,30 +58,25 @@ describe('medianame isolated workbench', () => {
     );
     expect(apiClient.put).toHaveBeenCalledOnce();
   });
-  it('uses selected engine and its independent draft for full-path shadow preview', async () => {
+  it('uses selected engine and its independent draft for full-path built-in preview', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
       code: 0,
       data: {
         pipeline: {
           schema: 1,
-          source: 'shadow',
+          source: 'medianame',
           package_version: 'v0.1.1',
           config_version: 'snapshot',
         },
         item: {
-          engine: 'moviepilot',
-          target_path: '/MP2/Example.mkv',
-          shadow_comparison: {
-            medianame: {
-              target_path: '/NEW/Example.mkv',
-              medianame: {
-                result: {
-                  status: 'review',
-                  candidates: [
-                    { conflicts: [{ field: 'tmdb_id', message: 'conflict' }] },
-                  ],
-                },
-              },
+          engine: 'medianame',
+          target_path: '/NEW/Example.mkv',
+          medianame: {
+            result: {
+              status: 'review',
+              candidates: [
+                { conflicts: [{ field: 'tmdb_id', message: 'conflict' }] },
+              ],
             },
           },
         },
@@ -93,13 +88,13 @@ describe('medianame isolated workbench', () => {
       </App>,
     );
     await screen.findByLabelText('medianame 分类规则');
-    fireEvent.click(screen.getByText('影子对比'));
+    expect(screen.queryByRole('radio', { name: /MP2|影子/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '预览完整流程' }));
     await waitFor(() =>
       expect(apiClient.post).toHaveBeenCalledWith(
         '/api/media-recognition/pipeline-test',
         expect.objectContaining({
-          source: 'shadow',
+          source: 'medianame',
           mode: 'file',
           medianame_config: config,
           classify: true,
@@ -107,17 +102,16 @@ describe('medianame isolated workbench', () => {
       ),
     );
     expect((await screen.findByRole('status')).textContent).toContain('review');
-    expect(screen.getByText('/MP2/Example.mkv')).toBeTruthy();
     expect(screen.getByText('/NEW/Example.mkv')).toBeTruthy();
     const table = within(screen.getByRole('table'));
     expect(
       table.getAllByRole('columnheader').map((cell) => cell.textContent),
-    ).toEqual(['字段', 'medianame', 'MP2 / 对照']);
+    ).toEqual(['字段', 'medianame']);
     expect(
       within(table.getByRole('row', { name: /完整目标路径/ }))
         .getAllByRole('cell')
         .map((cell) => cell.textContent),
-    ).toEqual(['/NEW/Example.mkv', '/MP2/Example.mkv']);
+    ).toEqual(['/NEW/Example.mkv']);
     expect(apiClient.put).not.toHaveBeenCalled();
   });
   it('defaults the read-only full-flow test to medianame without saving an engine setting', async () => {
@@ -131,13 +125,8 @@ describe('medianame isolated workbench', () => {
       </App>,
     );
     await screen.findByLabelText('medianame 分类规则');
-    expect(
-      (
-        screen.getByRole('radio', {
-          name: 'medianame',
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
+    expect(screen.queryByRole('radio', { name: 'medianame' })).toBeNull();
+    expect(screen.queryByText('FilmFusion 本地')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '预览完整流程' }));
     await waitFor(() =>
       expect(apiClient.post).toHaveBeenCalledWith(

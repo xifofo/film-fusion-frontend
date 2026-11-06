@@ -2890,7 +2890,7 @@ const NodeConfigModal = ({
             </Form.Item>
             <Form.Item
               className={styles.nodeConfigFull}
-              extra="可留空让 MP2 自动识别；也可引用下载前的 MP 标题识别结果。"
+              extra="可留空让 MP2 自动识别；也可引用下载前的 媒体标题识别结果。"
               label="辅助 TMDB ID（可选）"
               name="tmdb_id"
               rules={[
@@ -3111,7 +3111,7 @@ const NodeConfigModal = ({
             <Text className={styles.nodeConfigHint} type="secondary">
               {recognitionMode === 'file'
                 ? '直接连接“等待 115 下载完成”的成功出口，递归读取其中的视频文件；不会修改云端文件名，也不会调用 MP2。'
-                : '读取 条目标题或任意流程变量，应用“识别词管理”中已保存的词表后，由 FilmFusion 本地内核解析。'}
+                : '读取 条目标题或任意流程变量，应用“识别词管理”中已保存的词表后，由 medianame 解析。'}
             </Text>
             <Form.Item
               className={styles.nodeConfigFull}
@@ -3139,7 +3139,7 @@ const NodeConfigModal = ({
                 rules={[{ required: true }]}
               >
                 <TemplateVariableInput
-                  ariaLabel="FilmFusion 本地识别标题"
+                  ariaLabel="medianame 解析（兼容）标题"
                   placeholder="点击“插入变量”选择 条目标题或上游变量"
                   references={fieldReferences}
                 />
@@ -3185,14 +3185,14 @@ const NodeConfigModal = ({
               ]}
             >
               <TemplateVariableInput
-                ariaLabel="FilmFusion 本地识别辅助 TMDB ID"
+                ariaLabel="medianame 解析（兼容）辅助 TMDB ID"
                 placeholder="例如 1396，或点击“插入变量”"
                 references={fieldReferences}
               />
             </Form.Item>
           </>
         );
-      case 'moviepilot_recognize':
+      case 'media_file_recognize':
         return (
           <>
             <Alert
@@ -3234,13 +3234,13 @@ const NodeConfigModal = ({
             </Form.Item>
           </>
         );
-      case 'moviepilot_title_recognize':
+      case 'media_title_recognize':
         return (
           <>
             <Alert
               className={styles.nodeConfigFull}
               description="可放在关键词或 IF 筛选后、下载节点前。节点会输出 TMDB ID、标题、年份、分类、评分和海报地址，供下载路径或通知继续使用。"
-              title="使用 条目标题调用 MoviePilot 识别，不依赖 115 下载。"
+              title="使用条目标题调用项目内置识别引擎，不依赖 115 下载。"
               showIcon
               type="info"
             />
@@ -3324,7 +3324,7 @@ const NodeConfigModal = ({
             <TemplateConfigField
               field="tmdb_id"
               label="TMDB ID"
-              placeholder="点击“插入变量”选择 MP 识别结果"
+              placeholder="点击“插入变量”选择 媒体识别结果"
               protocol={inputProtocol('tmdb_id')}
               references={fieldReferences}
               required
@@ -3406,7 +3406,7 @@ const NodeConfigModal = ({
               />
             </Form.Item>
             <Form.Item
-              extra="留空时沿用 MoviePilot 分类和目录配置的分类规则。"
+              extra="留空时沿用内置识别分类和目录配置的分类规则。"
               label="指定分类（可选）"
               name="category"
             >
@@ -3730,7 +3730,7 @@ const NodeConfigModal = ({
               className={styles.nodeConfigFull}
               extra={
                 protocolFieldExtra(inputProtocol('image_url')) ||
-                '可留空；通常选择 MP 标题识别输出的海报地址。'
+                '可留空；通常选择 媒体标题识别输出的海报地址。'
               }
               label="通知图片 / 海报（可选）"
               name="image_url"
@@ -3939,10 +3939,10 @@ const NodeConfigModal = ({
                   ...OPENAPI_115_CLOUD_NODES,
                   'wait115',
                   'rename115_openapi',
-                  'moviepilot_title_recognize',
+                  'media_title_recognize',
                   'filmfusion_recognize',
                   'media_exists',
-                  'moviepilot_recognize',
+                  'media_file_recognize',
                   'organize_strm',
                   'strm_verify',
                   'strm_regenerate',

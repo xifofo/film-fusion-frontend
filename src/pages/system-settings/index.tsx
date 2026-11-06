@@ -5,7 +5,6 @@ import {
   CloudServerOutlined,
   FileTextOutlined,
   KeyOutlined,
-  PartitionOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
   SendOutlined,
@@ -71,7 +70,6 @@ const SETTINGS_TAB_ICON_COLORS: Record<SettingsTabKey, string> = {
   webhook: '#000000',
   emby: '#52b54b',
   notifications: '#000000',
-  mediaRecognition: '#111827',
   moviepilot: '#4c1d95',
   tmdb: '#032541',
   log: '#000000',
@@ -1792,61 +1790,6 @@ const SystemSettingsPage: React.FC = () => {
                               }}
                             />
                           </div>
-                        </SettingsSection>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'mediaRecognition',
-                    label: '媒体识别',
-                    icon: renderTabIcon(
-                      <PartitionOutlined />,
-                      SETTINGS_TAB_ICON_COLORS.mediaRecognition,
-                    ),
-                    forceRender: true,
-                    children: (
-                      <div className={styles.tabPanel}>
-                        <SettingsSection
-                          title="默认识别方式"
-                          description="作为未单独指定识别方式时的系统默认值；整理页仍可按单次任务覆盖。"
-                        >
-                          <Alert
-                            className={styles.sectionAlert}
-                            type="info"
-                            showIcon
-                            title="影子模式比较 MP2 与 medianame 完整流程"
-                            description="影子模式采用 MP2 的整理计划；medianame 使用独立分类和模板生成对比。默认模式切换仅影响后续任务，已保存预览继续使用原计划，不会重新整理已有媒体。"
-                          />
-                          <div className={styles.fieldGrid}>
-                            <ProFormSelect
-                              width="lg"
-                              name={['media_recognition', 'source']}
-                              label="识别方式"
-                              rules={[
-                                {
-                                  required: true,
-                                  message: '请选择识别方式',
-                                },
-                              ]}
-                              options={[
-                                {
-                                  label: '影子模式（MP2 优先）',
-                                  value: 'shadow',
-                                },
-                                { label: '仅 MP2', value: 'moviepilot' },
-                                { label: '旧本地（兼容）', value: 'local' },
-                                { label: 'medianame', value: 'medianame' },
-                              ]}
-                            />
-                          </div>
-                        </SettingsSection>
-                        <SettingsSection
-                          title="洗版规则"
-                          description="集中维护画质、音轨、字幕与组合条件，再由目录选择引用。"
-                        >
-                          <Button href="/upgrade-rules" target="_blank">
-                            管理洗版规则组
-                          </Button>
                         </SettingsSection>
                       </div>
                     ),

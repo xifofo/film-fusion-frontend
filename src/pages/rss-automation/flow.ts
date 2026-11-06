@@ -94,10 +94,10 @@ export const NODE_LABELS: Record<RSSAutomationNodeType, string> = {
   clear115_tasks_openapi: '115 清空云下载任务',
   wait115: '等待 115 下载完成',
   rename115_openapi: '115 API 重命名',
-  moviepilot_title_recognize: 'MP 标题识别',
-  filmfusion_recognize: 'FilmFusion 本地识别',
+  media_title_recognize: '媒体标题识别',
+  filmfusion_recognize: 'medianame 解析（兼容）',
   media_exists: '本地 / Emby 查重',
-  moviepilot_recognize: 'MP 媒体识别',
+  media_file_recognize: '媒体文件识别',
   organize_strm: '整理生成 STRM',
   strm_verify: 'STRM 校验',
   strm_regenerate: 'STRM 重生成',
@@ -124,10 +124,10 @@ export const ACTION_NODE_TYPES: RSSAutomationNodeType[] = [
   'clear115_tasks_openapi',
   'wait115',
   'rename115_openapi',
-  'moviepilot_title_recognize',
+  'media_title_recognize',
   'filmfusion_recognize',
   'media_exists',
-  'moviepilot_recognize',
+  'media_file_recognize',
   'organize_strm',
   'strm_verify',
   'strm_regenerate',
@@ -488,6 +488,24 @@ export const parseWorkflowDefinition = (
     if (parsed.schema_version !== 1 || !Array.isArray(parsed.nodes)) {
       return undefined;
     }
+    parsed.nodes = parsed.nodes.map((node) => {
+      const legacyType = node.type as string;
+      const type =
+        legacyType === 'moviepilot_title_recognize'
+          ? 'media_title_recognize'
+          : legacyType === 'moviepilot_recognize'
+            ? 'media_file_recognize'
+            : node.type;
+      const config = { ...node.config };
+      if (
+        ['moviepilot', 'shadow', 'mp', 'mp2'].includes(
+          String(config.recognition_source),
+        )
+      ) {
+        config.recognition_source = 'medianame';
+      }
+      return { ...node, type, config };
+    });
     return parsed;
   } catch {
     return undefined;
@@ -773,8 +791,8 @@ export const createNodeDefinition = (
   if (type === 'delete_qbittorrent') {
     Object.assign(config, { delete_files: false, timeout_seconds: 30 });
   }
-  if (type === 'moviepilot_recognize') config.tmdb_id = '';
-  if (type === 'moviepilot_title_recognize') {
+  if (type === 'media_file_recognize') config.tmdb_id = '';
+  if (type === 'media_title_recognize') {
     Object.assign(config, { input: '$item.title', tmdb_id: '' });
   }
   if (type === 'filmfusion_recognize') {
@@ -857,10 +875,10 @@ export const createNodeDefinition = (
       type === 'stop_qbittorrent' ||
       type === 'wait115' ||
       type === 'rename115_openapi' ||
-      type === 'moviepilot_title_recognize' ||
+      type === 'media_title_recognize' ||
       type === 'filmfusion_recognize' ||
       type === 'media_exists' ||
-      type === 'moviepilot_recognize' ||
+      type === 'media_file_recognize' ||
       type === 'emby_refresh_wait' ||
       type === 'notification'
         ? 3

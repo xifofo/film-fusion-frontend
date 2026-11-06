@@ -138,7 +138,7 @@ describe('directory automation steps', () => {
     expect(saved.workflow.definition.nodes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: 'moviepilot_recognize',
+          type: 'media_file_recognize',
           config: expect.objectContaining({ recognition_source: 'medianame' }),
         }),
         expect.objectContaining({

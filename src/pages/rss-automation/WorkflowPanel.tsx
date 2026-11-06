@@ -732,7 +732,7 @@ const WorkflowPanelInner = ({
       ) {
         return String(selectedNode.config?.url || '').trim();
       }
-      if (selectedNode.type === 'moviepilot_title_recognize') {
+      if (selectedNode.type === 'media_title_recognize') {
         return String(selectedNode.config?.input || '').trim();
       }
       if (
@@ -756,7 +756,7 @@ const WorkflowPanelInner = ({
             : selectedNode.config?.input || '',
         ).trim();
       }
-      if (selectedNode.type === 'moviepilot_recognize') {
+      if (selectedNode.type === 'media_file_recognize') {
         return String(selectedNode.config?.tmdb_id || '').trim();
       }
       return '';

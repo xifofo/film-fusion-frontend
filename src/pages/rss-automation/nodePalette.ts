@@ -76,15 +76,11 @@ export const NODE_PALETTE_COLUMNS: readonly (readonly NodePaletteGroup[])[] = [
     },
     {
       title: 'MoviePilot',
-      types: [
-        'moviepilot_title_recognize',
-        'moviepilot_transfer',
-        'moviepilot_recognize',
-      ],
+      types: ['moviepilot_transfer'],
     },
     {
       title: 'FilmFusion',
-      types: ['filmfusion_recognize', 'media_exists'],
+      types: ['media_title_recognize', 'media_file_recognize', 'media_exists'],
     },
     {
       title: 'STRM / Emby',

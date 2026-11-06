@@ -30,19 +30,17 @@ export function PipelineDiagnostics({
 }: {
   item: API.Organize115ItemResult;
 }) {
-  const other = item.shadow_comparison?.medianame;
-  const preferred = other || item;
-  const evidence = preferred.medianame;
-  const rows: Array<[string, string, string]> = [
-    ['媒体类型', preferred.media_type || '', item.media_type || ''],
-    ['TMDB ID', preferred.tmdb_id || '', item.tmdb_id || ''],
-    ['标题', preferred.title || '', item.title || ''],
-    ['年份', preferred.year || '', item.year || ''],
-    ['季集', preferred.season_episode || '', item.season_episode || ''],
-    ['分类', preferred.category || '', item.category || ''],
-    ['目标文件名', preferred.rename_to || '', item.rename_to || ''],
-    ['完整目标路径', preferred.target_path || '', item.target_path || ''],
-    ['失败原因', preferred.error || '', item.error || ''],
+  const evidence = item.medianame;
+  const rows: Array<[string, string]> = [
+    ['媒体类型', item.media_type || ''],
+    ['TMDB ID', item.tmdb_id || ''],
+    ['标题', item.title || ''],
+    ['年份', item.year || ''],
+    ['季集', item.season_episode || ''],
+    ['分类', item.category || ''],
+    ['目标文件名', item.rename_to || ''],
+    ['完整目标路径', item.target_path || ''],
+    ['失败原因', item.error || ''],
   ];
   return (
     <div className="space-y-3">
@@ -59,18 +57,11 @@ export function PipelineDiagnostics({
           <thead>
             <tr>
               <th className="p-2">字段</th>
-              <th>
-                {other || evidence || item.engine === 'medianame'
-                  ? 'medianame'
-                  : item.engine === 'local'
-                    ? '旧本地'
-                    : 'MP2'}
-              </th>
-              {other && <th>MP2 / 对照</th>}
+              <th>medianame</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(([label, a, b]) => (
+            {rows.map(([label, a]) => (
               <tr
                 key={label}
                 className="border-t border-neutral-200 dark:border-neutral-700"
@@ -79,9 +70,6 @@ export function PipelineDiagnostics({
                   {label}
                 </th>
                 <td className="break-all p-2 align-top">{a || '—'}</td>
-                {other && (
-                  <td className="break-all p-2 align-top">{b || '—'}</td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -93,8 +81,8 @@ export function PipelineDiagnostics({
           {JSON.stringify(
             {
               medianame: evidence,
-              variables: preferred.rename_context,
-              mp2: item.recognition_raw,
+              variables: item.rename_context,
+              recognition: item.recognition_raw,
             },
             null,
             2,
@@ -109,7 +97,6 @@ export default function MedianameWorkbench() {
   const [view, setView] = useState<ConfigView>();
   const [draft, setDraft] = useState<MedianameConfig>();
   const [busy, setBusy] = useState(false);
-  const [source, setSource] = useState('medianame');
   const [mode, setMode] = useState('file');
   const [input, setInput] = useState(
     '/downloads/Example (2024) [tmdb=123]/Season 0/01.mkv',
@@ -147,7 +134,7 @@ export default function MedianameWorkbench() {
           {
             input,
             mode,
-            source,
+            source: 'medianame',
             root,
             category,
             classify,
@@ -188,11 +175,11 @@ export default function MedianameWorkbench() {
       aria-label="medianame 完整流程"
     >
       <h2 className="text-lg font-semibold">
-        medianame {view?.package_version} · 独立配置与完整流程对比
+        medianame {view?.package_version} · 独立配置与完整流程预览
       </h2>
       <p>
-        MP2 使用下方原有分类和 Jinja 模板。medianame 使用这里的分类与 Go
-        text/template，保存不会切换默认引擎。
+        所有媒体识别统一使用 medianame，在这里配置分类规则与 Go text/template
+        命名模板。
       </p>
       <p>
         最终路径：媒体库根目录 / 分类目录（按开关） /
@@ -273,16 +260,6 @@ export default function MedianameWorkbench() {
       )}
       <h3 className="font-semibold">识别 → 分类 → 命名 → 完整目标路径</h3>
       <Segmented
-        value={source}
-        onChange={setSource}
-        options={[
-          { label: 'medianame', value: 'medianame' },
-          { label: '影子对比', value: 'shadow' },
-          { label: 'MP2', value: 'moviepilot' },
-          { label: '系统默认', value: '' },
-        ]}
-      />
-      <Segmented
         value={mode}
         onChange={setMode}
         options={[
@@ -322,7 +299,7 @@ export default function MedianameWorkbench() {
         预览完整流程
       </Button>
       <p className="text-sm text-neutral-500">
-        使用已保存的识别词、MP2 配置及上方 medianame 草稿。优先展示 medianame
+        使用已保存的识别词、内置引擎配置及上方 medianame 草稿。展示识别
         结果；实际整理引擎在整理页确认时选择。
       </p>
       {result && (

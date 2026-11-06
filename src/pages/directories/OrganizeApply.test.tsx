@@ -69,14 +69,14 @@ const preview = {
   plan_id: 'confirmed-plan',
   pipeline: {
     schema: 1,
-    source: 'moviepilot',
+    source: 'medianame',
     package_version: 'v0.1.1',
     config_version: 'frozen-config',
   },
   cloud_directory_id: 2,
   cloud_storage_id: 3,
   folder_id: '100',
-  recognition_source: 'moviepilot',
+  recognition_source: 'medianame',
   dry_run: true,
   total: 1,
   groups: [
@@ -110,7 +110,7 @@ const task: API.OrganizePreviewTask = {
   folder_path: '云下载 / Show S03',
   depth: 1,
   max_depth: 1,
-  recognition_source: 'moviepilot',
+  recognition_source: 'medianame',
   status: 'completed',
   total: 1,
   interval_seconds: 45,
@@ -119,7 +119,7 @@ const task: API.OrganizePreviewTask = {
 };
 
 const enginePreview = (
-  source: 'moviepilot' | 'medianame',
+  source: 'local' | 'medianame',
   error?: string,
 ): API.Organize115CookieResult => ({
   ...preview,
@@ -264,7 +264,7 @@ describe('confirm organize error reporting', () => {
 
   afterEach(cleanup);
 
-  it('selects a shadow candidate in the details table and confirms the saved medianame plan', async () => {
+  it('selects a medianame candidate in the details table and confirms the saved medianame plan', async () => {
     const evidence: API.MedianameRecognition = {
       engine: 'medianame',
       package_version: 'v0.1.3',
@@ -285,25 +285,18 @@ describe('confirm organize error reporting', () => {
     };
     const original: API.Organize115CookieResult = {
       ...preview,
-      recognition_source: 'shadow',
-      pipeline: { ...preview.pipeline, source: 'shadow' },
+      recognition_source: 'medianame',
+      pipeline: { ...preview.pipeline, source: 'medianame' },
       groups: [
         {
           ...preview.groups[0],
           items: [
             {
               ...preview.groups[0].items[0],
-              shadow_comparison: {
-                status: 'local_error',
-                matched: false,
-                differences: [],
-                medianame: {
-                  ...preview.groups[0].items[0],
-                  error: 'medianame: review',
-                  target_path: '',
-                  medianame: evidence,
-                },
-              },
+              engine: 'medianame',
+              error: 'medianame: review',
+              target_path: '',
+              medianame: evidence,
             },
           ],
         },
@@ -465,233 +458,151 @@ describe('confirm organize error reporting', () => {
     ).not.toBe(true);
   });
 
-  it('prefers medianame for display without changing the engine or plan used at confirmation', async () => {
-    const mp2Item = preview.groups[0].items[0];
-    const medianame = {
-      ...mp2Item,
-      engine: 'medianame',
-      title_year: 'medianame 标题 (2024)',
-      tmdb_id: '123',
-      target_path: '/medianame/Show/S03E21.mkv',
-    };
-    const shadow: API.Organize115CookieResult = {
-      ...preview,
-      recognition_source: 'shadow',
-      pipeline: { ...preview.pipeline, source: 'shadow' },
-      groups: [
-        {
-          ...preview.groups[0],
-          items: [
-            {
-              ...mp2Item,
-              shadow_comparison: {
-                medianame,
-                status: 'different',
-                matched: false,
-                differences: [],
-              },
-            },
-          ],
-        },
-      ],
-    };
-    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
-      code: 0,
-      message: '',
-      data: { task, result: shadow },
-    });
-    vi.mocked(organize115Cookie).mockResolvedValue({
-      code: 0,
-      message: '',
-      data: { ...shadow, dry_run: false },
-    });
-    await applyPreview(
-      false,
-      true,
-      false,
-      async () => {
-        const dialog = within(screen.getByRole('dialog'));
-        expect(
-          (dialog.getByRole('radio', { name: 'MP2' }) as HTMLInputElement)
-            .checked,
-        ).toBe(true);
-        expect(dialog.getByText(mp2Item.target_path)).toBeTruthy();
-        expect(dialog.queryByText(medianame.target_path)).toBeNull();
-        return undefined;
-      },
-      async () => {
-        expect(
-          (
-            screen.getByRole('radio', {
-              name: 'medianame 识别',
-            }) as HTMLInputElement
-          ).checked,
-        ).toBe(true);
-        expect(screen.getByText(medianame.target_path)).toBeTruthy();
-        expect(screen.getByText(medianame.title_year)).toBeTruthy();
-        expect(screen.queryByText(mp2Item.target_path)).toBeNull();
-        fireEvent.click(screen.getByRole('radio', { name: 'MP2 识别' }));
-        await screen.findByText(mp2Item.target_path);
-        expect(screen.queryByText(medianame.target_path)).toBeNull();
-        fireEvent.click(screen.getByRole('radio', { name: 'medianame 识别' }));
-        await screen.findByText(medianame.target_path);
-        expect(organize115Cookie).not.toHaveBeenCalled();
-        expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
-      },
-    );
-    expect(organize115Cookie).toHaveBeenCalledWith(
-      expect.objectContaining({
-        plan_id: 'confirmed-plan',
-        recognition_source: 'shadow',
-        dry_run: false,
-        file_ids: ['101'],
-      }),
-    );
-    expect(shadow.groups?.[0].items?.[0].target_path).toBe(mp2Item.target_path);
-  });
-
-  it.each(['medianame', 'moviepilot'] as const)(
-    'can select %s at confirmation and execute only its newly previewed plan',
+  it.each(['moviepilot', 'shadow', 'local'] as const)(
+    'requires a new built-in preview for a saved %s plan',
     async (source) => {
-      const original =
-        source === 'medianame'
-          ? {
-              ...preview,
-              recognition_source: 'shadow' as const,
-              pipeline: { ...preview.pipeline, source: 'shadow' },
-            }
-          : enginePreview('medianame');
+      const legacy: API.Organize115CookieResult = {
+        ...preview,
+        recognition_source: source,
+        pipeline: { ...preview.pipeline, source },
+      };
       vi.mocked(getOrganizePreviewTask).mockResolvedValue({
         code: 0,
         message: '',
-        data: { task, result: original },
+        data: { task, result: legacy },
       });
-      const selected = enginePreview(source);
-      vi.mocked(organize115Cookie)
-        .mockResolvedValueOnce({ code: 0, message: '', data: selected })
-        .mockResolvedValueOnce({
-          code: 0,
-          message: '',
-          data: { ...selected, dry_run: false },
-        });
+      await applyPreview(false, true, false, async () => {
+        const dialog = within(screen.getByRole('dialog'));
+        expect((await dialog.findByRole('alert')).textContent).toContain(
+          '请重新预览',
+        );
+        expect(
+          (
+            dialog.getByRole('button', {
+              name: /执行整理/,
+            }) as HTMLButtonElement
+          ).disabled,
+        ).toBe(true);
+        expect(dialog.queryByRole('radio', { name: 'MP2' })).toBeNull();
+        expect(organize115Cookie).not.toHaveBeenCalled();
+        expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+        return false;
+      });
+    },
+  );
 
+  it.each(['medianame'] as const)(
+    'confirms the saved %s plan without offering an engine switch',
+    async (source) => {
+      const selected = enginePreview(source);
+      vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+        code: 0,
+        message: '',
+        data: { task, result: selected },
+      });
+      vi.mocked(organize115Cookie).mockResolvedValue({
+        code: 0,
+        message: '',
+        data: { ...selected, dry_run: false },
+      });
       await applyPreview(false, true, false, async () => {
         const dialog = within(screen.getByRole('dialog'));
         expect(
-          (
-            dialog.getByRole('radio', {
-              name: source === 'medianame' ? 'MP2' : 'medianame',
-            }) as HTMLInputElement
-          ).checked,
-        ).toBe(true);
-        fireEvent.click(
-          dialog.getByRole('radio', {
-            name: source === 'medianame' ? 'medianame' : 'MP2',
-          }),
-        );
-        await dialog.findByText(`/影视/${source}/Selected.S03E21.mkv`);
-        expect(organize115Cookie).toHaveBeenCalledOnce();
-        expect(vi.mocked(organize115Cookie).mock.calls[0][0]).toMatchObject({
-          dry_run: true,
-          recognition_source: source,
-          folder_ids: ['100'],
-          file_ids: ['101'],
-          folder_contexts: [
-            {
-              folder_id: '100',
-              folder_name: 'Show S03',
-              folder_path: '云下载 / Show S03',
-            },
-          ],
-        });
+          dialog.queryByRole('radio', { name: /medianame|FilmFusion/ }),
+        ).toBeNull();
+        expect(screen.queryByText('识别方式')).toBeNull();
         expect(
-          vi.mocked(organize115Cookie).mock.calls[0][0].plan_id,
-        ).toBeUndefined();
-        expect(
-          vi.mocked(organize115Cookie).mock.calls[0][0].delete_source_folder,
-        ).toBeUndefined();
-        expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+          dialog.getByText(`/影视/${source}/Selected.S03E21.mkv`),
+        ).toBeTruthy();
+        expect(organize115Cookie).not.toHaveBeenCalled();
         return undefined;
       });
-      expect(vi.mocked(organize115Cookie).mock.calls[1][0]).toMatchObject({
+      expect(organize115Cookie).toHaveBeenCalledOnce();
+      expect(vi.mocked(organize115Cookie).mock.calls[0][0]).toMatchObject({
         dry_run: false,
         recognition_source: source,
         plan_id: `${source}-selected-plan`,
         file_ids: ['101'],
       });
-      await waitFor(() =>
-        expect(deleteOrganizePreviewTask).toHaveBeenCalledWith(9),
-      );
     },
   );
 
-  it('blocks execution when the selected engine needs review instead of falling back to MP2', async () => {
-    const failed = enginePreview(
-      'medianame',
-      'medianame: review，需要核对冲突',
-    );
+  it('keeps execution blocked when regenerating a legacy plan still requires review', async () => {
+    const legacy: API.Organize115CookieResult = {
+      ...preview,
+      recognition_source: 'shadow',
+      pipeline: { ...preview.pipeline, source: 'shadow' },
+    };
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { task, result: legacy },
+    });
     vi.mocked(organize115Cookie).mockResolvedValue({
       code: 0,
       message: '',
-      data: failed,
+      data: enginePreview('medianame', 'medianame: review，需要核对冲突'),
     });
     await applyPreview(false, true, false, async () => {
       const dialog = within(screen.getByRole('dialog'));
-      fireEvent.click(dialog.getByRole('radio', { name: 'medianame' }));
-      expect((await dialog.findByRole('alert')).textContent).toContain(
-        'review',
+      fireEvent.click(dialog.getByRole('button', { name: '重新生成预览' }));
+      await waitFor(() =>
+        expect(dialog.getByRole('alert').textContent).toContain('review'),
       );
-      const execute = dialog.getByRole('button', {
-        name: /执行整理/,
-      }) as HTMLButtonElement;
-      expect(execute.disabled).toBe(true);
-      fireEvent.click(execute);
+      expect(
+        (dialog.getByRole('button', { name: /执行整理/ }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true);
       expect(organize115Cookie).toHaveBeenCalledOnce();
+      expect(vi.mocked(organize115Cookie).mock.calls[0][0]).toMatchObject({
+        dry_run: true,
+        recognition_source: 'medianame',
+        file_ids: ['101'],
+      });
+      expect(
+        vi.mocked(organize115Cookie).mock.calls[0][0].plan_id,
+      ).toBeUndefined();
+      expect(
+        vi.mocked(organize115Cookie).mock.calls[0][0].candidate_plan_id,
+      ).toBeUndefined();
       expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
       return false;
     });
   });
 
-  it('ignores a late preview response after switching back to the original engine', async () => {
-    let finishPreview!: (
-      value: API.Response<API.Organize115CookieResult>,
-    ) => void;
-    vi.mocked(organize115Cookie)
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishPreview = resolve;
-          }),
-      )
-      .mockResolvedValueOnce({
-        code: 0,
-        message: '',
-        data: { ...preview, dry_run: false },
-      });
+  it('ignores a late regenerated plan after closing confirmation', async () => {
+    const legacy: API.Organize115CookieResult = {
+      ...preview,
+      recognition_source: 'moviepilot',
+      pipeline: { ...preview.pipeline, source: 'moviepilot' },
+    };
+    vi.mocked(getOrganizePreviewTask).mockResolvedValue({
+      code: 0,
+      message: '',
+      data: { task, result: legacy },
+    });
+    let finish!: (value: API.Response<API.Organize115CookieResult>) => void;
+    vi.mocked(organize115Cookie).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     await applyPreview(false, true, false, async () => {
       const dialog = within(screen.getByRole('dialog'));
-      fireEvent.click(dialog.getByRole('radio', { name: 'medianame' }));
+      fireEvent.click(dialog.getByRole('button', { name: '重新生成预览' }));
       expect(
         (dialog.getByRole('button', { name: /执行整理/ }) as HTMLButtonElement)
           .disabled,
       ).toBe(true);
-      fireEvent.click(dialog.getByRole('radio', { name: 'MP2' }));
-      finishPreview({ code: 0, message: '', data: enginePreview('medianame') });
-      await waitFor(() =>
-        expect(
-          (dialog.getByRole('radio', { name: 'MP2' }) as HTMLInputElement)
-            .checked,
-        ).toBe(true),
-      );
-      expect(
-        dialog.queryByText('/影视/medianame/Selected.S03E21.mkv'),
-      ).toBeNull();
-      return undefined;
-    });
-    expect(vi.mocked(organize115Cookie).mock.calls[1][0]).toMatchObject({
-      plan_id: 'confirmed-plan',
-      recognition_source: 'moviepilot',
-      dry_run: false,
+      fireEvent.click(dialog.getByRole('button', { name: /取\s*消/ }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      finish({ code: 0, message: '', data: enginePreview('medianame') });
+      await Promise.resolve();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(organize115Cookie).toHaveBeenCalledOnce();
+      expect(deleteOrganizePreviewTask).not.toHaveBeenCalled();
+      return false;
     });
   });
 
@@ -723,7 +634,7 @@ describe('confirm organize error reporting', () => {
     expect(organize115Cookie).toHaveBeenCalledWith(
       expect.objectContaining({
         plan_id: 'confirmed-plan',
-        recognition_source: 'moviepilot',
+        recognition_source: 'medianame',
       }),
     );
     await screen.findByText('有 1 个目录整理失败');

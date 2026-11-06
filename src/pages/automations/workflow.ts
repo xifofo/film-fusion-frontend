@@ -44,7 +44,7 @@ const asNumber = (value: unknown) => {
 export const defaultAutomationActions = (): AutomationActionValues => ({
   delay_value: 0,
   delay_unit: 'minutes',
-  recognition: 'shadow',
+  recognition: 'medianame',
   organize_enabled: false,
   organize_dry_run: false,
   media_type: 'auto',
@@ -81,31 +81,18 @@ export const buildAutomationDefinition = (
     });
   }
 
-  if (values.recognition === 'local') {
-    nodes.push({
-      id: 'recognize',
-      type: 'filmfusion_recognize',
-      name: 'FilmFusion 媒体识别',
-      position: { x: 40 + nodes.length * 260, y: 120 },
-      config: { recognition_mode: 'file', lookup_tmdb: true },
-      max_attempts: 3,
-    });
-  } else if (
+  if (
+    values.recognition === 'local' ||
     values.recognition === 'medianame' ||
     values.recognition === 'moviepilot' ||
     values.recognition === 'shadow'
   ) {
     nodes.push({
       id: 'recognize',
-      type: 'moviepilot_recognize',
-      name:
-        values.recognition === 'shadow'
-          ? '影子识别（MP2 优先）'
-          : values.recognition === 'medianame'
-            ? 'medianame 识别'
-            : '仅 MP2 识别',
+      type: 'media_file_recognize',
+      name: '媒体文件识别',
       position: { x: 40 + nodes.length * 260, y: 120 },
-      config: { recognition_source: values.recognition },
+      config: { recognition_source: 'medianame' },
       max_attempts: 3,
     });
   }
@@ -119,8 +106,7 @@ export const buildAutomationDefinition = (
       config: {
         cloud_directory_id: values.cloud_directory_id,
         dry_run: values.organize_dry_run,
-        recognition_source:
-          values.recognition === 'none' ? '' : values.recognition,
+        recognition_source: values.recognition === 'none' ? '' : 'medianame',
         media_type: values.media_type || 'auto',
         category: values.category?.trim() || '',
       },
@@ -179,8 +165,10 @@ export const readAutomationActions = (
     const local = definition.nodes.find(
       (node) => node.type === 'filmfusion_recognize',
     );
-    const moviePilot = definition.nodes.find(
-      (node) => node.type === 'moviepilot_recognize',
+    const fileRecognitionNode = definition.nodes.find(
+      (node) =>
+        node.type === 'media_file_recognize' ||
+        node.type === 'moviepilot_recognize',
     );
     const organize = definition.nodes.find(
       (node) => node.type === 'organize_strm',
@@ -192,20 +180,14 @@ export const readAutomationActions = (
     const delayConfig = asRecord(delayNode?.config);
     const delay = automationDelayParts(delayConfig.delay_seconds);
     const notificationConfig = asRecord(notification?.config);
-    const moviePilotConfig = asRecord(moviePilot?.config);
-    const moviePilotRecognition =
-      moviePilotConfig.recognition_source === 'medianame'
-        ? 'medianame'
-        : moviePilotConfig.recognition_source === 'shadow'
-          ? 'shadow'
-          : 'moviepilot';
+    const fileRecognition = 'medianame';
     return {
       delay_value: delay.value,
       delay_unit: delay.unit,
       recognition: local
-        ? 'local'
-        : moviePilot
-          ? moviePilotRecognition
+        ? 'medianame'
+        : fileRecognitionNode
+          ? fileRecognition
           : 'none',
       organize_enabled: Boolean(organize),
       organize_dry_run: organizeConfig.dry_run === true,

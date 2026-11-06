@@ -8,10 +8,11 @@ export async function getCloudDirectoryList(
   const { current, pageSize, page, page_size, ...rest } = params || {};
 
   return apiClient.get<API.Response<API.PageResult<API.CloudDirectory>>>(
-    '/api/directories',
+    '/api/media-directories',
     {
       params: {
         ...rest,
+        capability: 'organize',
         page: page ?? current,
         page_size: page_size ?? pageSize,
       },
@@ -26,19 +27,7 @@ export async function getCloudDirectoryDetail(
   options?: { [key: string]: any },
 ) {
   return apiClient.get<API.Response<API.CloudDirectory>>(
-    `/api/directories/${id}`,
-    { ...(options || {}) },
-  );
-}
-
-/** 创建目录配置 */
-export async function createCloudDirectory(
-  data: API.CreateCloudDirectoryParams,
-  options?: { [key: string]: any },
-) {
-  return apiClient.post<API.Response<API.CloudDirectory>>(
-    '/api/directories',
-    data,
+    `/api/media-directories/${id}`,
     { ...(options || {}) },
   );
 }
@@ -49,18 +38,8 @@ export async function updateCloudDirectory(
   options?: { [key: string]: any },
 ) {
   return apiClient.put<API.Response<API.CloudDirectory>>(
-    `/api/directories/${data.id}`,
-    data,
+    `/api/media-directories/${data.id}`,
+    Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'id')),
     { ...(options || {}) },
   );
-}
-
-/** 删除目录配置 */
-export async function deleteCloudDirectory(
-  id: number,
-  options?: { [key: string]: any },
-) {
-  return apiClient.delete<API.Response<null>>(`/api/directories/${id}`, {
-    ...(options || {}),
-  });
 }

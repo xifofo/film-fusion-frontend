@@ -55,10 +55,13 @@ export const automationStatus = (
 export const automationNodeLabel = (node: AutomationNodeDefinition) => {
   if (node.type === 'organize_strm' && node.config?.dry_run === true)
     return '整理预览';
-  if (node.type === 'moviepilot_recognize') {
+  if (node.type === 'media_file_recognize') {
     if (node.config?.recognition_source === 'medianame')
       return 'medianame 识别';
-    if (node.config?.recognition_source === 'shadow') return '影子识别';
+    if (
+      ['moviepilot', 'shadow'].includes(String(node.config?.recognition_source))
+    )
+      return 'medianame 识别';
   }
   return node.name || NODE_LABELS[node.type] || node.type;
 };
